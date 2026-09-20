@@ -1,15 +1,14 @@
-# OpenAthan ESPHome development entry point.
+# OpenAthan official reference-firmware entry point.
 #
-# This file is intentionally only a scaffold until the reference hardware
-# has been validated. Do not publish it as an end-user firmware release.
+# This file composes the hardware-independent OpenAthan package with the
+# C126 + A167 reference-hardware package. It remains a non-buildable scaffold
+# until those packages and the reference hardware have been implemented and
+# validated. Do not publish it as an end-user firmware release yet.
 #
-# Planned responsibilities:
-# - AtomS3R/ESP32-S3 platform configuration
-# - PSRAM
-# - Wi-Fi provisioning
-# - OTA
-# - time synchronization
-# - OpenAthan prayer/scheduler component
-# - Voice Pyramid hardware adapter
-# - audio pipeline
-# - local API used by the OpenAthan device UI
+# Official-only provisioning, networking, OTA, time synchronization, local UI,
+# and release settings will also be configured at this layer. They do not
+# belong in the reusable packages/openathan.yaml package.
+
+packages:
+  openathan: !include packages/openathan.yaml
+  reference_hardware: !include packages/hardware/voice-pyramid.yaml

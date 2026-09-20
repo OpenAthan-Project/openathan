@@ -1,0 +1,22 @@
+# Reusable, hardware-independent OpenAthan ESPHome package.
+#
+# This package is intentionally an empty scaffold. Future implementation will
+# load components/openathan and bind it to capabilities supplied by the
+# consuming ESPHome configuration.
+#
+# Required capability:
+# - audio playback, provided by a media player or speaker-backed adapter
+#
+# Optional capabilities:
+# - status light(s)
+# - display
+# - physical, touch, or other controls
+# - microphone
+# - RTC
+# - removable storage
+# - Home Assistant or another external integration
+#
+# Do not add a board, GPIO mapping, Wi-Fi credentials/configuration, native API
+# requirement, or Voice Pyramid dependency here.
+
+{}

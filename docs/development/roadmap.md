@@ -18,9 +18,8 @@ This roadmap is intentionally high-level and will evolve as the reference hardwa
 - Calculation method and Asr method selection.
 - Per-prayer offsets.
 - Normal and Fajr Athan playback.
-- LED prayer-status indication.
-- Touch controls for playback/volume/dismiss.
 - Persisted settings.
+- Reference-build adapters for optional LED status and touch playback/volume/dismiss controls.
 
 ## Phase 2 — Installation and local UI
 

@@ -1,0 +1,47 @@
+# Documentation example for integrating OpenAthan with an existing ESPHome
+# configuration. This is not buildable yet: the OpenAthan component and its
+# capability-binding schema have not been implemented, and v1.0.0 is only an
+# illustrative future release tag.
+
+packages:
+  openathan:
+    url: https://github.com/OpenAthan-Project/openathan
+    ref: v1.0.0
+    files:
+      - firmware/esphome/packages/openathan.yaml
+
+# Keep your existing ESPHome configuration here, including the board, network,
+# credentials, and the components that expose your hardware. OpenAthan's
+# generic package must not replace or require them.
+#
+# esphome:
+#   name: my-openathan-device
+#
+# wifi:
+#   # Your existing network configuration.
+#
+# media_player:
+#   # Your existing media player, or an adapter around an ESPHome speaker.
+#
+# light:
+#   # Optional status light(s).
+#
+# binary_sensor:
+#   # Optional buttons or touch controls.
+#
+# display:
+#   # Optional display.
+
+# Planned capability mapping (pseudocode, not ESPHome component schema):
+#
+# openathan_capabilities:
+#   audio_playback: id(my_media_player)       # Required for Athan playback.
+#   status_light: id(my_status_light)         # Optional.
+#   play_pause_control: id(my_button)         # Optional.
+#   display: id(my_display)                   # Optional.
+#   microphone: id(my_microphone)             # Optional.
+#   rtc: id(my_rtc)                           # Optional.
+#   removable_storage: id(my_storage)         # Optional.
+#
+# Home Assistant is not a capability requirement. Users may add `api:` or
+# another integration independently if they want it.

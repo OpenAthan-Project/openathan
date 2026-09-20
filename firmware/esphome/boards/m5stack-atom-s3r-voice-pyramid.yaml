@@ -1,5 +1,11 @@
-# Hardware-specific ESPHome configuration scaffold for:
-#   M5Stack AtomS3R C126 + Voice Pyramid A167
+# Verified low-level ESPHome configuration for the official reference build:
+#   M5Stack AtomS3R C126 used with Voice Pyramid A167
 #
-# GPIO, codec, LED, touch, and power assumptions must be verified against
-# official documentation and physical hardware before implementation.
+# This file is intentionally empty until the board and interconnect have been
+# validated. Only confirmed platform, variant, PSRAM, bus, pin, and similar
+# low-level facts belong here. Product behavior and prayer policy do not.
+#
+# GPIO, codec, LED, touch, display, and power assumptions must be verified
+# against official documentation and physical hardware before implementation.
+
+{}

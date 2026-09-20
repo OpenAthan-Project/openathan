@@ -1,0 +1,11 @@
+# Convenience package for the official C126 + A167 reference hardware.
+#
+# This package will compose verified low-level board configuration with the
+# A167-specific voice_pyramid component and map the resulting entities onto the
+# capabilities consumed by packages/openathan.yaml.
+#
+# It intentionally contains no unverified GPIOs, buses, codec setup, entity
+# IDs, or capability bindings yet.
+
+packages:
+  reference_board: !include ../../boards/m5stack-atom-s3r-voice-pyramid.yaml
