@@ -1,0 +1,31 @@
+# ESPHome / PlatformIO
+.esphome/
+.pio/
+.platformio/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+*.bin
+*.elf
+*.map
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Secrets
+secrets.yaml
+*.local.yaml
+.env
+.env.*
+!.env.example

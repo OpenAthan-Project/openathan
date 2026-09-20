@@ -1,0 +1,15 @@
+# OpenAthan ESPHome development entry point.
+#
+# This file is intentionally only a scaffold until the reference hardware
+# has been validated. Do not publish it as an end-user firmware release.
+#
+# Planned responsibilities:
+# - AtomS3R/ESP32-S3 platform configuration
+# - PSRAM
+# - Wi-Fi provisioning
+# - OTA
+# - time synchronization
+# - OpenAthan prayer/scheduler component
+# - Voice Pyramid hardware adapter
+# - audio pipeline
+# - local API used by the OpenAthan device UI

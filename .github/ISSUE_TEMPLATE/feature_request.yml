@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose an OpenAthan feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What problem would this solve for OpenAthan users?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware impact
+      options:
+        - No new hardware
+        - Optional hardware only
+        - Would change the required BOM
+    validations:
+      required: true
+  - type: textarea
+    id: complexity
+    attributes:
+      label: Setup/cost impact
+      description: Explain any effect on price, assembly, setup, or standalone operation.

@@ -1,0 +1,5 @@
+# Hardware-specific ESPHome configuration scaffold for:
+#   M5Stack AtomS3R C126 + Voice Pyramid A167
+#
+# GPIO, codec, LED, touch, and power assumptions must be verified against
+# official documentation and physical hardware before implementation.
