@@ -100,4 +100,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing substantial changes.
 - Future original hardware design sources: [CERN-OHL-P-2.0](hardware/LICENSE.md), unless stated otherwise.
 - Third-party dependencies, hardware, and media remain under their respective terms.
 
-OpenAthan is an independent community project and is not affiliated with M5Stack, ESPHome, Home Assistant, Bilal Speaker, Quran Foundation, or other third parties named in its documentation.
+OpenAthan is an independent community project and is not affiliated with the third-party hardware, software, or content providers referenced in its documentation.
