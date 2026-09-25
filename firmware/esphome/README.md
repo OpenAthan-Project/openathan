@@ -2,12 +2,12 @@
 
 ESPHome is the preferred initial embedded framework for OpenAthan.
 
-> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, saved runtime settings, durable consumption/skip state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official product entry point remains unfinished. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
+> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, saved runtime settings, durable consumption/skip state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official entry point now builds a provisioning/local-UI development candidate, with physical acceptance pending. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
 
-Runtime configuration currently uses the optional encrypted
-[settings console](scheduler/SETTINGS.md). Phone-based setup and local settings
-are the next product milestone. Their provisioning and access controls must
-preserve the settings service and consumed-prayer history.
+Runtime configuration uses the optional encrypted [settings console](scheduler/SETTINGS.md)
+or the reference candidate’s [device-hosted settings interface](provisioning/README.md).
+The latter adds USB Wi-Fi/password setup and recovery, local access protection,
+and explicit activation while retaining the settings service and prayer history.
 
 ## Two supported paths
 

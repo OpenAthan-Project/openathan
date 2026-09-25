@@ -98,20 +98,23 @@ volume readback gates new playback while dropped commands are retried. Stored
 timezone rules affect OpenAthan's civil-date conversion without changing UTC or
 other components' timezones. See the [settings contract](../../firmware/esphome/scheduler/SETTINGS.md).
 
-The optional encrypted developer actions are a current transport for this
-service. A future phone interface must use the same validation, revision,
-application-status and persistence behavior. Prayer-settings edits must go
+The optional encrypted developer actions and reference local HTTP API are
+transports for this service, sharing validation, revision, application-status
+and persistence behavior. Prayer-settings edits must go
 through this service, preserving consumption and reading back an uncertain save
 before any retry.
 
 ### Device UI
 
-A purpose-built OpenAthan web UI served locally by the device is the intended
-interface, targeted at `openathan.local`. It is not implemented yet. Initial
-Wi-Fi provisioning/recovery, local access protection and first-run confirmation
-belong to the reference product layer. Developer firmware currently restores
-saved/default settings and arms once time and audio are ready; a completed
-ordinary-user setup flow must not be inferred from that behavior.
+The reference candidate embeds a responsive UI at a unique
+`openathan-<suffix>.local` hostname, with an IPv4 fallback. The product layer
+provides USB Wi-Fi/password provisioning, protected local access, and an explicit
+setup gate. New devices persist an incomplete marker before settings seeding;
+until activation they neither announce nor consume prayers. Recognized existing
+settings migrate as configured. Generic/developer builds retain their existing
+initialization behavior. HTTP work reaches settings and scheduling only on the
+ESPHome main loop. See the [provisioning contract](../../firmware/esphome/provisioning/README.md)
+for serial ownership, authentication, persistence, and hardware acceptance limits.
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 
@@ -119,7 +122,7 @@ The generic ESPHome web UI may be useful during development but is not the inten
 
 Core Athan scheduling must not require Home Assistant or a cloud service. Internet may be used for initial/periodic time sync, Quran streaming, firmware downloads, or optional services.
 
-The generic ESPHome package does not configure Wi-Fi. The official image will provide an ordinary-user provisioning flow, while ESPHome integrators keep their existing network configuration.
+The generic ESPHome package does not configure Wi-Fi. The reference candidate provides USB provisioning, while ESPHome integrators keep their existing network configuration.
 
 ## Public website boundary
 

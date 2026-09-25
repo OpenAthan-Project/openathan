@@ -32,3 +32,6 @@ secrets.yaml
 .env
 .env.*
 !.env.example
+
+# Device UI browser-test dependencies
+node_modules/

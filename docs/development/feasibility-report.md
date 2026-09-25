@@ -276,3 +276,48 @@ regressions cover repeated export/import without writes, a volume-only save at
 a prayer's due time, boundary coordinates and uncertain-response reconciliation.
 This transport fix has not been repeated on the physical device; the hardware
 results and build measurements above describe the earlier tested firmware.
+
+## USB provisioning and local settings — 2026-09-25
+
+The local implementation builds on saved-settings commit `b371b65`. Before
+implementation, the copied worktree files and documentation handoff were compared
+against the source checkout and reconciled to that exact commit. The source
+checkout was retained unchanged. The reference `openathan.yaml` now builds USB
+Wi-Fi/password provisioning, a bundled local settings UI/API, Digest access
+protection, and a separate first-run activation record.
+
+| Build | Application `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| --- | ---: | ---: | ---: |
+| Provisioning and local UI reference candidate | 1,126,832 | 113,991 | 970,320 |
+| Existing real-schedule developer configuration | 1,118,208 | 113,651 | 978,944 |
+
+Both images passed pinned-dependency checks, the 1.5 MiB application target,
+partition boundaries, and factory/application payload consistency. The compatible
+shared-audio format was checked using generated CI audio; no release recordings
+were selected or qualified. These static RAM figures do not measure live heap
+headroom during simultaneous HTTP, Wi-Fi and audio operation.
+
+Local validation passed:
+
+- Five C++ suites under UBSan, including protocol framing, Digest expiry/replay,
+  credential storage and interrupted activation boundaries.
+- Thirty Python tests, including the production JSON API with ArduinoJson 7.4.3,
+  scheduler/settings regressions, timezone/DST behavior and the USB console.
+- All seven ESPHome configuration checks and both builds listed above, using
+  ESPHome 2026.9.0, ESP-IDF 5.5.5 and tzdata 2026.4.
+- Four browser tests across Chromium and WebKit, using a simulated device for
+  native Digest login, first-run setup, stale edits, lost responses, failed
+  readback, invalid time, occurrence-bound actions and mobile layout.
+- A comparison confirming that the roadmap retains its original phase order
+  and task wording; only implementation status and explanatory notes changed.
+
+The actual local API and authentication implementation are host-tested separately
+from the browser fixture. Wi-Fi join/failure/retry and serial reconnection are
+state-machine/protocol tests, not evidence of radio or USB acceptance. This
+candidate has **not been flashed**. Physical power cuts, USB/password recovery,
+actual phone browsers, compatible migration and concurrent audio/network behavior
+remain separately coordinated acceptance work. The public website, installer,
+publication and release-media qualification are outside this implementation.
+
+See the [installer and developer handoff](../../firmware/esphome/provisioning/README.md)
+for commands, HTTP/USB contracts, fresh-install artifacts and the remaining checks.

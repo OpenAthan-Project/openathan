@@ -36,7 +36,8 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
 }
 ''')
                 extra = ["-DOPENATHAN_JSON_TEST", "-I" + directory, "-I" + include,
-                    str(ROOT / "firmware/esphome/components/openathan/settings_json.cpp")]
+                    str(ROOT / "firmware/esphome/components/openathan/settings_json.cpp"),
+                    str(ROOT / "firmware/esphome/components/openathan_device/local_api.cpp")]
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined",
                 "-fno-sanitize-recover=all", "-DUSE_TIME_TIMEZONE", *extra,
                 "-I" + str(ROOT / "tests/stubs"), "-I" + str(ROOT / "lib/openathan-core/include"),
@@ -45,6 +46,7 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
                 str(ROOT / "firmware/esphome/components/openathan/openathan.cpp"),
                 str(ROOT / "firmware/esphome/components/openathan/nvs_state_store.cpp"),
                 str(ROOT / "firmware/esphome/components/openathan/nvs_settings_store.cpp"),
+                str(ROOT / "firmware/esphome/components/openathan/setup_store.cpp"),
                 str(package / "components/time/posix_tz.cpp"), str(core), "-o", str(output)], check=True)
             result = subprocess.run([str(output)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

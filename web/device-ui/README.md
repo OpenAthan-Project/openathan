@@ -1,37 +1,22 @@
-# OpenAthan Device UI
+# OpenAthan device UI
 
-Target local URL: `http://openathan.local`
+The reference firmware embeds this responsive interface and serves it locally
+at its unique `http://openathan-<suffix>.local/` address, with an IPv4 fallback.
+It includes first-run manual location/timezone/calculation setup, prayer and
+volume settings, schedule previews, status, stop, skip and cancel-skip controls.
+Assets work without the public website or a CDN. Device access uses the password
+chosen over USB and browser-native Digest login with username `admin`.
 
-This is intended to become the phone-friendly local configuration and playback UI served by the speaker itself.
+The firmware's existing settings service owns validation, persistence and
+revision checks. First-run activation is explicit, and incomplete setup does not
+consume prayer history. The interface preserves unsaved edits during status
+refreshes and reads back uncertain saves without repeating them.
 
-**Status (2026-09-25): planning, not an implemented interface.** The initial
-milestone is phone-friendly setup and ongoing prayer settings. Wi-Fi setup and
-recovery are intended to use the installation USB connection, followed by a
-handoff to this local interface. Manual location entry is acceptable initially.
-Local access will use a device password chosen during USB setup, with password
-recovery through USB. The protocol and first-run confirmation are still being
-designed; these choices do not describe shipped behavior.
+See [provisioning and the local API](../../firmware/esphome/provisioning/README.md)
+for build instructions, the USB console, recovery, API contracts, tests and
+remaining hardware acceptance. `index.html`, `app.js`, and `style.css` are
+compressed into firmware during code generation; no public website build is
+involved. The npm dependency is for browser testing only.
 
-The [saved settings service](../../firmware/esphome/scheduler/SETTINGS.md) already
-supports location/timezone, calculation/Asr/high-latitude methods, offsets,
-enabled prayers and volume. It is currently exposed by optional encrypted
-developer actions, not a browser HTTP API. A phone transport must retain full
-snapshot revision checks, durable acknowledgments, application/fault reporting
-and readback after an uncertain save. Wi-Fi changes, setup and recovery must
-preserve prayer settings and consumed-prayer history.
-
-The wider areas below remain later scope unless included in an approved plan;
-they are not all requirements of the initial setup milestone.
-
-Planned areas include:
-
-- location and timezone;
-- calculation method;
-- Asr method;
-- prayer offsets;
-- per-prayer Athan controls;
-- volume and LED settings;
-- Quran/adhkar playback;
-- update/status information.
-
-The generic ESPHome web interface is not intended to be the permanent OpenAthan user experience.
+Quran/adhkar, LED settings, product OTA, and the public browser installer remain
+separate work.

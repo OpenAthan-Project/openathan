@@ -5,6 +5,7 @@
 #include "openathan/scheduler.h"
 #include "nvs_state_store.h"
 #include "nvs_settings_store.h"
+#include "setup_store.h"
 #include "esphome/components/time/posix_tz.h"
 #include "esphome/components/json/json_util.h"
 #include <memory>
@@ -20,6 +21,15 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void set_state_store(::openathan::StateStore *store) { state_store_ = store; }
   void set_settings_store(::openathan::SettingsStore *store) { settings_store_ = store; }
   void set_default_timezone(const std::string &name) { timezone_name_ = name; }
+  void require_setup() { setup_gate_ = std::make_unique<SetupStore>(); }
+  const char *setup_state() const;
+  bool activated() const { return !setup_gate_ || setup_gate_->active(); }
+  bool finish_setup(uint32_t revision);
+  bool preview(const ::openathan::DeviceSettings &settings, ::openathan::PrayerDay &day,
+               std::vector<::openathan::Event> &events, std::vector<::openathan::ScheduleConflict> &conflicts);
+  bool skip_occurrence(const ::openathan::Event &expected);
+  bool cancel_occurrence(::openathan::EventKey expected);
+  bool parse_settings_json(JsonObjectConst root, ::openathan::DeviceSettings &settings, uint32_t &revision) const;
   void reload_schedule();
   void set_latitude(double value) { settings_.latitude = value; }
   void set_longitude(double value) { settings_.longitude = value; }
@@ -38,6 +48,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   bool skip_next();
   bool cancel_skip();
   bool local_date(int64_t utc, const ::openathan::Timezone &timezone, ::openathan::CivilDate &date) const;
+  std::string format_local(int64_t utc, const ::openathan::Timezone &timezone) const;
   bool local_date(int64_t utc, ::openathan::CivilDate &date) const;
   const ::openathan::SettingsService *settings_service() const { return settings_service_.get(); }
   ::openathan::SettingsResult change_settings(const ::openathan::DeviceSettings &candidate, uint32_t revision);
@@ -57,6 +68,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   NvsSettingsStore settings_nvs_;
   ::openathan::SettingsStore *settings_store_{&settings_nvs_};
   std::unique_ptr<::openathan::SettingsService> settings_service_;
+  std::unique_ptr<SetupStore> setup_gate_;
   std::string timezone_name_;
   bool volume_applied_{false}, request_ok_{false};
   unsigned volume_attempts_{};

@@ -97,10 +97,12 @@ class Scheduler {
   bool begin(const Settings &settings);
   bool configure(const Settings &settings);
   bool validate_schedule(const Settings &settings, CivilDate date) const;
+  bool preview(const Settings &settings, CivilDate date, PrayerDay &day,
+               std::vector<Event> &events, std::vector<ScheduleConflict> &conflicts) const;
   void block_storage();
   void allow_playback(bool allowed) { playback_allowed_ = allowed; }
   void tick();
-  bool skip_next();
+  bool skip_next(const std::optional<Event> &expected = {});
   bool cancel_skip();
   void stop() { playback_.stop(); }
   SchedulerStatus status() const;
