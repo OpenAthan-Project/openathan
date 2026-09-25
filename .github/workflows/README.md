@@ -3,9 +3,10 @@
 `firmware.yml` runs on pull requests and pushes to `main`, with read-only
 repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation
-for the six developer configurations and the provisioning reference configuration.
+for the six developer configurations, the provisioning reference configuration,
+and the isolated provisioning-validation configuration.
 Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
-`openathan.yaml`, then enforce dependency pins, partition layout,
+`openathan.yaml` and `provisioning/validation.yaml`, then enforce dependency pins, partition layout,
 the 1.5 MiB application budget and factory/OTA payload consistency. The device
 build also tests the production settings JSON bridge with the exact resolved
 ArduinoJson library. The host suite exercises interrupted settings writes and
@@ -14,6 +15,11 @@ cover the production local API, USB protocol, activation/credential storage, Dig
 authentication and Wi-Fi transactions. A separate browser job runs the embedded
 UI against a simulated device in Chromium and WebKit, including native Digest
 login, revision conflicts, dropped responses and narrow-screen layout.
+
+Production and isolated host builds exercise the same storage implementations.
+Tests prove cleanup rejects production namespaces, preserves unrelated records,
+and remains safe across interrupted writes/commits. Both settings/API builds
+verify `test_mode`; browser tests verify the isolated build's warning banner.
 
 CI uses Python 3.13 on Ubuntu 24.04 and the pinned ESPHome requirements. The
 macOS-specific constraints file must not be installed on Linux. Builds use

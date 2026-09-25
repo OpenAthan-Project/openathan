@@ -10,6 +10,7 @@
 #include "esphome/components/wifi/scan_list.h"
 #include "esphome/core/application.h"
 #include "esphome/core/helpers.h"
+#include "test_maintenance.h"
 
 namespace esphome::openathan_device {
 namespace {
@@ -144,6 +145,33 @@ void Device::serial_request(const Frame& request) {
   std::vector<std::string> fields;
   if (!parse_rpc(request.data, command, fields)) {
     send_(request.extension, 2, {1});
+    return;
+  }
+#ifdef OPENATHAN_PROVISIONING_TEST_STORAGE
+  if (request.extension && command == 0x70 && fields.empty()) {
+    result_(true, command, {"test-v1", hostname_, maintenance_ ? "restart_required" : "ready"});
+    return;
+  }
+  if (request.extension && command == 0x71) {
+    if (maintenance_) {
+      send_(true, 2, {255});
+      return;
+    }
+    const auto result = clear_test_storage(fields, hostname_, [this]() {
+      maintenance_ = true;
+      athan_->quiesce_for_maintenance();
+      wifi_attempt_.finish();
+      scanning_ = false;
+    });
+    if (result == ClearResult::CLEARED)
+      result_(true, command, {"cleared", "restart_required"});
+    else
+      send_(true, 2, {uint8_t(result == ClearResult::INVALID ? 1 : 255)});
+    return;
+  }
+#endif
+  if (maintenance_) {
+    send_(request.extension, 2, {255});
     return;
   }
   send_(request.extension, 2, {0});
@@ -344,6 +372,10 @@ bool Device::valid_host_(const std::string& host) const {
   return host == hostname_ || host == hostname_ + ":80" || host == ip_() || host == ip_() + ":80";
 }
 void Device::handle_http_(HttpExchange& request) {
+  if (maintenance_) {
+    error(request, 503, "Test maintenance requires a physical restart");
+    return;
+  }
   if (!valid_host_(request.host)) {
     error(request, 403, "Use the device's local address");
     return;

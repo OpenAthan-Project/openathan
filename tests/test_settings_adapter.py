@@ -13,6 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(importlib.util.find_spec("esphome"), "Run with the pinned ESPHome environment")
 class SettingsAdapterTests(unittest.TestCase):
     def test_production_bridge(self):
+        self.compile_bridge(False)
+
+    def test_isolated_bridge(self):
+        self.compile_bridge(True)
+
+    def compile_bridge(self, isolated):
         import esphome
         package = Path(esphome.__file__).resolve().parent
         core = Path(os.environ.get("OPENATHAN_CORE_LIB", ROOT / "build/libopenathan_core.a"))
@@ -38,6 +44,8 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
                 extra = ["-DOPENATHAN_JSON_TEST", "-I" + directory, "-I" + include,
                     str(ROOT / "firmware/esphome/components/openathan/settings_json.cpp"),
                     str(ROOT / "firmware/esphome/components/openathan_device/local_api.cpp")]
+            if isolated:
+                extra.append("-DOPENATHAN_PROVISIONING_TEST_STORAGE")
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined",
                 "-fno-sanitize-recover=all", "-DUSE_TIME_TIMEZONE", *extra,
                 "-I" + str(ROOT / "tests/stubs"), "-I" + str(ROOT / "lib/openathan-core/include"),

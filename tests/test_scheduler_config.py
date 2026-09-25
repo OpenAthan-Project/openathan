@@ -112,3 +112,9 @@ media_player:
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("enable_on_boot: false", result.stdout)
         self.assertIn("name_add_mac_suffix: true", result.stdout)
+
+    def test_isolated_provisioning_configuration(self):
+        config = f"packages:\n  reference: !include {ROOT}/firmware/esphome/provisioning/validation.yaml\n"
+        self.validate(config, True, "name: openathan-test")
+        self.validate(config + "esphome:\n  name: openathan\n", False, "requires openathan-test")
+        self.validate(config + "esphome:\n  name_add_mac_suffix: false\n", False, "requires openathan-test")

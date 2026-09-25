@@ -78,6 +78,7 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   std::string realm_, hostname_;
   std::function<void(const std::vector<uint8_t>&)> sender_;
   bool scanning_{};
+  bool maintenance_{};
   uint64_t scan_deadline_{}, auth_window_{};
   unsigned auth_attempts_{};
   const ZoneEntry* zones_{};

@@ -33,6 +33,7 @@ function times(id, schedule) {
   }
 }
 function render(state) {
+  $("test-banner").hidden=state.test_mode!==true;
   snapshot=state;
   $("setup-state").textContent=state.setup==="active"?"Setup complete":state.setup==="incomplete"?"Setup incomplete":"Storage fault";
   $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${state.next.local}`:"No upcoming announcement available";

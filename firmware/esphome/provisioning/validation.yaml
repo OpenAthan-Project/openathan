@@ -1,0 +1,15 @@
+# Real reference firmware with isolated storage and USB-only test maintenance.
+packages:
+  reference: !include ../openathan.yaml
+
+esphome:
+  name: openathan-test
+  name_add_mac_suffix: true
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_provisioning_validation]
+
+openathan_provisioning_validation:

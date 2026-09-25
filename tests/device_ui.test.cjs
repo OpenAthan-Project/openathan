@@ -55,6 +55,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   try{
     await page.goto(f.url);await page.locator('#fields').waitFor();
     await page.waitForFunction(()=>!document.querySelector('#fields').disabled);
+    assert.equal(await page.locator('#test-banner').isVisible(),false);
     assert.equal(await page.locator('#latitude').inputValue(),'');
     assert.equal(await page.locator('#method').inputValue(),'');
     await page.locator('#latitude').fill('44.3894');await page.locator('#longitude').fill('-79.6903');
@@ -86,16 +87,20 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   }finally{await context.close();await browser.close();await f.close();}
  });
  test(`${browserName}: activation waits for a synchronized clock`,async()=>{
-  const f=await fixture();f.state.device.clock_ready=false;
+  const f=await fixture();f.state.device.clock_ready=false;f.state.device.test_mode=true;
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async(error)=>{await f.close();throw error;});
   const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'},viewport:{width:390,height:844}});
   try{
     await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#fields').disabled);
+    assert.equal(await page.locator('#test-banner').isVisible(),true);
+    assert.match(await page.locator('#test-banner').textContent(),/Test firmware/);
     await page.locator('#latitude').fill('0');await page.locator('#longitude').fill('0');await page.locator('#timezone').fill('UTC');await page.locator('#method').selectOption('muslim_world_league');
     await page.locator('#preview').click();await page.waitForFunction(()=>document.querySelector('#preview-message').textContent.includes('Waiting for time'));
     await page.locator('#save').click();await page.waitForFunction(()=>document.querySelector('#setup-state').textContent==='Setup complete');
     assert.equal(f.state.device.automatic_ready,false);
     assert.match(await page.locator('#health').textContent(),/Waiting for time synchronization/);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+    await page.screenshot({path:join(process.env.OPENATHAN_TEST_OUTPUT_DIR || require('node:os').tmpdir(),`openathan-test-firmware-${browserName}.png`),fullPage:true});
   }finally{await browser.close();await f.close();}
  });
 }

@@ -47,6 +47,7 @@ void OpenAthan::setup() {
   update();
 }
 void OpenAthan::reload_schedule() {
+  if (maintenance_) return;
   if (scheduler_ && settings_service_ && settings_service_->healthy()) {
     scheduler_->begin(settings_service_->saved()->value.prayer);
     scheduler_->allow_playback(volume_applied_ && activated());
@@ -82,7 +83,7 @@ std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz
 }
 ::openathan::SettingsResult OpenAthan::change_settings(const ::openathan::DeviceSettings &candidate, uint32_t revision) {
   using ::openathan::SettingsResult;
-  if (!settings_service_ || !scheduler_) return SettingsResult::STORAGE;
+  if (maintenance_ || !settings_service_ || !scheduler_) return SettingsResult::STORAGE;
   const auto old = settings_service_->saved();
   const auto result = settings_service_->update(candidate, revision, [this, &old](const auto &value) {
     if (old && old->value.prayer == value.prayer && old->value.timezone == value.timezone) return true;
@@ -104,6 +105,7 @@ std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz
   return result;
 }
 void OpenAthan::apply_volume_() {
+  if (maintenance_) return;
   if (!settings_service_ || !settings_service_->healthy() || !scheduler_) return;
   const unsigned wanted = settings_service_->saved()->value.volume;
   volume_applied_ = playback_->volume_percent() == std::optional<unsigned>(wanted);
@@ -156,6 +158,7 @@ const char *OpenAthan::setup_state() const {
   return setup_gate_->active() ? "active" : "incomplete";
 }
 bool OpenAthan::finish_setup(uint32_t revision) {
+  if (maintenance_) return false;
   if (!settings_service_ || !settings_service_->healthy() || !settings_service_->saved() ||
       settings_service_->saved()->revision != revision || !scheduler_ ||
       scheduler_->status().fault == ::openathan::Fault::STORAGE) return false;
@@ -203,5 +206,9 @@ void OpenAthan::log_status_() {
       }
     }
   }
+}
+void OpenAthan::quiesce_for_maintenance() {
+  maintenance_ = true;
+  if (scheduler_) { scheduler_->stop(); scheduler_->block_storage(); }
 }
 }  // namespace esphome::openathan_component
