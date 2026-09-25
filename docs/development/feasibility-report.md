@@ -162,6 +162,28 @@ verified after reboot. These hashes identify the private device-validation
 images, not later CI builds made with public compile-only settings.
 
 Device-specific images, credentials, recovery backup, settings and raw evidence
-remain in a private dated archive outside the repository. Actual prayer-time
-observation and deliberate automatic-rollback fault injection were not performed.
+remain in a private dated archive outside the repository. At this stage, actual
+prayer-time observation and deliberate automatic-rollback fault injection had
+not been performed.
 See the [reusable validation procedure](../../firmware/esphome/scheduler/VALIDATION.md).
+
+## Real scheduled Fajr observation — 2026-09-25
+
+The listener confirmed that Fajr started at 05:49 EDT, matching the calculated
+Barrie schedule with ISNA, Standard Asr, middle-of-night and zero offsets. The
+recording played completely and clearly, and the 70% player volume was comfortable.
+This completes the first real prayer-time playback observation; the earlier
+full-recording listening results at 60% remain separate evidence.
+
+Read-only encrypted diagnostics joined at 05:50:29 EDT and reported a valid
+clock, automatic playback ready, active audio, 70% volume, no scheduler fault,
+and Dhuhr at 13:11 EDT as the next event. The player returned to idle at
+05:53:28.757 EDT, consistent with the approximately 268-second Fajr recording.
+Monitoring continued through 05:54:28 EDT without replay or a scheduler fault.
+Exact start latency was not captured because logging began after playback started.
+
+The observation used the previously installed 70% device-validation image
+identified above. No controls, clock changes, restart or firmware upload were
+sent during observation. It does not establish device validation of the later
+high-latitude conflict fixes. Deliberate automatic-rollback fault injection
+remains outstanding.

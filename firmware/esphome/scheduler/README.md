@@ -7,7 +7,8 @@ host-tested and exercised on the AtomS3R/Voice Pyramid reference unit. The devic
 checks covered full playback of both supplied recordings, cold-start time gating,
 scheduled track selection, stop, persistent skip/cancel, playback replacement,
 offline scheduling, restart without replay, and OTA preservation of audio.
-An actual prayer-time observation remains separate from the synthetic tests.
+A real scheduled Fajr observation on 2026-09-25 also passed, with complete,
+clear playback at a comfortable 70% volume on the previously installed image.
 
 ## Configuration and build
 
@@ -187,8 +188,10 @@ builds with public placeholder settings and synthetic audio-image fixtures.
 The [capacity report](../../../docs/development/feasibility-report.md) records
 build results and limits, including completed reference-device tests for SNTP
 behavior, sound quality, runtime memory, power-loss persistence and OTA slot
-switching. Actual prayer-time observation and deliberate rollback fault injection
-remain outstanding; successful slot switching does not prove automatic rollback.
+switching. The dated real-Fajr observation is separate from the synthetic checks
+and does not validate later firmware revisions on hardware. Deliberate rollback
+fault injection remains outstanding; successful slot switching does not prove
+automatic rollback.
 Provisioning UI, scheduler settings UI and automatic audio updates remain outside
 this milestone.
 
