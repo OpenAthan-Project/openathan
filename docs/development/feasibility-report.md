@@ -321,3 +321,45 @@ publication and release-media qualification are outside this implementation.
 
 See the [installer and developer handoff](../../firmware/esphome/provisioning/README.md)
 for commands, HTTP/USB contracts, fresh-install artifacts and the remaining checks.
+
+## Isolated provisioning acceptance preparation — 2026-09-25
+
+Provisioning was checkpointed locally as `a8af597`, based on `b371b65`. The
+subsequent preparation adds an existing-device test image using real prayer
+calculations with isolated settings/history, activation and credential namespaces.
+Production defaults and record formats are unchanged. The older synthetic
+scheduler configuration and its explicit `oa_validation` storage remain unchanged.
+
+| Build | Application `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| --- | ---: | ---: | ---: |
+| Production provisioning candidate | 1,127,200 | 113,991 | 969,952 |
+| Isolated provisioning validation | 1,129,200 | 113,515 | 967,952 |
+| Existing real-schedule developer image | 1,118,224 | 113,651 | 978,928 |
+| Existing synthetic scheduler validation | 1,141,936 | 114,363 | 955,216 |
+
+All four builds passed pinned-dependency, partition, factory/application payload,
+shared-audio format and 1.5 MiB growth-target checks. Audio checks used the generated
+CI fixture; no new media qualification is implied. Generated feature flags were
+checked: only the isolated image enables provisioning-test storage.
+
+Seven C++ suites under UBSan, 36 Python tests, four Chromium/WebKit browser tests,
+and all eight ESPHome configuration checks passed. Storage tests cover both
+production and isolated builds, exact namespace rejection, unrelated-record
+preservation, cleanup faults, and power loss at every cleanup write/commit boundary.
+The actual settings/API adapter runs in both modes; maintenance latches further
+settings, activation and scheduler writes off until restart. Browser tests check
+that production hides the banner and test mode displays it at a phone viewport.
+The runbook's offline extraction script selected a confirmed application slot and
+rejected an unconfirmed slot in generated fixtures.
+
+The [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md) records
+build commands, USB-only test cleanup, private baseline/recovery evidence,
+application-only upgrades, production-record comparisons, and stop conditions.
+The namespace cleanup command is absent from production's serial dispatcher and
+has no HTTP endpoint. Cleanup first commits an incomplete marker, then clears test
+prayer/network records, and removes that marker last. Uncertain cleanup outcomes
+require inspection and restart, never automatic write retries.
+
+No physical device was accessed or flashed for this preparation. Actual USB/radio
+behavior, phone browsers, cold-power interruptions, simultaneous audio/network
+headroom, migration and final restoration remain pending coordinated acceptance.

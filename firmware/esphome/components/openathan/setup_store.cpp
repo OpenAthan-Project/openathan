@@ -1,4 +1,5 @@
 #include "setup_store.h"
+#include "storage_config.h"
 
 #include <array>
 
@@ -9,7 +10,7 @@ bool SetupStore::begin(::openathan::LoadResult settings, ::openathan::LoadResult
   if (settings == LoadResult::ERROR || history == LoadResult::ERROR ||
       (settings == LoadResult::EMPTY && history == LoadResult::LOADED))
     return false;
-  if (nvs_open("oa_setup", NVS_READWRITE, &handle_) != ESP_OK) return false;
+  if (nvs_open(openathan_storage::SETUP, NVS_READWRITE, &handle_) != ESP_OK) return false;
   opened_ = true;
   std::array<uint8_t, 8> record{};
   size_t length = record.size();

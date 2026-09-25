@@ -49,3 +49,20 @@ if(NOT APPLE)
   target_link_libraries(provisioning_tests PRIVATE OpenSSL::Crypto)
 endif()
 add_test(NAME provisioning_safety COMMAND provisioning_tests)
+
+foreach(mode IN ITEMS production isolated)
+  add_executable(storage_${mode}_tests tests/storage_isolation_tests.cpp
+    firmware/esphome/components/openathan/nvs_settings_store.cpp
+    firmware/esphome/components/openathan/nvs_state_store.cpp
+    firmware/esphome/components/openathan/setup_store.cpp
+    firmware/esphome/components/openathan_device/credential_store.cpp
+    firmware/esphome/components/openathan_device/protocol.cpp
+    firmware/esphome/components/openathan_device/test_maintenance.cpp)
+  target_include_directories(storage_${mode}_tests PRIVATE tests/stubs
+    firmware/esphome/components/openathan firmware/esphome/components/openathan_device)
+  target_link_libraries(storage_${mode}_tests PRIVATE openathan_core)
+  if(mode STREQUAL "isolated")
+    target_compile_definitions(storage_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)
+  endif()
+  add_test(NAME storage_${mode} COMMAND storage_${mode}_tests)
+endforeach()

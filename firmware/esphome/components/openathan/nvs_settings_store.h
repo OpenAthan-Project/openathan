@@ -1,11 +1,12 @@
 #pragma once
 #include "openathan/settings.h"
+#include "storage_config.h"
 #include <nvs.h>
 
 namespace esphome::openathan_component {
 class NvsSettingsStore : public ::openathan::SettingsStore {
  public:
-  explicit NvsSettingsStore(std::string name = "openathan") : namespace_(std::move(name)) {}
+  explicit NvsSettingsStore(std::string name = openathan_storage::PRAYER) : namespace_(std::move(name)) {}
   NvsSettingsStore(const NvsSettingsStore &) = delete;
   NvsSettingsStore &operator=(const NvsSettingsStore &) = delete;
   ~NvsSettingsStore() override { if (opened_) nvs_close(handle_); }

@@ -1,4 +1,5 @@
 #include "credential_store.h"
+#include "../openathan/storage_config.h"
 
 #include <algorithm>
 #include <cstring>
@@ -26,7 +27,7 @@ uint32_t get(const uint8_t* in) {
 }  // namespace
 bool CredentialStore::open_() {
   if (fault_) return false;
-  if (!opened_) opened_ = nvs_open("oa_network", NVS_READWRITE, &handle_) == ESP_OK;
+  if (!opened_) opened_ = nvs_open(openathan_storage::NETWORK, NVS_READWRITE, &handle_) == ESP_OK;
   if (!opened_) fault_ = true;
   return opened_;
 }

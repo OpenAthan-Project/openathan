@@ -157,9 +157,20 @@ static void setup_gate_and_preview() {
   CHECK(reboot.device.activated() && reboot.value()==changed);
   // Existing developer settings are adopted without resetting their history.
   Fixture legacy; legacy.begin(); legacy.device.utc=epoch({2026,9,25},5)-1;legacy.device.update();legacy.device.step(1);
-  const auto history=nvs_test::committed.at({"openathan","scheduler"});
+  const auto history=nvs_test::committed.at({esphome::openathan_storage::PRAYER,"scheduler"});
   Fixture migrated(false);migrated.device.require_setup();migrated.device.utc=legacy.device.utc;migrated.begin();
-  CHECK(migrated.device.activated() && nvs_test::committed.at({"openathan","scheduler"})==history);
+  CHECK(migrated.device.activated() && nvs_test::committed.at({esphome::openathan_storage::PRAYER,"scheduler"})==history);
+}
+static void maintenance_latches_writes() {
+  Fixture f; f.device.require_setup(); f.begin();
+  CHECK(f.device.finish_setup(1));
+  f.device.quiesce_for_maintenance();
+  const auto writes = nvs_test::writes;
+  auto changed = f.value(); changed.volume = 35;
+  CHECK(f.save(changed) == SettingsResult::STORAGE);
+  CHECK(!f.device.finish_setup(1) && !f.device.skip_next() && !f.device.cancel_skip());
+  f.device.step(86400); f.device.reload_schedule();
+  CHECK(nvs_test::writes == writes && !f.device.activated() && f.audio.starts == 0);
 }
 #ifdef OPENATHAN_JSON_TEST
 #include "../firmware/esphome/components/openathan_device/local_api.h"
@@ -176,6 +187,7 @@ static void local_api() {
   JsonDocument current;CHECK(!deserializeJson(current,initial.response));
   CHECK(current["setup"]=="incomplete" && current["clock_ready"].as<bool>());
   CHECK(current["schedule"]["state"]=="setup_required");
+  CHECK(current["test_mode"].is<bool>() && current["test_mode"].as<bool>() == esphome::openathan_storage::TEST_MODE);
   JsonDocument request;request["schema"]=1;request["expected_revision"]=1;request["settings"]=current["settings"];
   request["settings"]["latitude"]=44.3894;
   auto body=[&](){std::string value;serializeJson(request,value);return value;};
@@ -311,7 +323,7 @@ static void json_transport() {
 }
 #endif
 int main() {
-  updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview();
+  updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
   json_transport(); coordinate_roundtrip(); local_api();
 #endif

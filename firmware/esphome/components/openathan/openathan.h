@@ -23,7 +23,9 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void set_default_timezone(const std::string &name) { timezone_name_ = name; }
   void require_setup() { setup_gate_ = std::make_unique<SetupStore>(); }
   const char *setup_state() const;
-  bool activated() const { return !setup_gate_ || setup_gate_->active(); }
+  bool activated() const { return !maintenance_ && (!setup_gate_ || setup_gate_->active()); }
+  // Internal test-maintenance boundary; no product HTTP endpoint calls this.
+  void quiesce_for_maintenance();
   bool finish_setup(uint32_t revision);
   bool preview(const ::openathan::DeviceSettings &settings, ::openathan::PrayerDay &day,
                std::vector<::openathan::Event> &events, std::vector<::openathan::ScheduleConflict> &conflicts);
@@ -71,6 +73,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   std::unique_ptr<SetupStore> setup_gate_;
   std::string timezone_name_;
   bool volume_applied_{false}, request_ok_{false};
+  bool maintenance_{false};
   unsigned volume_attempts_{};
   uint64_t next_volume_check_{};
   std::string request_error_;

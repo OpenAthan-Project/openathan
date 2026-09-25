@@ -6,6 +6,10 @@ setup/settings page, and first-run activation. The public website and browser
 installer are separate work. Release recordings and physical acceptance of this
 new image remain pending; compiling this image is not release qualification.
 
+For existing-device acceptance, use the [isolated test build and hardware runbook](HARDWARE_TEST.md).
+It keeps test prayer, activation and credential records separate and includes a
+USB-only maintenance helper. Production builds reject those maintenance commands.
+
 ## Build and developer access
 
 Use the pinned ESPHome environment described in [firmware feasibility](../feasibility/README.md).
@@ -119,7 +123,7 @@ is cancelled before mutation; uncertain in-progress outcomes require readback.
 
 Use `GET /api/status` for a complete settings snapshot, revision, setup state,
 time readiness, application status, current/next playback, skip, and today's
-schedule. Fresh incomplete devices do not display a timetable based on seed
+schedule, plus an informational `test_mode` boolean. Fresh incomplete devices do not display a timetable based on seed
 coordinates. `GET /api/timezones` returns the supported IANA names and the pinned
 tzdata version (2026.4).
 
