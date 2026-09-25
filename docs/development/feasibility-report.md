@@ -230,7 +230,7 @@ ESP-IDF 5.5.5 and the pinned settings implementation. Application-only OTA
 retained the existing partition layout. The synthetic timetable uses separate
 settings and consumption records from the production schedule.
 
-| Settings build | OTA `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| Hardware-tested settings build (`b371b65`) | OTA `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
 | --- | ---: | ---: | ---: |
 | Real schedule with encrypted developer controls | 1,117,488 | 113,651 | 979,664 |
 | Isolated synthetic validation timetable | 1,141,200 | 114,363 | 955,952 |
@@ -269,3 +269,10 @@ changes, backward clocks and dropped volume requests. These cases were not all
 repeated physically. Firmware hashes, complete readbacks, recovery backups and
 raw device evidence are retained privately. The phone settings UI and release
 qualification remain separate milestones.
+
+Subsequent review found coordinate rounding in the JSON transport. The follow-up
+preserves full stored precision during both parsing and export. Automated
+regressions cover repeated export/import without writes, a volume-only save at
+a prayer's due time, boundary coordinates and uncertain-response reconciliation.
+This transport fix has not been repeated on the physical device; the hardware
+results and build measurements above describe the earlier tested firmware.

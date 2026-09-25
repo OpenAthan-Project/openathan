@@ -2,6 +2,7 @@
 #include "nvs_memory.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 
 #define CHECK(c) do { if (!(c)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #c); std::abort(); } } while (0)
 using namespace openathan;
@@ -125,6 +126,62 @@ static void timezones() {
   CHECK(f.device.local_date(epoch({2026,7,1},13),s.timezone,date) && day_number(date)==day_number({2026,7,1}));
 }
 #ifdef OPENATHAN_JSON_TEST
+static void coordinate_roundtrip() {
+  // Exercise wire JSON, not an in-memory JsonDocument copy: ArduinoJson's
+  // normal number writer and reader can both change coordinate precision.
+  for (const auto &[latitude, longitude] : {
+      std::pair{"43.6532123456789", "-79.3832123456789"},
+      std::pair{"43.65", "179.99999999999997"},
+      std::pair{"43.653212345678909", "-79.383212345678913"},
+      std::pair{"-89.99999999999999", "1.234567890123456e-10"},
+      std::pair{"0.1", "-0.1"}, std::pair{"-0.0", "180"}}) {
+    Fixture f; f.begin();
+    JsonDocument snapshot, request;
+    f.device.write_settings_json(snapshot.to<JsonObject>());
+    request["schema"] = 1; request["expected_revision"] = 1;
+    request["settings"] = snapshot["settings"];
+    request["settings"]["latitude"] = serialized(latitude);
+    request["settings"]["longitude"] = serialized(longitude);
+    std::string payload; serializeJson(request, payload);
+    payload.replace(payload.find("\"latitude\""), 10, "\"lati\\u0074ude\"");
+    f.device.read_settings_json(payload);
+    CHECK(f.device.settings_request_ok());
+    const auto saved = *f.device.settings_service()->saved();
+    CHECK(saved.value.prayer.latitude == std::strtod(latitude, nullptr));
+    CHECK(saved.value.prayer.longitude == std::strtod(longitude, nullptr));
+    CHECK(std::signbit(saved.value.prayer.latitude) == std::signbit(std::strtod(latitude, nullptr)));
+    f.device.utc = epoch({2026,9,25},5)-1; f.device.update();
+    const auto writes = nvs_test::writes;
+    for (unsigned repeat = 0; repeat < 3; ++repeat) {
+      snapshot.clear(); f.device.write_settings_json(snapshot.to<JsonObject>());
+      if (repeat == 0) {
+        std::string exported; serializeJson(snapshot, exported);
+        std::puts(exported.c_str());  // Checked with Python's JSON decoder too.
+      }
+      // Confirm exports preserve the stored number for a standard JSON client.
+      for (const auto &[name, expected] : {
+          std::pair{"latitude", saved.value.prayer.latitude},
+          std::pair{"longitude", saved.value.prayer.longitude}}) {
+        std::string number; serializeJson(snapshot["settings"][name], number);
+        CHECK(std::strtod(number.c_str(), nullptr) == expected);
+      }
+      request["expected_revision"] = saved.revision;
+      request["settings"] = snapshot["settings"];
+      payload.clear(); serializeJson(request, payload);
+      f.device.read_settings_json(payload);
+      CHECK(f.device.settings_request_ok() && nvs_test::writes == writes);
+      CHECK(*f.device.settings_service()->saved() == saved);
+    }
+    // Saving only volume when Fajr is due, before its poll, must not rearm.
+    f.device.utc = epoch({2026,9,25},5); mono += 1000;
+    request["settings"]["volume"] = 35;
+    payload.clear(); serializeJson(request, payload);
+    f.device.read_settings_json(payload);
+    CHECK(f.device.settings_request_ok() && f.value().prayer == saved.value.prayer);
+    CHECK(nvs_test::writes == writes + 1);
+    f.device.loop(); f.device.update(); CHECK(f.audio.starts == 1);
+  }
+}
 static void json_transport() {
   Fixture f; f.begin();
   JsonDocument snapshot;
@@ -145,7 +202,7 @@ static void json_transport() {
   const auto writes = nvs_test::writes;
   f.device.read_settings_json(payload);
   CHECK(f.device.settings_request_ok() && nvs_test::writes == writes);
-  for (unsigned fault=0; fault<10; ++fault) {
+  for (unsigned fault=0; fault<12; ++fault) {
     JsonDocument invalid; invalid.set(request);
     if (fault==0) invalid["settings"]["volume"] = true;
     if (fault==1) invalid["settings"]["volume"] = 256;
@@ -157,6 +214,8 @@ static void json_transport() {
     if (fault==7) invalid["schema"] = true;
     if (fault==8) invalid["expected_revision"] = -1;
     if (fault==9) invalid["settings"]["method"] = std::string("muslim_world_league\0extra",24);
+    if (fault==10) invalid["settings"]["latitude"] = serialized("90.00000000000001");
+    if (fault==11) invalid["settings"]["longitude"] = serialized("180.00000000000003");
     payload.clear(); serializeJson(invalid,payload);
     f.device.read_settings_json(payload);
     CHECK(!f.device.settings_request_ok() && nvs_test::writes == writes);
@@ -169,6 +228,6 @@ static void json_transport() {
 int main() {
   updates_and_replay(); volume_and_faults(); timezones();
 #ifdef OPENATHAN_JSON_TEST
-  json_transport();
+  json_transport(); coordinate_roundtrip();
 #endif
 }
