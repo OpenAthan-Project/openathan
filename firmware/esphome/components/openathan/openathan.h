@@ -31,7 +31,9 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
                std::vector<::openathan::Event> &events, std::vector<::openathan::ScheduleConflict> &conflicts);
   bool skip_occurrence(const ::openathan::Event &expected);
   bool cancel_occurrence(::openathan::EventKey expected);
-  bool parse_settings_json(JsonObjectConst root, ::openathan::DeviceSettings &settings, uint32_t &revision) const;
+  // Keep the original wire payload: the parsed document may round coordinates.
+  bool parse_settings_json(const std::string &payload, JsonObjectConst root,
+                           ::openathan::DeviceSettings &settings, uint32_t &revision) const;
   void reload_schedule();
   void set_latitude(double value) { settings_.latitude = value; }
   void set_longitude(double value) { settings_.longitude = value; }

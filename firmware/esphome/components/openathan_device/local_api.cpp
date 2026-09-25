@@ -133,7 +133,7 @@ void LocalApi::handle(ApiExchange& request) {
       }
       ::openathan::DeviceSettings candidate;
       uint32_t revision;
-      if (!athan_->parse_settings_json(payload, candidate, revision)) {
+      if (!athan_->parse_settings_json(request.body, payload, candidate, revision)) {
         error(request, 400, "Invalid settings document");
         return;
       }

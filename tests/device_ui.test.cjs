@@ -48,6 +48,31 @@ async function fixture(){
   return {state,url:`http://127.0.0.1:${server.address().port}`,close:()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);})};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: coordinate precision survives volume saves and lost responses`,async()=>{
+  const f=await fixture();f.state.device.setup='active';
+  const latitude=43.653212345678909,longitude=-79.383212345678913;
+  Object.assign(f.state.device.settings,{latitude,longitude});
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async(error)=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try{
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#fields').disabled);
+    assert.equal(Number(await page.locator('#latitude').inputValue()),latitude);
+    assert.equal(Number(await page.locator('#longitude').inputValue()),longitude);
+    await page.locator('#volume').fill('35');f.state.drop=true;
+    await page.locator('#save').click();
+    await page.waitForFunction(()=>/response was lost|another client/.test(document.querySelector('#message').textContent));
+    assert.equal(f.state.mutations,1);
+    const writes=f.state.posts.filter(p=>p.url==='/api/settings');assert.ok(writes.length>=1);
+    // Chromium may replay a failed transport; every replay must retain the
+    // original revision so it cannot produce a second durable mutation.
+    assert.ok(writes.every(p=>p.payload.expected_revision===1));
+    assert.equal(writes[0].payload.settings.latitude,latitude);
+    assert.equal(writes[0].payload.settings.longitude,longitude);
+    assert.equal(writes[0].payload.settings.volume,35);
+    assert.equal(Number(await page.locator('#latitude').inputValue()),latitude);
+    assert.equal(Number(await page.locator('#longitude').inputValue()),longitude);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: setup, concurrency, uncertain saves, and mobile layout`,async()=>{
   const f=await fixture();const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async(error)=>{await f.close();throw error;});
   const context=await browser.newContext({httpCredentials:{username:'admin',password:'browser test password'},viewport:{width:1280,height:900}});

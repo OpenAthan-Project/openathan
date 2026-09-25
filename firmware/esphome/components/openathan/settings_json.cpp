@@ -142,20 +142,19 @@ void OpenAthan::read_settings_json(const std::string &payload) {
   if (payload.size() > 4096) return;
   json::parse_json(payload, [this, &payload](JsonObject root) {
     ::openathan::DeviceSettings candidate;
-    if (root.size() != 3 || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1 ||
-        !root["expected_revision"].is<uint32_t>() || !read_value(root["settings"], candidate) ||
-        !read_coordinates(payload, candidate.prayer) || !::openathan::valid_device_settings(candidate)) return false;
-    const auto result = change_settings(candidate, root["expected_revision"].as<uint32_t>());
+    uint32_t revision;
+    if (!parse_settings_json(payload, root, candidate, revision)) return false;
+    const auto result = change_settings(candidate, revision);
     request_ok_ = result == ::openathan::SettingsResult::SAVED || result == ::openathan::SettingsResult::UNCHANGED;
     request_error_ = request_ok_ ? "" : ::openathan::settings_result_name(result);
     return true;
   });
 }
-bool OpenAthan::parse_settings_json(JsonObjectConst root, ::openathan::DeviceSettings &candidate,
-                                   uint32_t &revision) const {
-  if (root.size() != 3 || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1 ||
+bool OpenAthan::parse_settings_json(const std::string &payload, JsonObjectConst root,
+                                   ::openathan::DeviceSettings &candidate, uint32_t &revision) const {
+  if (payload.size() > 4096 || root.size() != 3 || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1 ||
       !root["expected_revision"].is<uint32_t>() || !read_value(root["settings"], candidate) ||
-      !::openathan::valid_device_settings(candidate)) return false;
+      !read_coordinates(payload, candidate.prayer) || !::openathan::valid_device_settings(candidate)) return false;
   revision = root["expected_revision"].as<uint32_t>();
   return true;
 }

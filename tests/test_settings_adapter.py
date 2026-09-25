@@ -65,4 +65,4 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
                     (43.65, 179.99999999999997),
                     (43.653212345678909, -79.383212345678913),
                     (-89.99999999999999, 1.234567890123456e-10),
-                    (0.1, -0.1), (-0.0, 180.0)])
+                    (0.1, -0.1), (-0.0, 180.0)] * 2)  # Developer and local HTTP APIs.

@@ -3,8 +3,10 @@
 `../openathan.yaml` is the buildable reference **development candidate** for the
 AtomS3R C126 + Voice Pyramid A167. It includes USB provisioning, a device-hosted
 setup/settings page, and first-run activation. The public website and browser
-installer are separate work. Release recordings and physical acceptance of this
-new image remain pending; compiling this image is not release qualification.
+installer are separate work. Bounded first-run and USB recovery hardware checks
+passed; see the [validation results](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25)
+for the tested revision and unresolved serial-associated Wi-Fi loss. Remaining
+physical acceptance and release recording qualification are still pending.
 
 For existing-device acceptance, use the [isolated test build and hardware runbook](HARDWARE_TEST.md).
 It keeps test prayer, activation and credential records separate and includes a
@@ -22,8 +24,11 @@ python -m esphome compile firmware/esphome/openathan.yaml
 
 USB uses the AtomS3R USB-C data port. Normal audio operation uses the single power
 cable through the Pyramid's bottom USB-C. Choose the actual current serial port;
-close other serial clients before running the console. The console does not
-reset, flash, erase, or automatically repeat a write.
+close other serial clients before running the console. The console sends no reset,
+flash or erase command and never automatically repeats a write. Host serial
+close/reopen caused temporary Wi-Fi loss on the tested unit; reset involvement is
+unconfirmed. Keep the connection open through a transaction and allow recovery
+before readback after reopening. Physical cable removal also interrupts power.
 
 ```sh
 python tools/provision_device.py --port /dev/cu.YOUR_DEVICE status
@@ -146,6 +151,10 @@ Settings requests reuse `{schema: 1, expected_revision, settings}` from
 catalog. An unchanged timezone keeps the saved rules unless refresh is explicitly
 requested. Thus existing POSIX-named settings remain editable without forcing a
 conversion to IANA. Clients cannot substitute arbitrary rules through this API.
+Latitude and longitude remain numeric JSON values with full stored double
+precision. Settings saves, preview and activation recover coordinates from the
+original request text, including after timezone resolution. Unchanged snapshots
+avoid writes; a volume-only edit cannot rearm scheduling through coordinate rounding.
 
 The displayed occurrence includes `day` (calculation day), `prayer` (0–4), `utc`,
 and optional `shared_with: {day, prayer}`. A skip key contains `day` and `prayer`.
@@ -216,7 +225,8 @@ npx playwright install chromium webkit
 OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
 ```
 
-Before a hardware rollout, separately verify fresh flash plus approved audio,
-USB/network recovery (including same-SSID password changes), cold-power cuts at
-setup/save boundaries, actual iPhone Safari/Android Chrome access, audio during
-Wi-Fi loss/recovery, and retained history after a compatible application upgrade.
+Bounded physical first-run and USB/password recovery results are recorded in the
+validation report above. Remaining acceptance includes hidden networks, phone
+playback controls, Android Chrome, deliberate setup/save interruptions, audio
+during Wi-Fi loss/recovery, production migration and qualified release media.
+The later coordinate-precision integration is automated-tested only.

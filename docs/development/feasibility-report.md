@@ -279,7 +279,7 @@ results and build measurements above describe the earlier tested firmware.
 
 ## USB provisioning and local settings — 2026-09-25
 
-The local implementation builds on saved-settings commit `b371b65`. Before
+The initial local implementation built on saved-settings commit `b371b65`. Before
 implementation, the copied worktree files and documentation handoff were compared
 against the source checkout and reconciled to that exact commit. The source
 checkout was retained unchanged. The reference `openathan.yaml` now builds USB
@@ -313,11 +313,10 @@ Local validation passed:
 
 The actual local API and authentication implementation are host-tested separately
 from the browser fixture. Wi-Fi join/failure/retry and serial reconnection are
-state-machine/protocol tests, not evidence of radio or USB acceptance. This
-candidate has **not been flashed**. Physical power cuts, USB/password recovery,
-actual phone browsers, compatible migration and concurrent audio/network behavior
-remain separately coordinated acceptance work. The public website, installer,
-publication and release-media qualification are outside this implementation.
+state-machine/protocol tests. At this initial checkpoint the candidate had not
+been flashed. Later hardware subsets and the post-merge coordinate integration
+are recorded below; these earlier build measurements remain historical.
+The public website, installer and release-media qualification are separate work.
 
 See the [installer and developer handoff](../../firmware/esphome/provisioning/README.md)
 for commands, HTTP/USB contracts, fresh-install artifacts and the remaining checks.
@@ -360,6 +359,70 @@ has no HTTP endpoint. Cleanup first commits an incomplete marker, then clears te
 prayer/network records, and removes that marker last. Uncertain cleanup outcomes
 require inspection and restart, never automatic write retries.
 
-No physical device was accessed or flashed for this preparation. Actual USB/radio
-behavior, phone browsers, cold-power interruptions, simultaneous audio/network
-headroom, migration and final restoration remain pending coordinated acceptance.
+No physical device was accessed or flashed during preparation. Subsequent bounded
+hardware results are recorded below.
+
+## Provisioning hardware subsets — 2026-09-25
+
+Two coordinated sessions used the isolated image from the preparation checkpoint
+(`d1c5f7f`) on the AtomS3R C126 + Voice Pyramid A167, retaining the shared audio and
+production records. These results predate the coordinate-precision integration.
+
+- First run: USB-only test cleanup, Wi-Fi/password enrollment, initially blank
+  required fields, manual setup, side-effect-free preview, explicit activation and
+  cold-restart retention passed. iPhone Safari on iOS 26.6.2 reached hostname and
+  IP addresses and displayed the test banner.
+- Recovery/access: wrong-password replacement for the current SSID failed without
+  overwriting working credentials; reconnection, cold persistence and a correct
+  retry passed. Password replacement invalidated the old password and pre-change
+  Digest nonces. A deliberately unread password acknowledgment was reconciled by
+  revision/authentication readback without resending. Safari rejected old access
+  and accepted the current password.
+- Preservation/restoration: production and existing scheduler-test record payloads,
+  shared audio, bootloader, partition table and inactive application were unchanged.
+  The original developer application was restored with an application-only write.
+  Final bottom-power checks found synchronized, automatic-ready, idle operation
+  with retained settings/history and no fault or skip.
+
+Serial-associated Wi-Fi loss is **unresolved**. With one serial connection held
+open, password replacement and the following 84.66 seconds of sampled observations
+showed no HTTP transport error or disconnected status. Three status-only host
+close/reopen cycles each caused temporary disconnected status: connected USB
+status returned after about 13 seconds and authenticated HTTP after about 24 seconds.
+No reset telemetry was added, so reset involvement or a specific cause is unconfirmed.
+Physical unplugging is a power interruption, not an isolated serial disconnect.
+
+These sessions did not qualify scheduled playback or audio under provisioning
+load. Hidden networks, broader phone controls/browser coverage, deliberate
+save/activation interruptions, production migration and release qualification
+remain pending. Exact images, double-read backups and raw evidence are retained
+privately; historical consumption backups are never routine recovery images.
+
+## Provisioning integration after saved-settings merge — 2026-09-25
+
+The provisioning changes were rebased onto merged settings commit `b2b7888`.
+The shared settings parser now takes the original wire payload for both the
+developer transport and the local HTTP settings, preview and activation paths.
+Timezone resolution cannot round coordinates. Schema and durable record formats
+are unchanged.
+
+Fresh validation passed seven C++ UBSan suites, 36 Python tests with the resolved
+ArduinoJson 7.4.3 bridge in production and isolated modes, six Chromium/WebKit
+browser tests, eight ESPHome configuration checks and all four firmware builds.
+Coordinate regressions include full-precision numeric exports, escaped/duplicate
+keys, boundary validation, side-effect-free preview, activation readback, unchanged
+saves and volume-only edits at a due occurrence. Browser tests retain coordinates
+through form edits and lost responses; transport replays keep the original revision.
+
+| Build | Application `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| --- | ---: | ---: | ---: |
+| Production provisioning candidate | 1,139,264 | 112,983 | 957,888 |
+| Isolated provisioning validation | 1,141,344 | 112,983 | 955,808 |
+| Existing real-schedule developer image | 1,126,176 | 114,143 | 970,976 |
+| Existing synthetic scheduler validation | 1,143,488 | 113,831 | 953,664 |
+
+All four passed the 1.5 MiB target, dependency pins, partition boundaries,
+factory/application consistency and shared-audio checks using the CI fixture.
+Only the isolated build enables test storage. The original roadmap task wording
+and phase order were retained. These rebuilt images have not been flashed;
+the physical results above continue to describe the earlier isolated image.
