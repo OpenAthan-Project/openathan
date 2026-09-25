@@ -17,8 +17,11 @@ covered by automated tests.
 
 The reference development candidate now implements USB Wi-Fi/password setup
 and recovery, a phone-friendly local settings interface, and explicit first-run
-activation. Host/API/browser tests and a firmware build validate the implementation;
-physical USB/radio/mobile-device acceptance is pending. The public website and
+activation. Host/API/browser tests and firmware builds validate the implementation.
+Bounded first-run and USB recovery checks passed on the reference device with
+iPhone Safari; serial-associated Wi-Fi loss remains unresolved. Broader controls,
+playback, interruption and production-migration acceptance remain pending.
+The public website and
 installer remain separate work. Provisioning and recovery preserve prayer settings
 and consumption; see the [handoff contract](../../firmware/esphome/provisioning/README.md).
 

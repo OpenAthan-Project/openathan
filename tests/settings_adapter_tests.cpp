@@ -20,7 +20,9 @@ struct Audio : Playback {
   bool request_volume_percent(unsigned value) override { ++requests; requested = value; if (!drop) volume = value; return true; }
 };
 struct Calculator : DayCalculator {
+  Settings last_settings;
   bool calculate(const Settings &s, CivilDate date, PrayerDay &out) override {
+    last_settings = s;
     constexpr unsigned hours[] = {5,6,12,15,18,20};
     for (unsigned i=0; i<6; ++i) out[i] = epoch(date,hours[i])+60*s.offsets[i];
     return true;
@@ -223,15 +225,87 @@ static void local_api() {
 #endif
 
 #ifdef OPENATHAN_JSON_TEST
+static constexpr std::pair<const char *, const char *> COORDINATES[] = {
+    {"43.6532123456789", "-79.3832123456789"},
+    {"43.65", "179.99999999999997"},
+    {"43.653212345678909", "-79.383212345678913"},
+    {"-89.99999999999999", "1.234567890123456e-10"},
+    {"0.1", "-0.1"}, {"-0.0", "180"}};
+static void local_api_coordinates() {
+  using namespace esphome::openathan_device;
+  const ZoneEntry zones[]={{"UTC",R"({"standard_offset":0,"daylight_offset":0,"start":{"type":0,"time_seconds":0,"day":0,"month":0,"week":0,"day_of_week":0},"end":{"type":0,"time_seconds":0,"day":0,"month":0,"week":0,"day_of_week":0}})"}};
+  for (const auto &[latitude, longitude] : COORDINATES) {
+    Fixture f; f.device.require_setup(); f.begin();
+    LocalApi api(&f.device, zones, 1);
+    JsonDocument snapshot, request;
+    f.device.write_settings_json(snapshot.to<JsonObject>());
+    request["schema"] = 1; request["expected_revision"] = 1;
+    request["settings"] = snapshot["settings"];
+    request["settings"]["latitude"] = serialized(latitude);
+    request["settings"]["longitude"] = serialized(longitude);
+    auto call = [&](const char *method, const char *uri) {
+      ApiExchange exchange; exchange.method = method; exchange.uri = uri;
+      serializeJson(request, exchange.body);
+      // Last duplicate wins, including an escaped key, in both parser views.
+      exchange.body.replace(exchange.body.find("\"latitude\""), 10,
+                            "\"latitude\":1,\"lati\\u0074ude\"");
+      api.handle(exchange); return exchange;
+    };
+    auto exact = [&](const Settings &s) {
+      CHECK(s.latitude == std::strtod(latitude, nullptr));
+      CHECK(s.longitude == std::strtod(longitude, nullptr));
+      CHECK(std::signbit(s.latitude) == std::signbit(std::strtod(latitude, nullptr)));
+    };
+    const auto before = nvs_test::committed;
+    const auto writes = nvs_test::writes;
+    CHECK(call("POST", "/api/preview").code == 200);
+    exact(f.calculator.last_settings);
+    CHECK(nvs_test::committed == before && nvs_test::writes == writes);
+    CHECK(f.device.settings_service()->saved()->revision == 1 && !f.device.activated());
+    CHECK(call("POST", "/api/activate").code == 200);
+    CHECK(f.device.activated()); exact(f.value().prayer);
+    const auto saved = *f.device.settings_service()->saved();
+    CHECK(call("POST", "/api/settings").code == 409);
+    // Resolve an unobserved activation response with a fresh, numeric snapshot.
+    const auto readback = call("GET", "/api/status"); CHECK(readback.code == 200);
+    std::puts(readback.response.c_str()); // Also decoded with Python's JSON parser.
+    request["expected_revision"] = saved.revision;
+    const auto committed = nvs_test::committed;
+    const auto saved_writes = nvs_test::writes;
+    for (bool refresh : {false, true}) {
+      request["refresh_timezone"] = refresh;
+      request["settings"]["timezone_rules"]["standard_offset"] = 3600;
+      CHECK(call("POST", "/api/settings").code == 200);
+      CHECK(*f.device.settings_service()->saved() == saved);
+      CHECK(nvs_test::writes == saved_writes && nvs_test::committed == committed);
+    }
+    // A volume-only HTTP save just as Fajr is due must not rearm the schedule.
+    f.device.utc = epoch({2026,9,25},5)-1; f.device.update();
+    f.device.utc++; mono += 1000;
+    request["settings"]["volume"] = 35;
+    CHECK(call("POST", "/api/settings").code == 200);
+    CHECK(f.value().prayer == saved.value.prayer && f.value().volume == 35);
+    CHECK(nvs_test::writes == saved_writes + 1);
+    f.device.loop(); f.device.update(); CHECK(f.audio.starts == 1);
+    request["expected_revision"] = saved.revision + 1;
+    const auto after_volume = nvs_test::committed;
+    for (const char *invalid : {"90.00000000000001", "\"43.0\"", "true"}) {
+      request["settings"]["latitude"] = serialized(invalid);
+      for (const char *uri : {"/api/preview", "/api/activate", "/api/settings"})
+        CHECK(call("POST", uri).code == 400);
+      CHECK(nvs_test::committed == after_volume);
+    }
+    // An actual coordinate edit also uses the original numeric token.
+    request["settings"]["latitude"] = serialized("44.389412345678909");
+    CHECK(call("POST", "/api/settings").code == 200);
+    CHECK(f.value().prayer.latitude == std::strtod("44.389412345678909", nullptr));
+    CHECK(f.value().prayer.longitude == std::strtod(longitude, nullptr));
+  }
+}
 static void coordinate_roundtrip() {
   // Exercise wire JSON, not an in-memory JsonDocument copy: ArduinoJson's
   // normal number writer and reader can both change coordinate precision.
-  for (const auto &[latitude, longitude] : {
-      std::pair{"43.6532123456789", "-79.3832123456789"},
-      std::pair{"43.65", "179.99999999999997"},
-      std::pair{"43.653212345678909", "-79.383212345678913"},
-      std::pair{"-89.99999999999999", "1.234567890123456e-10"},
-      std::pair{"0.1", "-0.1"}, std::pair{"-0.0", "180"}}) {
+  for (const auto &[latitude, longitude] : COORDINATES) {
     Fixture f; f.begin();
     JsonDocument snapshot, request;
     f.device.write_settings_json(snapshot.to<JsonObject>());
@@ -325,6 +399,6 @@ static void json_transport() {
 int main() {
   updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  json_transport(); coordinate_roundtrip(); local_api();
+  json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
 #endif
 }

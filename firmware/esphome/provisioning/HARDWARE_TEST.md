@@ -1,6 +1,9 @@
 # Provisioning hardware acceptance runbook
 
-**Preparation is implemented; physical acceptance is pending.** This runbook is
+**Preparation is implemented; the full physical matrix remains pending.** Bounded
+first-run and USB recovery sessions are recorded in the
+[validation report](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
+This runbook is
 for the existing AtomS3R C126 + Voice Pyramid A167. Execute hardware steps only in
 a separately coordinated session. The reference and test images have no product
 OTA endpoint: this procedure uses a verified, application-only USB update.
@@ -9,7 +12,8 @@ outside this procedure.
 
 ## 1. Build and checkpoint without accessing hardware
 
-Start from a clean local commit on `codex/device-provisioning`. Activate the
+Start from a clean checkout of the candidate commit. Run `prepare_ci.py` below in
+a disposable checkout; it refuses existing secret files. Activate the
 [pinned build environment](../feasibility/README.md). `IDF_PATH` below must point
 to the **resolved ESP-IDF 5.5.5 source directory**, not another SDK installation.
 Keep public CI audio fixtures separate from the device's existing private audio.

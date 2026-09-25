@@ -2,7 +2,7 @@
 
 OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project. It supports an ordinary-user reference build and a reusable ESPHome integration for people who already have compatible hardware. The reference experience is intended to work without soldering, PCB design, Home Assistant, or embedded-development experience.
 
-> **Project status:** early development. The [scheduler development build](firmware/esphome/scheduler/README.md) integrates local prayer calculations, scheduled offline audio and persisted skip/duplicate-prevention state. Host tests and reference-device tests cover playback, scheduling, persistence and application OTA. A buildable reference candidate now adds USB provisioning and a local setup UI; their hardware acceptance and release qualification remain. This is developer firmware, not an end-user release. See the [validation results](docs/development/feasibility-report.md#integrated-device-validation--2026-09-24) and [CI checks](.github/workflows/README.md).
+> **Project status:** early development. The [scheduler development build](firmware/esphome/scheduler/README.md) integrates local prayer calculations, scheduled offline audio and persisted skip/duplicate-prevention state. Host tests and reference-device tests cover playback, scheduling, persistence and application OTA. The reference candidate adds USB provisioning and a local setup UI, with bounded first-run and recovery hardware checks complete. Broader hardware acceptance and release qualification remain. This is developer firmware, not an end-user release. See the [validation results](docs/development/feasibility-report.md) and [CI checks](.github/workflows/README.md).
 
 Developer firmware supports [saved runtime settings](firmware/esphome/scheduler/SETTINGS.md)
 through an encrypted local console. The guide documents persistence, replay
@@ -93,8 +93,8 @@ protection, saved volume and settings, time synchronization, and application OTA
 Settings can be changed through the optional encrypted developer console.
 
 The reference candidate implements phone-friendly setup, local configuration,
-USB Wi-Fi/password recovery, and explicit first-run activation. Physical acceptance
-of these additions, the public installer, and release qualification remain. See the
+USB Wi-Fi/password recovery, and explicit first-run activation. Remaining physical
+acceptance, the public installer, and release qualification are tracked in the
 [roadmap](docs/development/roadmap.md) for completed work and remaining scope.
 The reference build may add prayer-status LEDs, touch controls, and its display
 through optional adapters; they are not requirements of the reusable scheduler.
