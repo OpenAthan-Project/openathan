@@ -1,11 +1,51 @@
-# Convenience package for the official C126 + A167 reference hardware.
-#
-# This package will compose verified low-level board configuration with the
-# A167-specific voice_pyramid component and map the resulting entities onto the
-# capabilities consumed by packages/openathan.yaml.
-#
-# It intentionally contains no unverified GPIOs, buses, codec setup, entity
-# IDs, or capability bindings yet.
-
 packages:
   reference_board: !include ../../boards/m5stack-atom-s3r-voice-pyramid.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [voice_pyramid]
+
+pi4ioe5v6408:
+  - id: pyramid_io
+    i2c_id: pyramid_bus
+    address: 0x43
+
+switch:
+  - platform: gpio
+    id: pyramid_speaker_enable
+    internal: true
+    pin:
+      pi4ioe5v6408: pyramid_io
+      number: 0
+      mode:
+        output: true
+    restore_mode: ALWAYS_ON
+
+voice_pyramid:
+  clock:
+    i2c_id: pyramid_bus
+    address: 0x60
+  amplifier:
+    i2c_id: pyramid_bus
+    address: 0x5B
+
+audio_dac:
+  - platform: es8311
+    id: pyramid_dac
+    i2c_id: pyramid_bus
+    address: 0x18
+    bits_per_sample: 16bit
+    sample_rate: 44100
+
+speaker:
+  - platform: i2s_audio
+    id: pyramid_speaker
+    i2s_audio_id: pyramid_audio_bus
+    i2s_dout_pin: GPIO7
+    dac_type: external
+    bits_per_sample: 16bit
+    sample_rate: 44100
+    channel: mono
+    audio_dac: pyramid_dac

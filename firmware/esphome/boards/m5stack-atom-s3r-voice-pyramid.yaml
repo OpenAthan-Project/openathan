@@ -1,11 +1,24 @@
-# Verified low-level ESPHome configuration for the official reference build:
-#   M5Stack AtomS3R C126 used with Voice Pyramid A167
-#
-# This file is intentionally empty until the board and interconnect have been
-# validated. Only confirmed platform, variant, PSRAM, bus, pin, and similar
-# low-level facts belong here. Product behavior and prayer policy do not.
-#
-# GPIO, codec, LED, touch, display, and power assumptions must be verified
-# against official documentation and physical hardware before implementation.
+# C126 + A167 audio wiring verified in private diagnostics on 2026-09-24.
+# This configuration does not claim touch/display/microphone acceptance.
+esp32:
+  variant: esp32s3
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    version: 5.5.5
 
-{}
+psram:
+  mode: octal
+  speed: 80MHz
+
+i2c:
+  - id: pyramid_bus
+    sda: GPIO38
+    scl: GPIO39
+    scan: false
+
+i2s_audio:
+  - id: pyramid_audio_bus
+    i2s_lrclk_pin: GPIO8
+    i2s_bclk_pin: GPIO6

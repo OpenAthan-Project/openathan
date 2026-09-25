@@ -1,0 +1,11 @@
+packages:
+  baseline: !include baseline.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_calculation]
+
+openathan_calculation:
+  id: prayer_probe

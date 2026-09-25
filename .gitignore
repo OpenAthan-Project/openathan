@@ -16,6 +16,9 @@ dist/
 *.bin
 *.elf
 *.map
+*.mp3
+*.wav
+audio-manifest.json
 
 # OS/editor
 .DS_Store

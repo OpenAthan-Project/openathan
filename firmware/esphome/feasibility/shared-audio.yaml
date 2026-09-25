@@ -1,0 +1,50 @@
+packages:
+  calculations: !include calculations.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_audio]
+
+openathan_audio:
+  id: athan_audio
+  media_player_id: athan_player
+
+# Temporary diagnostic controls: short click normal, long click Fajr.
+# Any click while playing stops the current announcement.
+binary_sensor:
+  - platform: gpio
+    id: front_button
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - script.execute:
+              id: diagnostic_play
+              track: 1
+      - min_length: 2s
+        max_length: 5s
+        then:
+          - script.execute:
+              id: diagnostic_play
+              track: 2
+
+script:
+  - id: diagnostic_play
+    parameters:
+      track: int
+    then:
+      - if:
+          condition:
+            lambda: return id(athan_player).state != esphome::media_player::MEDIA_PLAYER_STATE_IDLE;
+          then:
+            - media_player.stop:
+                id: athan_player
+                announcement: true
+          else:
+            - lambda: id(athan_audio).play(static_cast<openathan::Track>(track));
