@@ -61,5 +61,13 @@ void OpenAthan::log_status_() {
     if (s.fault == ::openathan::Fault::NONE) ESP_LOGI(TAG, "%s", message);
     else ESP_LOGW(TAG, "%s", message);
   }
+  std::string conflicts;
+  for (const auto &conflict : s.conflicts) conflicts += ::openathan::describe_conflict(conflict) + "\n";
+  if (last_conflicts_ != conflicts) {
+    last_conflicts_ = conflicts;
+    if (conflicts.empty()) ESP_LOGI(TAG, "No Isha/Fajr conflicts in the schedule window");
+    else for (const auto &conflict : s.conflicts)
+      ESP_LOGW(TAG, "%s", ::openathan::describe_conflict(conflict).c_str());
+  }
 }
 }  // namespace esphome::openathan_component

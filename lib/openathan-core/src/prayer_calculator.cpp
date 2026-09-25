@@ -23,7 +23,7 @@ bool calculate_prayers(const PrayerRequest &r, PrayerDay &out) {
   const auto index = static_cast<unsigned>(r.method);
   if (index >= std::size(methods))
     return false;
-  if (static_cast<unsigned>(r.high_latitude) > 2)
+  if (static_cast<unsigned>(r.high_latitude) > static_cast<unsigned>(HighLatitudeRule::AUTO))
     return false;
   for (int offset : r.offsets)
     if (offset < -120 || offset > 120)
@@ -31,7 +31,9 @@ bool calculate_prayers(const PrayerRequest &r, PrayerDay &out) {
   try {
     auto parameters = methods[index]();
     parameters.madhab = r.hanafi ? Adhan::Madhab::Hanafi : Adhan::Madhab::Shafi;
-    parameters.highLatitudeRule = static_cast<Adhan::HighLatitudeRule>(r.high_latitude);
+    parameters.highLatitudeRule = r.high_latitude == HighLatitudeRule::AUTO
+        ? Adhan::recommended(Adhan::Coordinates(r.latitude, r.longitude))
+        : static_cast<Adhan::HighLatitudeRule>(r.high_latitude);
     parameters.adjustments = {r.offsets[0], r.offsets[1], r.offsets[2],
                               r.offsets[3], r.offsets[4], r.offsets[5]};
     const Adhan::PrayerTimes day(Adhan::Coordinates(r.latitude, r.longitude), date, parameters);

@@ -46,6 +46,26 @@ int main() {
     r.high_latitude=static_cast<HighLatitudeRule>(rule);
     check(calculate_prayers(r,out));
   }
+  auto high = PrayerRequest{51.5074, -0.1278, 2026, 6, 21, Method::MUSLIM_WORLD_LEAGUE};
+  // Delegate the threshold and hemisphere behavior exactly to upstream:
+  // greater than 48 north uses seventh; all other latitudes use middle.
+  for (double latitude : {-60.0, -48.1, 0.0, 48.0, 48.0001, 60.0}) {
+    high.latitude = latitude;
+    high.high_latitude = HighLatitudeRule::AUTO;
+    PrayerDay automatic, explicit_day;
+    check(calculate_prayers(high, automatic));
+    high.high_latitude = latitude > 48 ? HighLatitudeRule::SEVENTH_OF_NIGHT : HighLatitudeRule::MIDDLE_OF_NIGHT;
+    check(calculate_prayers(high, explicit_day) && automatic == explicit_day);
+  }
+  high.latitude = 51.5074;
+  std::array<PrayerDay, 3> rules;
+  for (unsigned rule=0; rule<3; ++rule) {
+    high.high_latitude = static_cast<HighLatitudeRule>(rule);
+    check(calculate_prayers(high, rules[rule]));
+  }
+  check(rules[0][0] != rules[1][0] && rules[1][0] != rules[2][0] && rules[0][0] != rules[2][0]);
+  high.high_latitude = static_cast<HighLatitudeRule>(4);
+  check(!calculate_prayers(high, out));
   r.high_latitude=HighLatitudeRule::MIDDLE_OF_NIGHT;
   r.offsets[0]=10;
   check(calculate_prayers(r,out) && out[0] == *original[0]+600);

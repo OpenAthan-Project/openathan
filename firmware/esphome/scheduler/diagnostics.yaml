@@ -26,6 +26,16 @@ text_sensor:
                s.skip ? openathan::prayer_name(s.skip->prayer) : "none",
                s.skip ? static_cast<long>(s.skip->day) : 0L);
       return std::string(text);
+  - platform: template
+    name: Scheduler conflicts
+    update_interval: 1s
+    lambda: |-
+      std::string text;
+      for (const auto &conflict : id(athan_scheduler).status().conflicts) {
+        if (!text.empty()) text += " | ";
+        text += openathan::describe_conflict(conflict);
+      }
+      return text.empty() ? std::string("none") : text;
 
 interval:
   - interval: 15s

@@ -9,7 +9,7 @@ enum class Method {
   MUSLIM_WORLD_LEAGUE, EGYPTIAN, KARACHI, UMM_AL_QURA, DUBAI, MOONSIGHTING_COMMITTEE,
   NORTH_AMERICA, KUWAIT, QATAR, SINGAPORE, TEHRAN, TURKEY
 };
-enum class HighLatitudeRule { MIDDLE_OF_NIGHT, SEVENTH_OF_NIGHT, TWILIGHT_ANGLE };
+enum class HighLatitudeRule { MIDDLE_OF_NIGHT, SEVENTH_OF_NIGHT, TWILIGHT_ANGLE, AUTO };
 struct PrayerRequest {
   double latitude;
   double longitude;
@@ -18,7 +18,7 @@ struct PrayerRequest {
   unsigned day;
   Method method;
   bool hanafi{false};
-  HighLatitudeRule high_latitude{HighLatitudeRule::MIDDLE_OF_NIGHT};
+  HighLatitudeRule high_latitude{HighLatitudeRule::AUTO};
   std::array<int, 6> offsets{};
 };
 // Fajr, sunrise, Dhuhr, Asr, Maghrib, Isha; absent solar events remain absent.
