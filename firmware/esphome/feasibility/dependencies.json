@@ -1,0 +1,29 @@
+{
+  "checked_on": "2026-09-25",
+  "policy": "Latest compatible stable stack; ESPHome-recommended framework and toolchain",
+  "esphome": "2026.9.0",
+  "esp_idf": "5.5.5",
+  "xtensa_esp_elf": "esp-14.2.0_20260121",
+  "adhan_cpp": {
+    "release": "v1.0.2",
+    "commit": "8d65a2906dbdb90a84d30d385a1b5f84e38d0c1f"
+  },
+  "optional_diagnostic_libraries": {
+    "esphome/noise-c": "0.1.30",
+    "esphome/libsodium": "1.10021.11"
+  },
+  "managed_components": {
+    "esphome/esp-audio-libs": {
+      "version": "3.2.1",
+      "component_hash": "7e554555cce160b406ad6280f6efa9f0e10fceb1bd69ceb70b7e5fd3135b500a"
+    },
+    "esphome/micro-mp3": {
+      "version": "0.4.0",
+      "component_hash": "51106d6a6ef13d37b598aa06b4a4de39249319110f990950eb123203a9e2eb6d"
+    },
+    "espressif/mdns": {
+      "version": "1.12.0",
+      "component_hash": "3ba256ac95e07c274be53cbd73f06cb846c403b61e8fbdf1be57bdb79db7a63e"
+    }
+  }
+}
