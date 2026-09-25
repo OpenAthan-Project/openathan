@@ -125,6 +125,91 @@ static void timezones() {
   CHECK(f.device.local_date(epoch({2026,1,1},13),s.timezone,date) && day_number(date)==day_number({2026,1,2}));
   CHECK(f.device.local_date(epoch({2026,7,1},13),s.timezone,date) && day_number(date)==day_number({2026,7,1}));
 }
+
+static void occurrence_identity() {
+  Fixture f;f.begin();
+  const auto displayed=f.device.status().next;CHECK(displayed);
+  f.device.utc += 86400;f.device.update();
+  CHECK(!f.device.skip_occurrence(*displayed));
+  CHECK(!f.device.status().skip);
+}
+static void setup_gate_and_preview() {
+  Fixture f; f.device.require_setup(); f.begin();
+  CHECK(std::string(f.device.setup_state()) == "incomplete");
+  CHECK(!f.device.status().automatic_ready);
+  const auto initial_writes = nvs_test::writes;
+  f.device.utc = epoch({2026,9,25},5)-1;
+  for (int i=0;i<65;++i) f.device.step(1);
+  CHECK(f.audio.starts == 0 && nvs_test::writes == initial_writes);
+  CHECK(!f.device.skip_next() && !f.device.cancel_skip());
+  PrayerDay times; std::vector<Event> events; std::vector<ScheduleConflict> conflicts;
+  CHECK(f.device.preview(f.value(), times, events, conflicts));
+  CHECK(nvs_test::writes == initial_writes && f.audio.starts == 0);
+  auto changed = f.value(); changed.prayer.latitude=44; changed.volume=42;
+  CHECK(f.save(changed)==SettingsResult::SAVED);
+  Fixture interrupted(false); interrupted.device.require_setup(); interrupted.begin();
+  CHECK(!interrupted.device.activated() && interrupted.value()==changed);
+  const auto revision=interrupted.device.settings_service()->saved()->revision;
+  CHECK(!interrupted.device.finish_setup(revision-1));
+  CHECK(interrupted.device.finish_setup(revision));
+  CHECK(interrupted.device.activated());
+  Fixture reboot(false); reboot.device.require_setup(); reboot.begin();
+  CHECK(reboot.device.activated() && reboot.value()==changed);
+  // Existing developer settings are adopted without resetting their history.
+  Fixture legacy; legacy.begin(); legacy.device.utc=epoch({2026,9,25},5)-1;legacy.device.update();legacy.device.step(1);
+  const auto history=nvs_test::committed.at({"openathan","scheduler"});
+  Fixture migrated(false);migrated.device.require_setup();migrated.device.utc=legacy.device.utc;migrated.begin();
+  CHECK(migrated.device.activated() && nvs_test::committed.at({"openathan","scheduler"})==history);
+}
+#ifdef OPENATHAN_JSON_TEST
+#include "../firmware/esphome/components/openathan_device/local_api.h"
+static void local_api() {
+  using namespace esphome::openathan_device;
+  Fixture f;f.device.require_setup();f.begin();
+  const ZoneEntry zones[]={{"UTC",R"({"standard_offset":0,"daylight_offset":0,"start":{"type":0,"time_seconds":0,"day":0,"month":0,"week":0,"day_of_week":0},"end":{"type":0,"time_seconds":0,"day":0,"month":0,"week":0,"day_of_week":0}})"}};
+  LocalApi api(&f.device,zones,1);api.set_context("openathan-test.local",true);
+  auto call=[&](const char *method,const char *uri,const std::string &body="") {
+    ApiExchange exchange;exchange.method=method;exchange.uri=uri;exchange.body=body;
+    api.handle(exchange);return exchange;
+  };
+  auto initial=call("GET","/api/status");CHECK(initial.code==200);
+  JsonDocument current;CHECK(!deserializeJson(current,initial.response));
+  CHECK(current["setup"]=="incomplete" && current["clock_ready"].as<bool>());
+  CHECK(current["schedule"]["state"]=="setup_required");
+  JsonDocument request;request["schema"]=1;request["expected_revision"]=1;request["settings"]=current["settings"];
+  request["settings"]["latitude"]=44.3894;
+  auto body=[&](){std::string value;serializeJson(request,value);return value;};
+  const auto writes=nvs_test::writes;
+  CHECK(call("POST","/api/preview",body()).code==200 && nvs_test::writes==writes);
+  f.device.valid=false;
+  CHECK(call("POST","/api/preview",body()).response.find("waiting_for_time")!=std::string::npos);
+  auto saved=call("POST","/api/activate",body());CHECK(saved.code==200);
+  CHECK(f.device.activated() && !f.device.status().automatic_ready);
+  CHECK(call("POST","/api/settings",body()).code==409); // stale write cannot replay
+  CHECK(call("POST","/api/stop","{}").code==200);
+  request["expected_revision"]=2;
+  request["settings"]["timezone"]= "Invented/Zone";
+  CHECK(call("POST","/api/settings",body()).code==400);
+  request["settings"]["timezone"]="UTC";
+  request["settings"]["timezone_rules"]["standard_offset"]=3600;
+  CHECK(call("POST","/api/settings",body()).code==200 && f.value().timezone.standard_offset==0);
+  request["refresh_timezone"]=true;
+  CHECK(call("POST","/api/settings",body()).code==200 && f.value().timezone.standard_offset==0);
+  request["surprise"]=true;
+  CHECK(call("POST","/api/settings",body()).code==400);request.remove("surprise");
+  CHECK(call("POST","/api/settings","{broken").code==400);
+  f.device.valid=true;f.device.update();
+  auto state=call("GET","/api/status");CHECK(!deserializeJson(current,state.response));
+  JsonDocument skip;skip["expected_revision"]=2;skip["occurrence"]=current["next"];
+  std::string payload;serializeJson(skip,payload);
+  CHECK(call("POST","/api/skip",payload).code==200);
+  auto prior=f.value();prior.prayer.offsets[0]=1;CHECK(f.save(prior)==SettingsResult::SAVED);
+  CHECK(call("POST","/api/skip",payload).code==409);
+  CHECK(call("GET","/api/timezones").response.find("UTC")!=std::string::npos);
+  CHECK(call("GET","/not-found").code==404);
+}
+#endif
+
 #ifdef OPENATHAN_JSON_TEST
 static void coordinate_roundtrip() {
   // Exercise wire JSON, not an in-memory JsonDocument copy: ArduinoJson's
@@ -226,8 +311,8 @@ static void json_transport() {
 }
 #endif
 int main() {
-  updates_and_replay(); volume_and_faults(); timezones();
+  updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview();
 #ifdef OPENATHAN_JSON_TEST
-  json_transport(); coordinate_roundtrip();
+  json_transport(); coordinate_roundtrip(); local_api();
 #endif
 }

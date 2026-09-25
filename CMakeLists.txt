@@ -36,3 +36,16 @@ if(NOT APPLE)
   target_link_libraries(audio_validator PRIVATE OpenSSL::Crypto)
   target_link_libraries(audio_adapter_tests PRIVATE OpenSSL::Crypto)
 endif()
+
+add_executable(provisioning_tests tests/provisioning_tests.cpp
+  firmware/esphome/components/openathan/setup_store.cpp
+  firmware/esphome/components/openathan_device/protocol.cpp
+  firmware/esphome/components/openathan_device/digest.cpp
+  firmware/esphome/components/openathan_device/credential_store.cpp)
+target_include_directories(provisioning_tests PRIVATE tests/stubs
+  firmware/esphome/components/openathan firmware/esphome/components/openathan_device)
+target_link_libraries(provisioning_tests PRIVATE openathan_core)
+if(NOT APPLE)
+  target_link_libraries(provisioning_tests PRIVATE OpenSSL::Crypto)
+endif()
+add_test(NAME provisioning_safety COMMAND provisioning_tests)

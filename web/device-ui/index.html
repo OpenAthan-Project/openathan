@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenAthan · Device settings</title><link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header><div><p class="eyebrow">YOUR PRAYER COMPANION</p><h1>OpenAthan</h1></div><span id="setup-state" class="badge">Connecting</span></header>
+  <p id="message" role="status" aria-live="polite">Reading your device…</p>
+  <section class="card" aria-labelledby="today-title">
+    <div class="section-heading"><h2 id="today-title">Today</h2><button id="refresh" class="quiet" type="button">Refresh</button></div>
+    <p id="next" class="next">Waiting for device status</p><p id="health" class="muted"></p>
+    <dl id="times" class="times"></dl><p id="conflicts" class="muted"></p>
+    <div class="actions"><button id="stop" type="button" class="secondary">Stop playback</button><button id="skip" type="button" class="secondary">Skip next announcement</button><button id="cancel-skip" type="button" class="quiet" hidden>Cancel skip</button></div>
+  </section>
+  <section class="card" aria-labelledby="settings-title">
+    <h2 id="settings-title">Your settings</h2><p id="setup-help" class="muted">Choose your location and calculation settings. Review the timetable before finishing setup.</p>
+    <form id="settings">
+      <fieldset id="fields" disabled>
+        <legend class="sr-only">Prayer settings</legend>
+        <div class="grid"><label>Latitude<input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" required inputmode="decimal" placeholder="e.g. 44.3894"></label><label>Longitude<input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" required inputmode="decimal" placeholder="e.g. −79.6903"></label></div>
+        <label>Timezone<input id="timezone" name="timezone" list="zones" required autocomplete="off" placeholder="Search, e.g. America/Toronto"></label><datalist id="zones"></datalist>
+        <label>Calculation method<select id="method" required><option value="">Choose a method</option></select></label>
+        <label>Asr calculation<select id="asr"><option value="standard">Standard</option><option value="hanafi">Hanafi</option></select></label>
+        <fieldset class="prayers"><legend>Play Athan for</legend><div id="enabled" class="checks"></div></fieldset>
+        <label for="volume">Volume <output id="volume-value" for="volume">70%</output></label><input id="volume" type="range" min="0" max="100" value="70"><p class="hint">Changes apply when you save. Zero is silent.</p>
+        <details><summary>Advanced settings</summary><label>High-latitude rule<select id="high-latitude"><option value="auto">Automatic</option><option value="middle_of_night">Middle of the night</option><option value="seventh_of_night">One seventh of the night</option><option value="twilight_angle">Twilight angle</option></select></label><p class="hint">Prayer offsets, in minutes (−120 to +120).</p><div id="offsets" class="grid"></div><label class="check"><input id="refresh-timezone" type="checkbox">Refresh saved timezone rules from this firmware</label></details>
+      </fieldset>
+      <section id="preview-section" class="preview" hidden aria-labelledby="preview-title"><h3 id="preview-title">Schedule preview</h3><dl id="preview-times" class="times"></dl><p id="preview-message"></p></section>
+      <div class="actions"><button id="preview" type="button" class="secondary" disabled>Preview schedule</button><button id="save" type="submit" disabled>Finish setup</button><button id="reload" type="button" class="quiet" disabled>Reload saved settings</button></div>
+    </form>
+  </section>
+  <footer><span id="address"></span><p>Wi‑Fi or password changed? Connect by USB to recover access. Keep your phone on the same network as the device.</p></footer>
+</main>
+</body>
+</html>

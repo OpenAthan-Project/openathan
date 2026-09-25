@@ -37,7 +37,7 @@ jobs:
       - name: Validate developer configurations
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
-          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation; do
+          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan; do
             python -m esphome config "firmware/esphome/$config.yaml" > "$RUNNER_TEMP/config.log" 2>&1 || { cat "$RUNNER_TEMP/config.log"; exit 1; }
           done
 
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [device, validation]
+        configuration: [device, validation, reference]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,9 +66,16 @@ jobs:
           ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
-          python -m esphome compile "firmware/esphome/scheduler/$CONFIGURATION.yaml" > "$RUNNER_TEMP/compile.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/compile.log"; exit 1; }
+          if [ "$CONFIGURATION" = reference ]; then
+            config=firmware/esphome/openathan.yaml
+            image=openathan
+          else
+            config="firmware/esphome/scheduler/$CONFIGURATION.yaml"
+            image=openathan-feasibility
+          fi
+          python -m esphome compile "$config" > "$RUNNER_TEMP/compile.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/compile.log"; exit 1; }
           python tools/check_feasibility.py \
-            --build-dir "$ESPHOME_BUILD_PATH/openathan-feasibility" \
+            --build-dir "$ESPHOME_BUILD_PATH/$image" \
             --log "$RUNNER_TEMP/compile.log" \
             --audio-image "$RUNNER_TEMP/audio-fixture/athan-audio.bin"
       - name: Test settings JSON with the resolved firmware library
@@ -79,3 +86,22 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
           cmake --build build --target openathan_core --parallel 2
           python -m unittest discover -s tests -p test_settings_adapter.py -v
+
+  device-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install browser test dependencies
+        working-directory: web/device-ui
+        run: |
+          node --version
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium webkit
+      - name: Test device UI and browser Digest login
+        working-directory: web/device-ui
+        env:
+          OPENATHAN_TEST_BROWSERS: chromium,webkit
+        run: npm test

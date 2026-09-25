@@ -2,6 +2,7 @@
 #include "esphome/core/log.h"
 #include <esp_timer.h>
 #include <cstdio>
+#include <ctime>
 #include <sys/time.h>
 
 namespace esphome::openathan_component {
@@ -21,7 +22,14 @@ void OpenAthan::setup() {
        stored_rule(tz.dst_start), stored_rule(tz.dst_end)},
       static_cast<uint8_t>(playback_->volume_percent().value_or(70))};
   // Load independently: a settings upgrade must never overwrite consumption.
-  const bool settings_ok = settings_service_->begin(defaults);
+  bool gate_ok = true;
+  if (setup_gate_) {
+    ::openathan::SavedSettings existing;
+    ::openathan::DurableState history;
+    gate_ok = setup_gate_->begin(settings_store_->load(existing), state_store_->load(history));
+    defaults.volume = 70;
+  }
+  const bool settings_ok = gate_ok && settings_service_->begin(defaults);
   scheduler_->begin(settings_ok ? settings_service_->saved()->value.prayer : settings_);
   if (!settings_ok) scheduler_->block_storage();
   scheduler_->allow_playback(false);
@@ -32,14 +40,16 @@ void OpenAthan::setup() {
     ESP_LOGI(TAG, "Restored settings revision=%lu crc=%08lx clock=%s", static_cast<unsigned long>(saved.revision),
         static_cast<unsigned long>(::openathan::read_u32(record.data() + record.size() - 4)),
         read().valid ? "ready" : "waiting");
-  } else ESP_LOGE(TAG, "Settings unavailable; automatic playback blocked, NVS retained");
+  } else {
+    ESP_LOGE(TAG, "Settings unavailable; automatic playback blocked, NVS retained");
+  }
   clock_->add_on_time_sync_callback([this]() { this->update(); });
   update();
 }
 void OpenAthan::reload_schedule() {
   if (scheduler_ && settings_service_ && settings_service_->healthy()) {
     scheduler_->begin(settings_service_->saved()->value.prayer);
-    scheduler_->allow_playback(volume_applied_);
+    scheduler_->allow_playback(volume_applied_ && activated());
     update();
   }
 }
@@ -53,6 +63,14 @@ bool OpenAthan::local_date(int64_t utc, const ::openathan::Timezone &tz, ::opena
 bool OpenAthan::local_date(int64_t utc, ::openathan::CivilDate &date) const {
   return settings_service_ && settings_service_->saved() &&
       local_date(utc, settings_service_->saved()->value.timezone, date);
+}
+std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz) const {
+  const time::ParsedTimezone parsed{tz.standard_offset, tz.daylight_offset, applied_rule(tz.start), applied_rule(tz.end)};
+  tm local{};
+  if (!time::epoch_to_local_tm(utc, parsed, &local)) return {};
+  char text[32];
+  if (std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M", &local) == 0) return {};
+  return text;
 }
 ::openathan::ClockSample OpenAthan::read() {
   timeval wall{};
@@ -89,7 +107,7 @@ void OpenAthan::apply_volume_() {
   if (!settings_service_ || !settings_service_->healthy() || !scheduler_) return;
   const unsigned wanted = settings_service_->saved()->value.volume;
   volume_applied_ = playback_->volume_percent() == std::optional<unsigned>(wanted);
-  scheduler_->allow_playback(volume_applied_);
+  scheduler_->allow_playback(volume_applied_ && activated());
   if (!volume_applied_) {
     ++volume_attempts_;
     playback_->request_volume_percent(wanted);
@@ -113,7 +131,7 @@ const char *OpenAthan::settings_application_status() const {
 void OpenAthan::update() {
   if (!scheduler_) return;
   apply_volume_();
-  scheduler_->tick();
+  if (activated()) scheduler_->tick();
   log_status_();
 }
 void OpenAthan::stop() {
@@ -121,16 +139,45 @@ void OpenAthan::stop() {
   log_status_();
 }
 bool OpenAthan::skip_next() {
-  const bool ok = scheduler_ && scheduler_->skip_next();
-  if (!ok) ESP_LOGW(TAG, "Skip request rejected; check clock, next prayer and storage");
+  const bool ok = activated() && scheduler_ && scheduler_->skip_next();
+  if (!ok) { ESP_LOGW(TAG, "Skip request rejected; check clock, next prayer and storage"); }
   log_status_();
   return ok;
 }
 bool OpenAthan::cancel_skip() {
-  const bool ok = scheduler_ && scheduler_->cancel_skip();
-  if (!ok) ESP_LOGW(TAG, "Cancel skip rejected; durable state unavailable");
+  const bool ok = activated() && scheduler_ && scheduler_->cancel_skip();
+  if (!ok) { ESP_LOGW(TAG, "Cancel skip rejected; durable state unavailable"); }
   log_status_();
   return ok;
+}
+const char *OpenAthan::setup_state() const {
+  if (!setup_gate_) return "active";
+  if (!setup_gate_->healthy()) return "storage_fault";
+  return setup_gate_->active() ? "active" : "incomplete";
+}
+bool OpenAthan::finish_setup(uint32_t revision) {
+  if (!settings_service_ || !settings_service_->healthy() || !settings_service_->saved() ||
+      settings_service_->saved()->revision != revision || !scheduler_ ||
+      scheduler_->status().fault == ::openathan::Fault::STORAGE) return false;
+  const auto now = read();
+  if (now.valid && !scheduler_->validate_schedule(settings_service_->saved()->value.prayer, now.local_date)) return false;
+  if (setup_gate_ && !setup_gate_->activate()) { scheduler_->block_storage(); return false; }
+  update();
+  return true;
+}
+bool OpenAthan::preview(const ::openathan::DeviceSettings &settings, ::openathan::PrayerDay &day,
+                       std::vector<::openathan::Event> &events,
+                       std::vector<::openathan::ScheduleConflict> &conflicts) {
+  const auto now = read();
+  ::openathan::CivilDate date;
+  return scheduler_ && now.valid && local_date(now.utc, settings.timezone, date) &&
+      scheduler_->preview(settings.prayer, date, day, events, conflicts);
+}
+bool OpenAthan::skip_occurrence(const ::openathan::Event &expected) {
+  return activated() && scheduler_ && scheduler_->skip_next(expected);
+}
+bool OpenAthan::cancel_occurrence(::openathan::EventKey expected) {
+  return activated() && scheduler_ && scheduler_->status().skip == expected && scheduler_->cancel_skip();
 }
 void OpenAthan::log_status_() {
   const auto s = status();
@@ -142,16 +189,19 @@ void OpenAthan::log_status_() {
       s.skip ? ::openathan::prayer_name(s.skip->prayer) : "none", s.skip ? static_cast<long>(s.skip->day) : 0L);
   if (last_status_ != message) {
     last_status_ = message;
-    if (s.fault == ::openathan::Fault::NONE) ESP_LOGI(TAG, "%s", message);
-    else ESP_LOGW(TAG, "%s", message);
+    if (s.fault == ::openathan::Fault::NONE) { ESP_LOGI(TAG, "%s", message); }
+    else { ESP_LOGW(TAG, "%s", message); }
   }
   std::string conflicts;
   for (const auto &conflict : s.conflicts) conflicts += ::openathan::describe_conflict(conflict) + "\n";
   if (last_conflicts_ != conflicts) {
     last_conflicts_ = conflicts;
-    if (conflicts.empty()) ESP_LOGI(TAG, "No Isha/Fajr conflicts in the schedule window");
-    else for (const auto &conflict : s.conflicts)
-      ESP_LOGW(TAG, "%s", ::openathan::describe_conflict(conflict).c_str());
+    if (conflicts.empty()) { ESP_LOGI(TAG, "No Isha/Fajr conflicts in the schedule window"); }
+    else {
+      for (const auto &conflict : s.conflicts) {
+        ESP_LOGW(TAG, "%s", ::openathan::describe_conflict(conflict).c_str());
+      }
+    }
   }
 }
 }  // namespace esphome::openathan_component

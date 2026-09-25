@@ -151,4 +151,12 @@ void OpenAthan::read_settings_json(const std::string &payload) {
     return true;
   });
 }
+bool OpenAthan::parse_settings_json(JsonObjectConst root, ::openathan::DeviceSettings &candidate,
+                                   uint32_t &revision) const {
+  if (root.size() != 3 || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1 ||
+      !root["expected_revision"].is<uint32_t>() || !read_value(root["settings"], candidate) ||
+      !::openathan::valid_device_settings(candidate)) return false;
+  revision = root["expected_revision"].as<uint32_t>();
+  return true;
+}
 }  // namespace esphome::openathan_component

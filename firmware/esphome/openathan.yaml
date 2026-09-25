@@ -1,15 +1,98 @@
-# OpenAthan official reference-firmware entry point.
-#
-# This file composes the hardware-independent OpenAthan package with the
-# C126 + A167 reference-hardware package. It remains a non-buildable scaffold
-# until the product services have been implemented and validated. A separate
-# scheduler/ build exercises scheduled playback and persistent controls. Do not publish
-# it as an end-user firmware release yet.
-#
-# Official-only provisioning, networking, OTA, time synchronization, local UI,
-# and release settings will also be configured at this layer. They do not
-# belong in the reusable packages/openathan.yaml package.
+# Reference firmware with USB provisioning and a device-hosted settings UI.
+# Development candidate: public installer, approved audio, and hardware acceptance
+# are separate release gates. No private credentials are compiled into this image.
+esphome:
+  name: openathan
+  name_add_mac_suffix: true
+  min_version: 2026.9.0
 
 packages:
   openathan: !include packages/openathan.yaml
   reference_hardware: !include packages/hardware/voice-pyramid.yaml
+
+esp32:
+  partitions: feasibility/partitions.csv
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [openathan_audio, openathan_device, improv_serial]
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: NONE
+
+wifi:
+  enable_on_boot: false
+  reboot_timeout: 0s
+
+mdns:
+  services:
+    - service: _http
+      protocol: _tcp
+      port: 80
+
+time:
+  - platform: sntp
+    id: athan_clock
+    timezone: UTC
+
+media_player:
+  - platform: speaker
+    id: athan_player
+    internal: true
+    volume_initial: 70%
+    volume_max: 60%
+    announcement_pipeline:
+      speaker: pyramid_speaker
+      format: MP3
+      sample_rate: 44100
+      num_channels: 1
+
+openathan_audio:
+  id: athan_audio
+  media_player_id: athan_player
+
+# These seed values are inactive until an explicit full setup document is saved
+# and activation committed. Existing saved settings take precedence.
+openathan:
+  id: athan_scheduler
+  time_id: athan_clock
+  playback_id: athan_audio
+  latitude: 0
+  longitude: 0
+  method: muslim_world_league
+  timezone_name: UTC
+  high_latitude: auto
+
+openathan_device:
+  id: athan_device
+  openathan_id: athan_scheduler
+
+improv_serial:
+  device_id: athan_device
+
+binary_sensor:
+  - platform: gpio
+    id: front_button
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - openathan.stop:
+              id: athan_scheduler
+      - min_length: 2s
+        max_length: 5s
+        then:
+          - openathan.skip_next:
+              id: athan_scheduler
+      - min_length: 6s
+        max_length: 10s
+        then:
+          - openathan.cancel_skip:
+              id: athan_scheduler

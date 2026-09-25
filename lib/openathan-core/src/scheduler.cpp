@@ -97,6 +97,15 @@ void Scheduler::block_storage() {
   next_.reset();
   fault_ = Fault::STORAGE;
 }
+bool Scheduler::preview(const Settings &settings, CivilDate date, PrayerDay &day,
+                        std::vector<Event> &events, std::vector<ScheduleConflict> &conflicts) const {
+  Scheduler scratch(clock_, calculator_, store_, playback_);
+  if (!valid_date(date) || !scratch.configure(settings) || !scratch.rebuild(date) ||
+      !calculator_.calculate(settings, date, day)) return false;
+  events = std::move(scratch.events_);
+  conflicts = std::move(scratch.conflicts_);
+  return true;
+}
 bool Scheduler::rebuild(CivilDate date) {
   // Clearing the timetable invalidates its cached date, including on failure.
   built_day_ = NEVER_CONSUMED;
@@ -249,9 +258,11 @@ void Scheduler::tick() {
   if (due) fault_ = playback_.start(due->key.prayer == Prayer::FAJR ? Track::FAJR : Track::NORMAL)
                         ? Fault::NONE : Fault::PLAYBACK_REJECTED;
 }
-bool Scheduler::skip_next() {
+bool Scheduler::skip_next(const std::optional<Event> &expected) {
   tick();
   if (!storage_ok_ || !armed_ || !next_) return false;
+  if (expected && (expected->key != next_->key || expected->utc != next_->utc ||
+      expected->shared_with != next_->shared_with)) return false;
   DurableState candidate = state_;
   // Repeated presses do not move an already selected skip onto another prayer.
   if (candidate.skip) return true;

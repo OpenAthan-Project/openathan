@@ -104,3 +104,11 @@ media_player:
     def test_settings_timezone_label_matches_boot_rules(self):
         self.validate(self.config("  timezone_name: America/Toronto"), True)
         self.validate(self.config("  timezone_name: Asia/Kolkata"), False, "timezone_name must resolve")
+
+    def test_reference_product_configuration(self):
+        result = subprocess.run([sys.executable, "-m", "esphome", "config",
+                                 str(ROOT / "firmware/esphome/openathan.yaml")],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("enable_on_boot: false", result.stdout)
+        self.assertIn("name_add_mac_suffix: true", result.stdout)

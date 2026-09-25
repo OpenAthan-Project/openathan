@@ -15,14 +15,12 @@ physical power cuts; consumed, disabled and skipped prayers did not replay when
 moved later. Precise write/commit failures and wider timezone/clock cases are
 covered by automated tests.
 
-Next is phone-based setup and ongoing local settings. The initial direction is
-USB installation followed by Wi-Fi provisioning through the same connection,
-USB recovery for changed network credentials, and a handoff to local setup on a
-phone or computer. Manual location entry is sufficient initially. Local access
-will use a device password chosen during USB setup, with recovery through USB.
-These are accepted design choices; the protocol and first-run confirmation still
-need implementation. Provisioning and recovery must preserve prayer settings
-and consumption.
+The reference development candidate now implements USB Wi-Fi/password setup
+and recovery, a phone-friendly local settings interface, and explicit first-run
+activation. Host/API/browser tests and a firmware build validate the implementation;
+physical USB/radio/mobile-device acceptance is pending. The public website and
+installer remain separate work. Provisioning and recovery preserve prayer settings
+and consumption; see the [handoff contract](../../firmware/esphome/provisioning/README.md).
 
 ## Phase 0 — Hardware validation
 
@@ -44,7 +42,7 @@ Additional items:
 
 ## Phase 1 — Standalone Athan MVP
 
-- [ ] Wi-Fi provisioning.
+- [x] Wi-Fi provisioning.
 - [x] NTP/timezone handling.
 - [x] Local prayer calculation.
 - [x] Calculation method and Asr method selection.
@@ -60,16 +58,19 @@ Additional items:
 - [x] Saved volume with player readback and retry.
 - [x] Stop, skip/cancel and durable replay protection across settings changes and restarts.
 - [x] Encrypted developer console for reading and changing complete settings snapshots.
-- [ ] First-run setup confirmation before automatic playback.
+- [x] First-run setup confirmation before automatic playback.
 - [ ] Reference-build adapter for optional display status.
 
 ## Phase 2 — Installation and local UI
 
 - [ ] Browser installer at `openathan.com/install`.
-- [ ] Local setup wizard.
-- [ ] Local control/configuration interface at `openathan.local`.
+- [x] Local setup wizard.
+- [x] Local control/configuration interface at `openathan.local`.
 - [ ] OTA update flow.
 - [ ] Recovery/documented reflashing process.
+
+The implemented local interface uses a unique `openathan-<suffix>.local` hostname
+with an IP fallback. Its checkboxes describe implementation, not physical acceptance.
 
 Developer OTA and recovery procedures exist; the complete product update flow
 and ordinary-user recovery guidance remain unfinished.
@@ -78,8 +79,8 @@ Additional items:
 
 - [x] Developer application OTA with retained audio/settings/consumption and a
   reference-device test of automatic rollback after an unconfirmed startup failure.
-- [ ] Device password setup through USB and protected access to local settings.
-- [ ] USB Wi-Fi and password recovery that preserves prayer settings and consumption.
+- [x] Device password setup through USB and protected access to local settings.
+- [x] USB Wi-Fi and password recovery that preserves prayer settings and consumption.
 - [ ] Integrate qualified firmware release artifacts into the installer and update flow.
 
 Verified private recovery backups and developer procedures exist. Older layouts
