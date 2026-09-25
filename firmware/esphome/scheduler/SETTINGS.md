@@ -26,6 +26,8 @@ The response contains `schema`, `revision`, `settings`, `application`,
 Application status separately reports `applied`, `volume_pending`,
 `volume_failed`, or `storage_fault`. Read back until applied before evaluating
 volume. Export again before another edit: stale revisions are rejected.
+Coordinate numbers retain their full stored precision across export/import, so
+unchanged saves and volume-only edits preserve the exact saved location.
 
 | Setting | Values |
 | --- | --- |

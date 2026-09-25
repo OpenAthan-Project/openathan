@@ -1,5 +1,6 @@
 """Compile the production settings bridge with the pinned ESPHome timezone code."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -45,4 +46,13 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
                 str(ROOT / "firmware/esphome/components/openathan/nvs_state_store.cpp"),
                 str(ROOT / "firmware/esphome/components/openathan/nvs_settings_store.cpp"),
                 str(package / "components/time/posix_tz.cpp"), str(core), "-o", str(output)], check=True)
-            subprocess.run([str(output)], check=True)
+            result = subprocess.run([str(output)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            if include:
+                exports = [json.loads(line)["settings"] for line in result.stdout.splitlines()]
+                self.assertEqual([(s["latitude"], s["longitude"]) for s in exports], [
+                    (43.6532123456789, -79.3832123456789),
+                    (43.65, 179.99999999999997),
+                    (43.653212345678909, -79.383212345678913),
+                    (-89.99999999999999, 1.234567890123456e-10),
+                    (0.1, -0.1), (-0.0, 180.0)])

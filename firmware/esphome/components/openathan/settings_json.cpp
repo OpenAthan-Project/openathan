@@ -1,6 +1,10 @@
 #include "openathan.h"
 #include <cmath>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+#include <utility>
 
 namespace esphome::openathan_component {
 namespace {
@@ -9,6 +13,45 @@ constexpr const char *METHODS[] = {"muslim_world_league", "egyptian", "karachi",
 constexpr const char *HIGH_LATITUDE[] = {"middle_of_night", "seventh_of_night", "twilight_angle", "auto"};
 constexpr const char *EVENTS[] = {"fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"};
 constexpr const char *PRAYERS[] = {"fajr", "dhuhr", "asr", "maghrib", "isha"};
+std::string coordinate_number(double value) {
+  // ArduinoJson's default writer limits significant digits. Keep these as
+  // JSON numbers while retaining the exact stored double for export/readback.
+  char number[32];
+  std::snprintf(number, sizeof(number), "%.*g", std::numeric_limits<double>::max_digits10, value);
+  return number;
+}
+bool read_coordinates(const std::string &payload, ::openathan::Settings &settings) {
+  // The typed document has already been checked. Parse a second view with
+  // numeric tokens quoted so ArduinoJson cannot round them through float or
+  // its limited-mantissa number parser. It still handles structure, escaped
+  // keys and duplicate-key semantics; strtod handles only the two coordinates.
+  std::string quoted;
+  quoted.reserve(payload.size());
+  bool in_string = false;
+  for (size_t i = 0; i < payload.size();) {
+    const char c = payload[i];
+    if (!in_string && (c == '-' || (c >= '0' && c <= '9'))) {
+      const auto end = payload.find_first_not_of("0123456789.eE+-", i);
+      const auto count = (end == std::string::npos ? payload.size() : end) - i;
+      quoted += '"'; quoted.append(payload, i, count); quoted += '"'; i += count;
+    } else {
+      quoted += c; ++i;
+      if (in_string && c == '\\' && i < payload.size()) quoted += payload[i++];
+      else if (c == '"') in_string = !in_string;
+    }
+  }
+  return json::parse_json(quoted, [&settings](JsonObject root) {
+    for (const auto &[name, value] : {std::pair{"latitude", &settings.latitude},
+                                    std::pair{"longitude", &settings.longitude}}) {
+      if (!root["settings"][name].is<const char *>()) return false;
+      const auto number = root["settings"][name].as<std::string>();
+      char *end;
+      *value = std::strtod(number.c_str(), &end);
+      if (end != number.c_str() + number.size() || !std::isfinite(*value)) return false;
+    }
+    return true;
+  });
+}
 template<size_t N> bool choice(JsonVariantConst value, const char *const (&names)[N], unsigned &out) {
   if (!value.is<const char *>()) return false;
   const auto string = value.as<JsonString>();
@@ -61,8 +104,7 @@ bool read_value(JsonVariantConst root, ::openathan::DeviceSettings &s) {
   }
   s.timezone.standard_offset = tz["standard_offset"].as<int32_t>();
   s.timezone.daylight_offset = tz["daylight_offset"].as<int32_t>();
-  return read_rule(tz["start"], s.timezone.start) && read_rule(tz["end"], s.timezone.end) &&
-      ::openathan::valid_device_settings(s);
+  return read_rule(tz["start"], s.timezone.start) && read_rule(tz["end"], s.timezone.end);
 }
 }  // namespace
 void OpenAthan::write_settings_json(JsonObject root) const {
@@ -79,7 +121,8 @@ void OpenAthan::write_settings_json(JsonObject root) const {
   root["revision"] = saved.revision;
   auto value = root["settings"].to<JsonObject>();
   const auto &s = saved.value;
-  value["latitude"] = s.prayer.latitude; value["longitude"] = s.prayer.longitude;
+  value["latitude"] = serialized(coordinate_number(s.prayer.latitude));
+  value["longitude"] = serialized(coordinate_number(s.prayer.longitude));
   value["method"] = METHODS[static_cast<unsigned>(s.prayer.method)];
   value["asr_method"] = s.prayer.hanafi ? "hanafi" : "standard";
   value["high_latitude"] = HIGH_LATITUDE[static_cast<unsigned>(s.prayer.high_latitude)];
@@ -97,10 +140,11 @@ void OpenAthan::read_settings_json(const std::string &payload) {
   request_ok_ = false;
   request_error_ = "invalid settings document";
   if (payload.size() > 4096) return;
-  json::parse_json(payload, [this](JsonObject root) {
+  json::parse_json(payload, [this, &payload](JsonObject root) {
     ::openathan::DeviceSettings candidate;
     if (root.size() != 3 || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1 ||
-        !root["expected_revision"].is<uint32_t>() || !read_value(root["settings"], candidate)) return false;
+        !root["expected_revision"].is<uint32_t>() || !read_value(root["settings"], candidate) ||
+        !read_coordinates(payload, candidate.prayer) || !::openathan::valid_device_settings(candidate)) return false;
     const auto result = change_settings(candidate, root["expected_revision"].as<uint32_t>());
     request_ok_ = result == ::openathan::SettingsResult::SAVED || result == ::openathan::SettingsResult::UNCHANGED;
     request_error_ = request_ok_ ? "" : ::openathan::settings_result_name(result);

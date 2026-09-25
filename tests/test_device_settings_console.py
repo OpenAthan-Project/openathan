@@ -54,6 +54,8 @@ class SettingsConsoleTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.console.export_settings(ROOT / "settings.json", {})
 
     def test_uncertain_disconnect_reads_back_without_resending(self):
+        self.document["settings"]["latitude"] = 43.6532123456789
+        self.document["settings"]["longitude"] = -79.3832123456789
         request, _ = self.console.settings_request(self.document)
         snapshot = {"schema":1, "revision":5, "settings":request["settings"], "application":"applied"}
         calls = []
