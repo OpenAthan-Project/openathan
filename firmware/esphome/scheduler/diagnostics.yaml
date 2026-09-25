@@ -1,0 +1,47 @@
+# Optional encrypted local diagnostics for developer device validation.
+esphome:
+  includes:
+    - diagnostics.h
+  on_boot:
+    priority: -110
+    then:
+      - lambda: openathan_diagnostics();
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret diagnostic_api_key
+
+text_sensor:
+  - platform: template
+    name: Scheduler status
+    update_interval: 1s
+    lambda: |-
+      const auto s = id(athan_scheduler).status();
+      char text[256];
+      snprintf(text, sizeof(text), "clock=%d ready=%d playing=%d fault=%s next=%s utc=%lld skip=%s day=%ld",
+               s.clock_ready, s.automatic_ready, s.playing, openathan::fault_name(s.fault),
+               s.next ? openathan::prayer_name(s.next->key.prayer) : "none",
+               s.next ? static_cast<long long>(s.next->utc) : 0LL,
+               s.skip ? openathan::prayer_name(s.skip->prayer) : "none",
+               s.skip ? static_cast<long>(s.skip->day) : 0L);
+      return std::string(text);
+
+interval:
+  - interval: 15s
+    then:
+      - lambda: openathan_diagnostics();
+
+button:
+  - platform: template
+    name: Verify audio image
+    on_press:
+      - lambda: |-
+          if (!id(athan_audio).playing()) openathan_audio_digest();
+          else ESP_LOGW("oa_diagnostics", "Stop audio before hashing the partition");
+  - platform: restart
+    name: Diagnostic restart
+  - platform: template
+    name: Diagnostic status
+    on_press:
+      - lambda: openathan_diagnostics();

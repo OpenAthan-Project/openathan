@@ -1,0 +1,73 @@
+name: Firmware
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libssl-dev
+          python -m pip install -r firmware/esphome/requirements.txt
+      - name: Build and test core with UBSan
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+          python tools/run_tests.py
+      - name: Validate developer configurations
+        run: |
+          python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
+          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation; do
+            python -m esphome config "firmware/esphome/$config.yaml" > "$RUNNER_TEMP/config.log" 2>&1 || { cat "$RUNNER_TEMP/config.log"; exit 1; }
+          done
+
+  firmware-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [device, validation]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libffi-dev libssl-dev
+          python -m pip install -r firmware/esphome/requirements.txt
+      - name: Compile and inspect firmware
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+          ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
+        run: |
+          python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
+          python -m esphome compile "firmware/esphome/scheduler/$CONFIGURATION.yaml" > "$RUNNER_TEMP/compile.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/compile.log"; exit 1; }
+          python tools/check_feasibility.py \
+            --build-dir "$ESPHOME_BUILD_PATH/openathan-feasibility" \
+            --log "$RUNNER_TEMP/compile.log" \
+            --audio-image "$RUNNER_TEMP/audio-fixture/athan-audio.bin"

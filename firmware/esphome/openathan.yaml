@@ -2,8 +2,9 @@
 #
 # This file composes the hardware-independent OpenAthan package with the
 # C126 + A167 reference-hardware package. It remains a non-buildable scaffold
-# until those packages and the reference hardware have been implemented and
-# validated. Do not publish it as an end-user firmware release yet.
+# until the product services have been implemented and validated. A separate
+# scheduler/ build exercises scheduled playback and persistent controls. Do not publish
+# it as an end-user firmware release yet.
 #
 # Official-only provisioning, networking, OTA, time synchronization, local UI,
 # and release settings will also be configured at this layer. They do not
