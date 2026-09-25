@@ -1,5 +1,18 @@
 # Audio Strategy
 
+## Developer implementation
+
+The current scheduler plays normal and Fajr recordings from a separately
+provisioned shared audio partition. Saved volume is applied through the portable
+playback adapter with readback; the reference board retains its 60% output
+ceiling. Settings changes preserve current playback, and consumption is committed
+before a scheduled recording starts. A crash after consumption can omit playback
+but must not replay that prayer. See the [settings guide](../../firmware/esphome/scheduler/SETTINGS.md)
+and dated [device validation](feasibility-report.md).
+
+These developer results do not settle release recording selection, content
+approval or redistribution rights.
+
 ## Initial release
 
 The base device should support:

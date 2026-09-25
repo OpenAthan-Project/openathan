@@ -1,7 +1,7 @@
 # Documentation example for integrating OpenAthan with an existing ESPHome
-# configuration. This is not buildable yet: the OpenAthan component and its
-# capability-binding schema have not been implemented, and v1.0.0 is only an
-# illustrative future release tag.
+# configuration. The core component and Playback capability are implemented;
+# this broader optional-capability mapping is pseudocode, and v1.0.0 is only
+# an illustrative future release tag. This example is not buildable yet.
 
 packages:
   openathan:

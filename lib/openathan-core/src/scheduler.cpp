@@ -69,12 +69,7 @@ bool Scheduler::configure(const Settings &settings) {
   events_.clear();
   conflicts_.clear();
   configured_ = false;
-  bool valid = std::isfinite(settings.latitude) && std::isfinite(settings.longitude) &&
-      std::abs(settings.latitude) <= 90 && std::abs(settings.longitude) <= 180 &&
-      static_cast<unsigned>(settings.method) < 12 &&
-      static_cast<unsigned>(settings.high_latitude) <= static_cast<unsigned>(HighLatitudeRule::AUTO);
-  for (int offset : settings.offsets) valid = valid && offset >= -120 && offset <= 120;
-  if (!valid) {
+  if (!valid_settings(settings)) {
     fault_ = storage_ok_ ? Fault::INVALID_SETTINGS : Fault::STORAGE;
     return false;
   }
@@ -82,6 +77,25 @@ bool Scheduler::configure(const Settings &settings) {
   configured_ = true;
   fault_ = storage_ok_ ? Fault::NONE : Fault::STORAGE;
   return true;
+}
+bool valid_settings(const Settings &settings) {
+  bool valid = std::isfinite(settings.latitude) && std::isfinite(settings.longitude) &&
+      std::abs(settings.latitude) <= 90 && std::abs(settings.longitude) <= 180 &&
+      static_cast<unsigned>(settings.method) < 12 &&
+      static_cast<unsigned>(settings.high_latitude) <= static_cast<unsigned>(HighLatitudeRule::AUTO);
+  for (int offset : settings.offsets) valid = valid && offset >= -120 && offset <= 120;
+  return valid;
+}
+bool Scheduler::validate_schedule(const Settings &settings, CivilDate date) const {
+  // A scratch timetable never loads/saves consumption or calls playback.
+  Scheduler preview(clock_, calculator_, store_, playback_);
+  return valid_date(date) && preview.configure(settings) && preview.rebuild(date);
+}
+void Scheduler::block_storage() {
+  storage_ok_ = false;
+  armed_ = false;
+  next_.reset();
+  fault_ = Fault::STORAGE;
 }
 bool Scheduler::rebuild(CivilDate date) {
   // Clearing the timetable invalidates its cached date, including on failure.
@@ -227,7 +241,7 @@ void Scheduler::tick() {
   previous_ = now;
   armed_ = true;
   refresh_next(now.utc);
-  if (!playback_.ready()) {
+  if (!playback_allowed_ || !playback_.ready()) {
     fault_ = Fault::AUDIO_UNAVAILABLE;
     return;  // due event remains consumed; never retry when audio recovers
   }
@@ -251,7 +265,7 @@ bool Scheduler::cancel_skip() {
   return persist(candidate);
 }
 SchedulerStatus Scheduler::status() const {
-  return {clock_ready_, armed_ && configured_ && storage_ok_ && playback_.ready(),
+  return {clock_ready_, armed_ && configured_ && storage_ok_ && playback_allowed_ && playback_.ready(),
           playback_.playing(), next_, state_.skip, fault_, conflicts_};
 }
 }  // namespace openathan

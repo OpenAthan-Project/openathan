@@ -4,6 +4,9 @@
 #include "esphome/components/time/real_time_clock.h"
 #include "openathan/scheduler.h"
 #include "nvs_state_store.h"
+#include "nvs_settings_store.h"
+#include "esphome/components/time/posix_tz.h"
+#include "esphome/components/json/json_util.h"
 #include <memory>
 
 namespace esphome::openathan_component {
@@ -15,6 +18,8 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   // Internal injection points, wired before setup by the developer test harness.
   void set_calculator(::openathan::DayCalculator *calculator) { calculator_source_ = calculator; }
   void set_state_store(::openathan::StateStore *store) { state_store_ = store; }
+  void set_settings_store(::openathan::SettingsStore *store) { settings_store_ = store; }
+  void set_default_timezone(const std::string &name) { timezone_name_ = name; }
   void reload_schedule();
   void set_latitude(double value) { settings_.latitude = value; }
   void set_longitude(double value) { settings_.longitude = value; }
@@ -25,19 +30,38 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void set_enabled(size_t index, bool value) { if (index < 5) settings_.enabled[index] = value; }
   float get_setup_priority() const override { return setup_priority::LATE; }
   void setup() override;
+  void loop() override;
   void update() override;
   ::openathan::ClockSample read() override;
   ::openathan::SchedulerStatus status() const;
   void stop();
   bool skip_next();
   bool cancel_skip();
+  bool local_date(int64_t utc, const ::openathan::Timezone &timezone, ::openathan::CivilDate &date) const;
+  bool local_date(int64_t utc, ::openathan::CivilDate &date) const;
+  const ::openathan::SettingsService *settings_service() const { return settings_service_.get(); }
+  ::openathan::SettingsResult change_settings(const ::openathan::DeviceSettings &candidate, uint32_t revision);
+  void write_settings_json(JsonObject root) const;
+  void read_settings_json(const std::string &payload);
+  bool settings_request_ok() const { return request_ok_; }
+  const std::string &settings_request_error() const { return request_error_; }
+  const char *settings_application_status() const;
  private:
   void log_status_();
+  void apply_volume_();
   time::RealTimeClock *clock_{};
   ::openathan::Playback *playback_{};
   ::openathan::Settings settings_;
   ::openathan::DayCalculator calculator_;
   NvsStateStore store_;
+  NvsSettingsStore settings_nvs_;
+  ::openathan::SettingsStore *settings_store_{&settings_nvs_};
+  std::unique_ptr<::openathan::SettingsService> settings_service_;
+  std::string timezone_name_;
+  bool volume_applied_{false}, request_ok_{false};
+  unsigned volume_attempts_{};
+  uint64_t next_volume_check_{};
+  std::string request_error_;
   ::openathan::DayCalculator *calculator_source_{&calculator_};
   ::openathan::StateStore *state_store_{&store_};
   std::unique_ptr<::openathan::Scheduler> scheduler_;

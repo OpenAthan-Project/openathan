@@ -12,8 +12,8 @@ clear playback at a comfortable 70% volume on the previously installed image.
 
 ## Configuration and build
 
-Use the [pinned ESPHome environment](../feasibility/README.md). The scheduler
-adds no firmware dependencies. Create an ignored `secrets.yaml` alongside
+Use the [pinned ESPHome environment](../feasibility/README.md). The settings
+bridge uses the pinned ArduinoJson dependency. Create an ignored `secrets.yaml` alongside
 `development.yaml` containing these keys:
 
 ```yaml
@@ -63,11 +63,10 @@ These conflicts are reported separately from fatal faults; other prayers remain
 scheduled. This is OpenAthan's playback policy, not a change to the selected
 calculation rule or the returned prayer times.
 
-ESPHome's timezone is global. Every configured time source must specify the
-same timezone; the schema rejects missing or conflicting values. IANA names
-are resolved into ESPHome's timezone rules during configuration. Clock sources
-update the system UTC clock; the bridge derives the civil date from the same
-timestamp using those timezone rules.
+Every configured time source must initially specify the same explicit timezone.
+IANA names resolve to ESPHome rules during configuration. OpenAthan saves those
+rules on first upgrade; runtime edits use stored rules for its own civil dates,
+without changing UTC or other components' global timezone.
 
 ```sh
 export ESPHOME_BUILD_PATH=/tmp/openathan-scheduler
@@ -92,7 +91,9 @@ date), calculator, durable store, and playback capability. It maintains yesterda
 today and tomorrow, with guard-day calculations to classify Isha/Fajr conflicts
 at both edges. Event identity is the calculation date plus prayer, even
 when an offset moves playback across midnight. Core `configure()` re-arms with
-future events; the ESPHome developer settings are currently supplied at boot.
+future events. Settings initialize from the build on first upgrade, then restore
+from a separate durable record. The encrypted developer console can change them
+at runtime; see [saved settings](SETTINGS.md).
 
 Normal polls run once per second, with at most 2,000ms of lateness allowed.
 The core compares precise UTC elapsed time with monotonic elapsed time, allowing

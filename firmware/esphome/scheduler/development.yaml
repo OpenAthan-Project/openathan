@@ -25,6 +25,7 @@ openathan:
   latitude: !secret athan_latitude
   longitude: !secret athan_longitude
   method: !secret athan_method
+  timezone_name: !secret athan_timezone
   hanafi: false
   high_latitude: middle_of_night
   offsets:
@@ -34,6 +35,11 @@ openathan:
     asr: 0
     maghrib: 0
     isha: 0
+
+# Runtime settings own volume; direct API commands must not bypass durable saves.
+media_player:
+  - id: !extend athan_player
+    internal: true
 
 # Diagnostic controls: short click stops; 2-5s skips next; 6-10s cancels skip.
 binary_sensor:

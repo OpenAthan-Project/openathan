@@ -48,6 +48,14 @@ int main(int argc, char **argv) {
   PartitionAudio valid;
   valid.set_player(&player); valid.setup();
   check(!valid.is_failed() && valid.ready());
+  check(valid.volume_percent() == 70);
+  player.drop_volume = true;
+  check(valid.request_volume_percent(25) && valid.volume_percent() == 70);
+  player.drop_volume = false;
+  check(valid.request_volume_percent(25) && valid.volume_percent() == 25);
+  check(!valid.request_volume_percent(101));
+  check(valid.request_volume_percent(0) && valid.volume_percent() == 0 && player.is_muted());
+  check(valid.request_volume_percent(70) && valid.volume_percent() == 70 && !player.is_muted());
   check(valid.play(Track::NORMAL) && valid.play(Track::FAJR));
   check(!valid.play(static_cast<Track>(3)) && !valid.play(static_cast<Track>(0)));
   check(player.queued.size() == 2 && player.queued[0] != player.queued[1]);

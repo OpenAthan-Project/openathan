@@ -5,7 +5,10 @@ repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation
 for all six developer configurations. Separate jobs compile `scheduler/device.yaml`
 and `scheduler/validation.yaml`, then enforce dependency pins, partition layout,
-the 1.5 MiB application budget and factory/OTA payload consistency.
+the 1.5 MiB application budget and factory/OTA payload consistency. The device
+build also tests the production settings JSON bridge with the exact resolved
+ArduinoJson library. The host suite exercises interrupted settings writes and
+the bridge against pinned ESPHome timezone conversion code.
 
 CI uses Python 3.13 on Ubuntu 24.04 and the pinned ESPHome requirements. The
 macOS-specific constraints file must not be installed on Linux. Builds use

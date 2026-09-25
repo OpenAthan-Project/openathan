@@ -9,6 +9,7 @@ from esphome.components import esp32, time
 from esphome.const import CONF_ID
 
 DEPENDENCIES = ["esp32", "time"]
+AUTO_LOAD = ["json"]
 core = cg.global_ns.namespace("openathan")
 Playback = core.class_("Playback")
 Method = core.enum("Method", is_class=True)
@@ -41,6 +42,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required("latitude"): coordinate(-90, 90),
     cv.Required("longitude"): coordinate(-180, 180),
     cv.Required("method"): cv.enum(METHODS, lower=True),
+    cv.Optional("timezone_name"): cv.All(cv.string_strict, cv.Length(min=1, max=96)),
     cv.Optional("hanafi", default=False): cv.boolean,
     cv.Optional("high_latitude", default="auto"): cv.enum(HIGH_LATITUDE, lower=True),
     cv.Optional("offsets", default={}): cv.Schema({
@@ -58,6 +60,9 @@ def validate_timezone(config):
     # ESPHome's parsed timezone is global, even when multiple clock sources exist.
     if any(source.get("timezone") != clock["timezone"] for source in full.get("time", [])):
         raise cv.Invalid("All ESPHome time sources must use the same explicit timezone as OpenAthan")
+    if "timezone_name" in config and time.validate_tz(config["timezone_name"]) != clock["timezone"]:
+        raise cv.Invalid("timezone_name must resolve to the configured clock timezone")
+    config.setdefault("timezone_name", clock["timezone"])
     return config
 
 
@@ -71,6 +76,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_clock(await cg.get_variable(config["time_id"])))
+    cg.add(var.set_default_timezone(config["timezone_name"]))
     cg.add(var.set_playback(await cg.get_variable(config["playback_id"])))
     for field in ("latitude", "longitude", "method", "hanafi", "high_latitude"):
         cg.add(getattr(var, "set_" + field)(config[field]))

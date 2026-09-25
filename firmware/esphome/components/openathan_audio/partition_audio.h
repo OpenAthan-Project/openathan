@@ -16,6 +16,8 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   bool playing() const override;
   bool start(::openathan::Track track) override;
   void stop() override;
+  std::optional<unsigned> volume_percent() const override;
+  bool request_volume_percent(unsigned percent) override;
  protected:
   speaker::SpeakerMediaPlayer *player_{};
   std::string partition_;

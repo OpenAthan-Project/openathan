@@ -71,3 +71,11 @@ jobs:
             --build-dir "$ESPHOME_BUILD_PATH/openathan-feasibility" \
             --log "$RUNNER_TEMP/compile.log" \
             --audio-image "$RUNNER_TEMP/audio-fixture/athan-audio.bin"
+      - name: Test settings JSON with the resolved firmware library
+        if: matrix.configuration == 'device'
+        env:
+          OPENATHAN_ARDUINOJSON_INCLUDE: ${{ runner.temp }}/firmware/openathan-feasibility/managed_components/bblanchon__arduinojson/src
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
+          cmake --build build --target openathan_core --parallel 2
+          python -m unittest discover -s tests -p test_settings_adapter.py -v

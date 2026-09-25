@@ -15,6 +15,7 @@ class Validation : public Component, public ::openathan::DayCalculator, public :
  private:
   openathan_component::OpenAthan *scheduler_{};
   openathan_component::NvsStateStore store_{"oa_validation"};
+  openathan_component::NvsSettingsStore settings_store_{"oa_validation"};
   nvs_handle_t metadata_{};
   bool healthy_{false};
   int32_t day_{};

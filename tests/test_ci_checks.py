@@ -84,6 +84,14 @@ class CapacityChecksTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unexpected local"):
             self.inspect()
 
+    def test_settings_json_dependency_is_optional_but_pinned(self):
+        name = "bblanchon/arduinojson"
+        self.lock[name] = {**self.pins["optional_managed_components"][name], "source": {"type": "service"}}
+        self.assertTrue(self.inspect()["growth_target_passed"])
+        self.lock[name]["component_hash"] = "changed"
+        with self.assertRaisesRegex(ValueError, "dependencies differ"):
+            self.inspect()
+
     def test_factory_mismatch_and_app_budget(self):
         (self.build / "build/firmware.factory.bin").write_bytes(b"wrong")
         with self.assertRaisesRegex(ValueError, "payloads differ"):

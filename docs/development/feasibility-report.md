@@ -222,3 +222,50 @@ previously installed device-validation image. It does not validate later
 high-latitude firmware changes on hardware or recovery from faults after an
 application has already been confirmed healthy. Backups, the diagnostic source
 and image, and raw evidence remain in the private validation archive.
+
+## Saved runtime settings — 2026-09-25
+
+The AtomS3R/Voice Pyramid reference device was tested with ESPHome 2026.9.0,
+ESP-IDF 5.5.5 and the pinned settings implementation. Application-only OTA
+retained the existing partition layout. The synthetic timetable uses separate
+settings and consumption records from the production schedule.
+
+| Settings build | OTA `.bin` bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| --- | ---: | ---: | ---: |
+| Real schedule with encrypted developer controls | 1,117,488 | 113,651 | 979,664 |
+| Isolated synthetic validation timetable | 1,141,200 | 114,363 | 955,952 |
+
+Both builds passed the 1.5 MiB application target and retained the 3.5 MiB shared
+audio partition. The settings JSON bridge adds pinned ArduinoJson 7.4.3. These
+measurements precede any phone UI, provisioning or access-control implementation;
+static RAM figures do not establish their future runtime headroom.
+
+Physical bottom-power cuts preserved every settings field, decoded timezone
+rules, revision and consumed-prayer watermark. Settings and volume were already
+applied while the clock was invalid; the 30-second cold-start gate stayed silent.
+An update interrupted before acknowledgment restored its complete new snapshot
+without resending the write or losing consumption. The exact instant of the
+flash write/commit relative to the cut was not observed.
+
+After cutting power during a consumed Fajr, its time was moved three minutes
+into the future. The clock synchronized before that time, and no replay occurred.
+The next unconsumed prayer played on time after a volume-only save two seconds
+before it was due. The listener confirmed silence at the moved time and clear,
+continuous subsequent playback through volume and scheduling changes. Invalid
+values, invalid ordering and stale revisions were rejected without mutation;
+unchanged saves retained their revision, and skip identity survived reconfiguration.
+
+Disabled and skipped prayers were consumed silently and did not replay after
+being re-enabled or moved later. The device finished on the real schedule with
+its intended settings, all prayers enabled, zero offsets and 70% volume. Its
+production consumption history was retained, the next real prayer was correct,
+and the complete audio-partition digest matched the pre-test image.
+
+Automated validation passed four C++ suites under UBSan, 23 Python tests,
+the production JSON bridge against ArduinoJson 7.4.3, six schema checks, and both
+firmware builds with dependency, partition and capacity checks. Host injection
+covers precise write/commit failures, shared Isha/Fajr identities, timezone/DST
+changes, backward clocks and dropped volume requests. These cases were not all
+repeated physically. Firmware hashes, complete readbacks, recovery backups and
+raw device evidence are retained privately. The phone settings UI and release
+qualification remain separate milestones.

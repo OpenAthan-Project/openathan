@@ -2,7 +2,12 @@
 
 ESPHome is the preferred initial embedded framework for OpenAthan.
 
-> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, durable state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official product entry point remains unfinished. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
+> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, saved runtime settings, durable consumption/skip state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official product entry point remains unfinished. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
+
+Runtime configuration currently uses the optional encrypted
+[settings console](scheduler/SETTINGS.md). Phone-based setup and local settings
+are the next product milestone. Their provisioning and access controls must
+preserve the settings service and consumed-prayer history.
 
 ## Two supported paths
 
@@ -36,7 +41,9 @@ capability-mapping boundary.
 Audio playback is the only fundamental hardware capability for Athan playback.
 The portable `Playback` interface supplies readiness, activity, start with
 replacement, and stop. The current adapter uses an ESPHome speaker media player
-and a separately provisioned audio partition.
+and a separately provisioned audio partition. Adapters used by the settings
+bridge also implement volume requests and actual volume readback. Networking
+and the encrypted developer API remain optional to the reusable component.
 
 The following capabilities remain optional:
 
