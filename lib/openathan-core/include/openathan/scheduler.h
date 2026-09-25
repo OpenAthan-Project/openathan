@@ -2,6 +2,7 @@
 #include "playback.h"
 #include "prayer_calculator.h"
 #include <limits>
+#include <string>
 #include <vector>
 
 namespace openathan {
@@ -24,12 +25,23 @@ struct Event {
   EventKey key;
   int64_t utc{};
   bool enabled{};
+  // A coincident Isha/Fajr occurrence retains both durable identities.
+  std::optional<EventKey> shared_with;
 };
+enum class ConflictResolution { SHARED_PLAYBACK, ISHA_SUPPRESSED };
+struct ScheduleConflict {
+  EventKey isha;
+  int64_t isha_utc{};
+  EventKey fajr;
+  int64_t fajr_utc{};
+  ConflictResolution resolution;
+};
+std::string describe_conflict(const ScheduleConflict &conflict);
 struct Settings {
   double latitude{}, longitude{};
   Method method{Method::MUSLIM_WORLD_LEAGUE};
   bool hanafi{false};
-  HighLatitudeRule high_latitude{HighLatitudeRule::MIDDLE_OF_NIGHT};
+  HighLatitudeRule high_latitude{HighLatitudeRule::AUTO};
   std::array<int, 6> offsets{};  // fajr, sunrise, dhuhr, asr, maghrib, isha
   std::array<bool, 5> enabled{true, true, true, true, true};
 };
@@ -73,6 +85,7 @@ struct SchedulerStatus {
   std::optional<Event> next;
   std::optional<EventKey> skip;
   Fault fault{Fault::NONE};
+  std::vector<ScheduleConflict> conflicts;
 };
 
 class Scheduler {
@@ -97,6 +110,7 @@ class Scheduler {
   Settings settings_;
   DurableState state_;
   std::vector<Event> events_;
+  std::vector<ScheduleConflict> conflicts_;
   std::optional<Event> next_;
   ClockSample previous_;
   int32_t built_day_{NEVER_CONSUMED};

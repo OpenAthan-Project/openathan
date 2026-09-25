@@ -20,7 +20,7 @@ METHODS = {name.lower(): getattr(Method, name) for name in (
     "MUSLIM_WORLD_LEAGUE", "EGYPTIAN", "KARACHI", "UMM_AL_QURA", "DUBAI",
     "MOONSIGHTING_COMMITTEE", "NORTH_AMERICA", "KUWAIT", "QATAR", "SINGAPORE", "TEHRAN", "TURKEY")}
 HIGH_LATITUDE = {name.lower(): getattr(HighLatitudeRule, name) for name in (
-    "MIDDLE_OF_NIGHT", "SEVENTH_OF_NIGHT", "TWILIGHT_ANGLE")}
+    "MIDDLE_OF_NIGHT", "SEVENTH_OF_NIGHT", "TWILIGHT_ANGLE", "AUTO")}
 PRAYERS = ("fajr", "dhuhr", "asr", "maghrib", "isha")
 EVENTS = ("fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha")
 
@@ -42,7 +42,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required("longitude"): coordinate(-180, 180),
     cv.Required("method"): cv.enum(METHODS, lower=True),
     cv.Optional("hanafi", default=False): cv.boolean,
-    cv.Optional("high_latitude", default="middle_of_night"): cv.enum(HIGH_LATITUDE, lower=True),
+    cv.Optional("high_latitude", default="auto"): cv.enum(HIGH_LATITUDE, lower=True),
     cv.Optional("offsets", default={}): cv.Schema({
         cv.Optional(name, default=0): cv.int_range(min=-120, max=120) for name in EVENTS}),
     cv.Optional("enabled", default={}): cv.Schema({

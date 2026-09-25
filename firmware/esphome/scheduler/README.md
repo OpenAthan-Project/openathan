@@ -30,15 +30,37 @@ The provided development file requires explicit latitude, longitude, timezone,
 and method. Supported presets are `muslim_world_league`, `egyptian`, `karachi`,
 `umm_al_qura`, `dubai`, `moonsighting_committee`, `north_america`, `kuwait`, `qatar`,
 `singapore`, `tehran`, and `turkey`. `hanafi` defaults to false (Standard Asr).
-High-latitude choices are `middle_of_night` (default), `seventh_of_night`, and
-`twilight_angle`. There are no custom angles.
+High-latitude choices are `auto` (default), `middle_of_night`, `seventh_of_night`,
+and `twilight_angle`. `auto` delegates to the vendored Adhan recommendation:
+`seventh_of_night` above 48 degrees north, `middle_of_night` otherwise. It does
+not use absolute latitude. Explicit overrides remain unchanged; the reference
+development configuration explicitly uses `middle_of_night`. There are no
+custom angles. See [Adhan's calculation guidance](https://github.com/batoulapps/adhan-js/blob/develop/METHODS.md#highlatituderule).
 
 `offsets` accepts integer minutes from -120 to +120 for fajr, sunrise, dhuhr,
 asr, maghrib and isha. Defaults are zero. `enabled` accepts booleans for the
 five prayers, all true by default; sunrise is informational. The calculation
-wrapper rejects collisions/reversed order, including disabled events and
-across the three-day window. Such an invalid schedule disables automatic
-playback and reports a fault. Polar events that cannot be calculated stay absent.
+wrapper rejects collisions/reversed order within each calculated day, including
+disabled events. The scheduler also validates ordering between days, with the
+following exception for an adjacent Isha/Fajr pair. Other invalid ordering
+disables automatic playback and reports a fault. Polar events that cannot be
+calculated stay absent.
+
+Isha and the following Fajr can meet under high-latitude rules. Their playback
+policy is:
+
+- Equal timestamps form one occurrence. If both prayers are enabled it plays
+  the Fajr recording; if only one is enabled it plays that prayer's recording.
+  Both disabled means no playback. Both identities are retained and consumed.
+- If Isha falls after the following Fajr, that Isha is suppressed even if Fajr
+  playback is disabled. Fajr retains its calculated time. An overlap with other
+  events, such as sunrise, remains invalid.
+- If Isha starts earlier and is still playing when Fajr is due, Fajr replaces
+  it through the existing playback adapter. There is no delayed second recording.
+
+These conflicts are reported separately from fatal faults; other prayers remain
+scheduled. This is OpenAthan's playback policy, not a change to the selected
+calculation rule or the returned prayer times.
 
 ESPHome's timezone is global. Every configured time source must specify the
 same timezone; the schema rejects missing or conflicting values. IANA names
@@ -66,7 +88,8 @@ the old layout.
 
 The core consumes an injected clock (UTC, milliseconds, monotonic time and local
 date), calculator, durable store, and playback capability. It maintains yesterday,
-today and tomorrow; event identity is the calculation date plus prayer, even
+today and tomorrow, with guard-day calculations to classify Isha/Fajr conflicts
+at both edges. Event identity is the calculation date plus prayer, even
 when an offset moves playback across midnight. Core `configure()` re-arms with
 future events; the ESPHome developer settings are currently supplied at boot.
 
@@ -78,7 +101,9 @@ changes re-arm without catch-up. Time-sync callbacks also evaluate the clock;
 an unchanged sync does not force a re-arm. Normal timezone/DST transitions use
 UTC instants and do not duplicate repeated local-clock times.
 
-Before requesting playback, the event is consumed in durable storage. Missing
+Before requesting playback, the event is consumed in durable storage. A shared
+occurrence consumes both identities in the same save. If either identity was
+already consumed, the occurrence cannot replay it after a settings change. Missing
 or failed audio does not retry the event. A crash after the save can miss an
 Athan, but does not replay it. Older dates are covered by per-prayer monotonic
 date watermarks; changing settings or moving time backward never clears them.
@@ -95,8 +120,13 @@ playback. A write failure latches the storage fault for the current boot. This
 adapter never erases NVS, and does not use ESPHome's deferred preference queue.
 
 The component exposes `status()` with clock readiness, automatic readiness,
-playback activity, next event, skip key and fault. State changes are logged;
-timestamps are UTC Unix seconds and skip dates are days since 1970-01-01.
+playback activity, next event, skip key, fault and a list of Isha/Fajr conflicts.
+Each conflict includes both prayer identities, their UTC times, and the resolution
+(`SHARED_PLAYBACK` or `ISHA_SUPPRESSED`). A shared next event includes its second
+identity in `shared_with`; `key` identifies the recording selected for playback.
+State changes and conflict details are logged; optional diagnostics also expose
+a Scheduler conflicts text sensor. Warnings do not block automatic readiness.
+Timestamps are UTC Unix seconds and skip dates are days since 1970-01-01.
 Static build memory figures do not establish runtime headroom.
 
 ## Controls and reuse
@@ -110,6 +140,11 @@ whether the requested state is durable; failed actions log a warning.
   Repeated requests are idempotent. Restart retains it; passing the event clears
   it. Removing/disabling its event clears it when its date is evaluated. It never
   transfers to another prayer, including after clock corrections.
+- For a shared occurrence, a saved skip for either member silences the entire
+  occurrence, including when that member's playback is disabled. This works with
+  existing 36-byte state records; no storage migration is needed. If settings
+  later separate the times, the skip follows only its stored prayer identity.
+  Suppressed Isha events are excluded from next-playback and skip selection.
 - Cancel skip durably clears the selected skip.
 - Scheduled playback replaces existing audio: the adapter queues stops for both
   player pipelines, then queues the correct announcement file in FIFO order.
@@ -139,6 +174,10 @@ python tools/run_tests.py
 C++ tests exercise real prayer reference values, injected clock transitions,
 DST, midnight/month/year rollovers, positive/negative offsets across midnight,
 duplicate prevention, persisted skips, storage failure and playback priority.
+They also cover shared playback, conflict warnings, failed rebuild recovery,
+explicit high-latitude overrides, and all 2026 dates in London, Stockholm, Oslo,
+Helsinki and Barrie using the recommended rule. These are automated checks,
+not additional device-test evidence.
 The production NVS adapter is tested against injected NVS errors. Python tests
 exercise the production audio adapter/parser and real ESPHome configuration
 validation. The test runner rejects skipped tests, including when ESPHome is

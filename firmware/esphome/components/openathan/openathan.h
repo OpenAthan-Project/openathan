@@ -42,6 +42,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   ::openathan::StateStore *state_store_{&store_};
   std::unique_ptr<::openathan::Scheduler> scheduler_;
   std::string last_status_;
+  std::string last_conflicts_;
 };
 template<typename... Ts> class ControlAction : public Action<Ts...> {
  public:

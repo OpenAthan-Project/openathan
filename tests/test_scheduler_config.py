@@ -79,6 +79,13 @@ interval:
     def test_explicit_timezone_required(self):
         self.validate(self.config(timezone=""), False, "explicit timezone")
 
+    def test_high_latitude_default_and_overrides(self):
+        self.validate(self.config(), True, "high_latitude: auto")
+        for rule in ("auto", "middle_of_night", "seventh_of_night", "twilight_angle"):
+            with self.subTest(rule=rule):
+                self.validate(self.config(f"  high_latitude: {rule}"), True, f"high_latitude: {rule}")
+        self.validate(self.config("  high_latitude: invented"), False)
+
     def test_invalid_inputs(self):
         self.validate(self.config("  offsets:\n    fajr: 121"), False)
         self.validate(self.config().replace("latitude: 43.6532", "latitude: .nan"), False, "finite")
