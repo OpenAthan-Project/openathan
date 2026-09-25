@@ -77,13 +77,14 @@ The adapter contains no flash-write path. ESPHome's application OTA backend
 selects the inactive OTA partition, while audio is a separate data partition.
 The generated factory image ends before shared audio. This source/build
 inspection supported the storage design. The later device tests below establish
-slot switching and audio preservation, while forced rollback remains untested.
+slot switching and audio preservation. The dated rollback test below separately
+verifies recovery from an unconfirmed application startup failure.
 
 The reusable core, image builder, storage adapter and hardware configuration
 can carry forward into the product. Fixed-date logs, measurement variants and
 button diagnostics are temporary. The original next milestone was the standalone
 prayer scheduler; its implementation and subsequent device results are recorded
-below. Recovery through automatic rollback still needs a separate fault test.
+below, including the separate automatic-rollback fault test.
 
 ## Scheduler integration — 2026-09-24
 
@@ -185,5 +186,39 @@ Exact start latency was not captured because logging began after playback starte
 The observation used the previously installed 70% device-validation image
 identified above. No controls, clock changes, restart or firmware upload were
 sent during observation. It does not establish device validation of the later
-high-latitude conflict fixes. Deliberate automatic-rollback fault injection
-remains outstanding.
+high-latitude conflict fixes.
+
+## Automatic OTA rollback — 2026-09-25
+
+The reference device passed a deliberate unconfirmed-startup failure test using
+ESPHome 2026.9.0 and ESP-IDF 5.5.5. Two identical full-flash reads were archived
+before testing. The working 70% image identified above occupied `app0` and was
+marked `VALID`; the existing bootloader and partition layout were retained.
+
+A separate 681,824-byte diagnostic application was installed through OTA into
+`app1`. It contained no audio player or scheduler. USB logs confirmed
+`PENDING_VERIFY` and an available rollback target, followed by a direct
+`esp_restart()` about five seconds into startup, before the 60-second successful
+boot confirmation. The probe neither confirmed its image nor selected another
+partition. The original `app0` application reported `VALID` about 2.5 seconds
+after the injected reset, without recovery flashing.
+
+Full-flash readback confirmed `app1` was `ABORTED`, the entire original `app0`
+slot was unchanged, and the bootloader, partition table, shared audio and
+36-byte scheduler record were unchanged. After a bottom-port cold power cycle,
+encrypted diagnostics again reported `app0` valid, 70% volume, no scheduler
+fault, no duplicate Fajr playback and Dhuhr at 13:11 EDT as the next event. The
+complete audio-partition hash also matched the pre-test value.
+
+The listener then confirmed clear, comfortable normal-Athan audio at the saved
+70% volume and a successful front-button stop. This approximately 55-second
+check streamed the exact normal recording extracted from the verified backup
+over the local network, because the installed real-schedule image exposes no
+manual stored-track play control. It verifies restored audio output and stop
+handling; it is not an additional scheduled or offline-playback test.
+
+This establishes automatic recovery from an unconfirmed startup failure on the
+previously installed device-validation image. It does not validate later
+high-latitude firmware changes on hardware or recovery from faults after an
+application has already been confirmed healthy. Backups, the diagnostic source
+and image, and raw evidence remain in the private validation archive.

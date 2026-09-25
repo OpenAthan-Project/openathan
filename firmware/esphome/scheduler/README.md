@@ -189,9 +189,10 @@ The [capacity report](../../../docs/development/feasibility-report.md) records
 build results and limits, including completed reference-device tests for SNTP
 behavior, sound quality, runtime memory, power-loss persistence and OTA slot
 switching. The dated real-Fajr observation is separate from the synthetic checks
-and does not validate later firmware revisions on hardware. Deliberate rollback
-fault injection remains outstanding; successful slot switching does not prove
-automatic rollback.
+and does not validate later firmware revisions on hardware. A separate deliberate
+startup-failure test on 2026-09-25 verified automatic rollback to the unchanged
+working image, with retained audio, scheduler state and 70% volume. This covers
+failure before successful-boot confirmation, not faults after confirmation.
 Provisioning UI, scheduler settings UI and automatic audio updates remain outside
 this milestone.
 
