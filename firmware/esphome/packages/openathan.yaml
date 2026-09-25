@@ -1,8 +1,7 @@
 # Reusable, hardware-independent OpenAthan ESPHome package.
 #
-# This package is intentionally an empty scaffold. Future implementation will
-# load components/openathan and bind it to capabilities supplied by the
-# consuming ESPHome configuration.
+# Loads components/openathan. The consuming configuration supplies the time
+# source, explicit settings and a Playback capability.
 #
 # Required capability:
 # - audio playback, provided by a media player or speaker-backed adapter
@@ -19,4 +18,8 @@
 # Do not add a board, GPIO mapping, Wi-Fi credentials/configuration, native API
 # requirement, or Voice Pyramid dependency here.
 
-{}
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan]

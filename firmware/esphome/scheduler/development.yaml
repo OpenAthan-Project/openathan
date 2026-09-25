@@ -1,0 +1,61 @@
+# Development build only: explicit location, timezone and method; no provisioning.
+packages:
+  baseline: !include ../feasibility/baseline.yaml
+  openathan: !include ../packages/openathan.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_audio]
+
+time:
+  - platform: sntp
+    id: athan_clock
+    timezone: !secret athan_timezone
+
+openathan_audio:
+  id: athan_audio
+  media_player_id: athan_player
+
+openathan:
+  id: athan_scheduler
+  time_id: athan_clock
+  playback_id: athan_audio
+  latitude: !secret athan_latitude
+  longitude: !secret athan_longitude
+  method: !secret athan_method
+  hanafi: false
+  high_latitude: middle_of_night
+  offsets:
+    fajr: 0
+    sunrise: 0
+    dhuhr: 0
+    asr: 0
+    maghrib: 0
+    isha: 0
+
+# Diagnostic controls: short click stops; 2-5s skips next; 6-10s cancels skip.
+binary_sensor:
+  - platform: gpio
+    id: front_button
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - openathan.stop:
+              id: athan_scheduler
+      - min_length: 2s
+        max_length: 5s
+        then:
+          - openathan.skip_next:
+              id: athan_scheduler
+      - min_length: 6s
+        max_length: 10s
+        then:
+          - openathan.cancel_skip:
+              id: athan_scheduler
