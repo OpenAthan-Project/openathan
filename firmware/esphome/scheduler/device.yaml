@@ -1,0 +1,4 @@
+# Real prayer schedule with optional developer telemetry; no synthetic timetable.
+packages:
+  scheduler: !include development.yaml
+  diagnostics: !include diagnostics.yaml

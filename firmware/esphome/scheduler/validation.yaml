@@ -1,0 +1,91 @@
+packages:
+  scheduler: !include development.yaml
+  diagnostics: !include diagnostics.yaml
+
+# Each test boot spends 30 seconds offline, without setting the system clock.
+# Record observations in RAM so the encrypted client can inspect them afterward.
+esphome:
+  on_boot:
+    priority: -110
+    then:
+      - delay: 30s
+      - lambda: id(boot_waiting) = false;
+      - wifi.enable:
+
+globals:
+  - id: boot_waiting
+    type: bool
+    initial_value: 'true'
+  - id: boot_gate_ok
+    type: bool
+    initial_value: 'true'
+  - id: boot_gate_samples
+    type: unsigned
+    initial_value: '0'
+
+wifi:
+  enable_on_boot: false
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(boot_waiting)) {
+            ++id(boot_gate_samples);
+            if (id(athan_scheduler).status().clock_ready || id(athan_audio).playing())
+              id(boot_gate_ok) = false;
+          }
+  - interval: 15s
+    then:
+      - lambda: |-
+          ESP_LOGI("oa_validation", "Boot gate: samples=%u clock_and_audio_waited=%s",
+                   id(boot_gate_samples), id(boot_gate_ok) ? "yes" : "no");
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_validation]
+
+openathan_validation:
+  id: validation
+  scheduler_id: athan_scheduler
+
+button:
+  - platform: template
+    name: Start test sequence
+    on_press:
+      - lambda: |-
+          if (!id(validation).start_test()) ESP_LOGE("oa_validation", "Test start rejected");
+  - platform: template
+    name: Play normal
+    on_press:
+      - lambda: id(athan_audio).start(openathan::Track::NORMAL);
+  - platform: template
+    name: Play Fajr
+    on_press:
+      - lambda: id(athan_audio).start(openathan::Track::FAJR);
+  - platform: template
+    name: Stop audio
+    on_press:
+      - openathan.stop: {id: athan_scheduler}
+  - platform: template
+    name: Skip next
+    on_press:
+      - openathan.skip_next: {id: athan_scheduler}
+  - platform: template
+    name: Cancel skip
+    on_press:
+      - openathan.cancel_skip: {id: athan_scheduler}
+  - platform: template
+    name: Offline for 90 seconds
+    on_press:
+      - script.execute: offline_window
+
+script:
+  - id: offline_window
+    mode: single
+    then:
+      - wifi.disable:
+      - delay: 90s
+      - wifi.enable:

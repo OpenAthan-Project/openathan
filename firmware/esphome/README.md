@@ -2,7 +2,7 @@
 
 ESPHome is the preferred initial embedded framework for OpenAthan.
 
-> **Status:** this directory is still an architecture scaffold. It contains no prayer implementation, verified Voice Pyramid mappings, or buildable release configuration yet.
+> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, durable state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official product entry point remains unfinished. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
 
 ## Two supported paths
 
@@ -25,11 +25,18 @@ packages:
       - firmware/esphome/packages/openathan.yaml
 ```
 
-The tag above is illustrative while the project remains a scaffold. See [`examples/custom-hardware.yaml`](examples/custom-hardware.yaml) for the planned capability-mapping boundary.
+The tag above is illustrative and does not exist. Current builds require a local
+checkout so the external components can locate the sibling core and vendored
+library. Remote package consumption is not validated for this milestone. See
+[`examples/custom-hardware.yaml`](examples/custom-hardware.yaml) for the planned
+capability-mapping boundary.
 
 ## Capability contract
 
-Audio playback is the only fundamental hardware capability for Athan playback. It may eventually be supplied by an ESPHome media player or by an adapter around a speaker/audio pipeline.
+Audio playback is the only fundamental hardware capability for Athan playback.
+The portable `Playback` interface supplies readiness, activity, start with
+replacement, and stop. The current adapter uses an ESPHome speaker media player
+and a separately provisioned audio partition.
 
 The following capabilities remain optional:
 
@@ -51,4 +58,4 @@ The scheduler and hardware-independent OpenAthan component may request playback 
 - [`packages/hardware/voice-pyramid.yaml`](packages/hardware/voice-pyramid.yaml) — convenience mapping for the official C126 + A167 combination.
 - [`boards/`](boards/) — verified low-level reference-board configuration only.
 - [`examples/custom-hardware.yaml`](examples/custom-hardware.yaml) — documented integration shape for user-owned ESPHome hardware.
-- [`openathan.yaml`](openathan.yaml) — complete official precompiled-firmware entry point.
+- [`openathan.yaml`](openathan.yaml) — unfinished official precompiled-firmware entry point.

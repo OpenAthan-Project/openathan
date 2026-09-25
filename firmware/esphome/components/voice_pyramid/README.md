@@ -1,6 +1,18 @@
 # Voice Pyramid ESPHome Component
 
-Planned hardware adapter for the M5Stack Voice Pyramid A167.
+Audio clock and amplifier adapter for the M5Stack Voice Pyramid A167.
+
+Implements the 44.1 kHz Si5351 CLK1 configuration (11.2896 MHz from a 27 MHz
+crystal) with register readback, and the AW87559 reset/SYSCTRL initialization
+used in the private 2026-09-24 audio diagnostics. The reference hardware
+package supplies the ESPHome ES8311 DAC, I2S speaker, and GPIO expander enable.
+The extracted implementation passed full-recording playback and scheduler
+validation on the reference unit; see the
+[device results](../../../../docs/development/feasibility-report.md#integrated-device-validation--2026-09-24).
+
+No third-party M5Stack component checkout is required. The register settings
+come from the verified diagnostic; the reusable implementation is OpenAthan
+code. Touch, LEDs, microphone and display are not implemented here.
 
 M5Stack's current official documentation calls SKU A167 Echo Pyramid. OpenAthan retains Voice Pyramid as its project-facing name for the same product.
 

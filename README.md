@@ -2,7 +2,7 @@
 
 OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project. It supports an ordinary-user reference build and a reusable ESPHome integration for people who already have compatible hardware. The reference experience is intended to work without soldering, PCB design, Home Assistant, or embedded-development experience.
 
-> **Project status:** early development. The files in this repository are an initial architecture scaffold, not installable or production-ready firmware.
+> **Project status:** early development. The [scheduler development build](firmware/esphome/scheduler/README.md) integrates local prayer calculations, scheduled offline audio and persisted skip/duplicate-prevention state. Host tests and reference-device tests cover playback, scheduling, persistence and application OTA. Provisioning, the setup UI and release qualification remain; this is developer firmware, not an end-user release. See the [validation results](docs/development/feasibility-report.md#integrated-device-validation--2026-09-24) and [CI checks](.github/workflows/README.md).
 
 ## Supported paths
 

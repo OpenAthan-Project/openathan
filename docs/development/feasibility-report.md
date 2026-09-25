@@ -1,0 +1,167 @@
+# Firmware capacity report — 2026-09-24
+
+**The compile-time capacity target passed.** ESPHome, released Adhan C++, and
+the shared audio adapter fit comfortably in each 2 MiB OTA slot. Both supplied
+MP3 recordings fit unchanged in the 3.5 MiB data partition. The initial builds
+were compile-only; subsequent device validation is recorded below.
+
+## Measured results
+
+The three builds use the same C126 + A167 board, MP3 speaker pipeline, Wi-Fi,
+logger, OTA settings and partition table. Home Assistant/native API, device UI,
+provisioning and scheduling are absent. See the [build instructions](../../firmware/esphome/feasibility/README.md).
+
+| Variant | Actual OTA `.bin` bytes | Linked image bytes | Static RAM bytes | Free bytes per 2 MiB slot |
+| --- | ---: | ---: | ---: | ---: |
+| ESPHome/audio baseline | 927,616 | 927,503 | 111,047 | 1,169,536 |
+| Plus prayer calculations | 990,400 | 990,287 | 111,247 | 1,106,752 |
+| Plus shared audio and diagnostic controls | 998,912 | 998,791 | 112,983 | 1,098,240 |
+
+Calculations add **62,784 application bytes**, including exception support and
+all twelve preset factories. Shared audio and diagnostic controls add **8,512
+bytes**. The full application is **573,952 bytes below the 1.5 MiB target**, and
+leaves about **1.05 MiB** in each OTA slot. These are measured feasibility-build
+sizes, not a forecast of the completed product.
+
+Static RAM excludes runtime heap, task stacks, decoder buffers and dynamic
+PSRAM allocations. Compilation alone did not prove sufficient MMU capacity;
+the later device validation below established successful mapping and playback.
+
+| Recording | Bytes | Sample rate / channels |
+| --- | ---: | --- |
+| Normal compressed MP3 | 1,246,749 | 44.1 kHz / stereo |
+| Fajr compressed MP3 | 1,768,332 | 44.1 kHz / stereo |
+| Total recordings | 3,015,081 | |
+| Image used, including metadata and alignment | 3,019,180 | |
+| Free audio-partition bytes | 650,836 | |
+
+The padded audio image is exactly 3,670,016 bytes. Recordings and generated images
+remain outside Git. No re-encoding occurred; content, stereo-to-mono playback
+quality and distribution rights were not assessed by this build.
+
+## Dependencies and evidence
+
+- ESPHome **2026.9.0**, its recommended ESP-IDF **5.5.5**, and compiler
+  **esp-14.2.0_20260121**. The chosen policy is latest compatible stable,
+  rather than forcing newer upstream IDF 6.1 into this ESPHome release.
+- Adhan C++ **v1.0.2**, commit `8d65a2906dbdb90a84d30d385a1b5f84e38d0c1f`.
+  Vendored source and MIT license match the release checkout byte-for-byte.
+  The original Batoul Apps MIT notice is also retained. C++20 and exceptions
+  are enabled; no astronomy or upstream error-handling changes were made.
+- ESPHome-selected managed components: esp-audio-libs **3.2.1**, micro-mp3
+  **0.4.0**, mdns **1.12.0**. Exact content hashes are recorded in the
+  [dependency manifest](../../firmware/esphome/feasibility/dependencies.json).
+- The image inspector passed for all three builds: exact dependency versions
+  and hashes, compiler pin, partition-table equality, application budget,
+  matching factory/OTA application payload, and no supplied recording data
+  blocks found in the application. The full real audio image also passed the
+  C++ validator.
+
+Full application SHA-256:
+`91b9e24e8a6b5c9f1123587ba8f48fbdb99b544c2f0fd8f3aae9cad8ee5476cc`
+
+Padded audio image SHA-256:
+`c3a14d93e5521cefb8a4cbea86075403abcb153ec93c5481e651ea447873392b`
+
+## Tests and limits
+
+Host C++ reference tests passed for published prayer times, all twelve presets,
+Standard/Hanafi Asr, rejected invalid/non-finite inputs and absent polar events.
+Seven Python integration tests passed against the actual C++ image parser and
+audio adapter. They cover deterministic unchanged payloads, missing/empty/large
+inputs, bad hashes, truncation, erased flash, overflow/overlap, wrong IDs/codecs,
+invalid partitions, mapping failures and persistent player-file pointers.
+The same suite passed with UndefinedBehaviorSanitizer enabled.
+
+The adapter contains no flash-write path. ESPHome's application OTA backend
+selects the inactive OTA partition, while audio is a separate data partition.
+The generated factory image ends before shared audio. This source/build
+inspection supported the storage design. The later device tests below establish
+slot switching and audio preservation, while forced rollback remains untested.
+
+The reusable core, image builder, storage adapter and hardware configuration
+can carry forward into the product. Fixed-date logs, measurement variants and
+button diagnostics are temporary. The original next milestone was the standalone
+prayer scheduler; its implementation and subsequent device results are recorded
+below. Recovery through automatic rollback still needs a separate fault test.
+
+## Scheduler integration — 2026-09-24
+
+The [scheduler development build](../../firmware/esphome/scheduler/README.md) now
+includes local calculation settings, SNTP/timezone integration, automatic
+Fajr/normal playback, durable consumed-event watermarks, persistent skip/cancel,
+stop controls, and state/fault logging. It uses the same pinned stable stack,
+two 2 MiB application slots and 3.5 MiB shared audio partition. No firmware
+dependencies were added. This initial integration was compile-only; later
+installation and runtime testing are recorded in the next section.
+
+| Initial scheduler build | OTA `.bin` bytes | Static RAM bytes | Free bytes per OTA slot |
+| --- | ---: | ---: | ---: |
+| Scheduler development | 1,009,344 | 112,143 | 1,087,808 |
+
+The scheduler application is **563,520 bytes below the 1.5 MiB target**, leaving
+about **1.04 MiB per OTA slot**. Its linked image size is 1,009,231 bytes. The
+unchanged audio image still leaves 650,836 bytes free in its separate partition.
+The size inspector confirmed dependency/component hashes, compiler pin, partition
+layout, matching factory/OTA application payloads and excluded recording data.
+The separate manual audio configuration also rebuilt successfully after the
+playback-interface changes and passed the same capacity/dependency checks.
+
+Scheduler application SHA-256:
+`ef1da47b86b1478a9928e0999f7e720201aade4017386563c75bf157f9ec2eef`
+
+The original table above records the earlier feasibility milestone, before the
+scheduler and playback-interface changes. Subsequent runtime, playback,
+persistence and OTA checks are recorded in the device-validation section below.
+
+Three CTest targets pass: prayer reference calculations and input validation,
+scheduler scenarios, and the production NVS adapter under injected storage
+errors. Eleven Python tests pass, covering the existing audio format/adapter and
+the real ESPHome schema, including required/matching timezones, finite location,
+method/offset validation, typed playback bindings and action registration. The
+C++ tests and host audio adapter also pass with UndefinedBehaviorSanitizer.
+
+Scheduler scenarios cover both recordings, save-before-play ordering, active
+audio replacement, stop without restart, missed events, normal lateness versus
+clock correction, subsecond boundaries, first valid time, restarts, backward
+date changes, altered offsets for consumed events, DST, month/year boundaries,
+offsets across midnight, durable skips/cancellation, missing solar events, failed
+calculations, corrupt/read-failed state, failed writes/commits and unavailable or
+rejected playback. A real Adhan reference case is exercised through the scheduler.
+
+## Integrated device validation — 2026-09-24
+
+The reference AtomS3R/Voice Pyramid completed full normal and Fajr playback with
+listener confirmation, including Fajr content. The user selected a 60% player
+control level within the existing 60% output ceiling; ESPHome remaps these values,
+so this corresponds to a 36% speaker setting. Both recordings completed without
+decoder errors or resets, and heap/PSRAM were released after playback.
+After validation, the requested firmware default was increased to a 70% player
+control level (42% speaker setting within the same output ceiling). The listening
+results above describe the tested 60% level.
+
+The isolated device timetable passed scheduled Fajr/normal selection, durable
+skip across physical power loss, cancel, repeated-skip idempotence, suppression
+of the selected event, front-button stop without replay, scheduled replacement
+of another track, restart without replay, and scheduled playback with Wi-Fi
+disabled. A cold boot recorded 30 samples with invalid time and inactive audio
+before connectivity returned. Software restart may retain the clock and is not
+equivalent to this cold-start check.
+
+Three application-only encrypted OTA transfers exercised both slots. The complete
+3,670,016-byte audio partition hash remained unchanged. The real-schedule
+developer build used at the end of validation excludes the synthetic component
+and controls; its OTA image is
+1,076,240 bytes, leaving 1,020,912 bytes in each 2 MiB app slot. Static RAM is
+113,459 bytes. The image SHA-256 is
+`fa78c7fd802189b0b121776d7c9c50d55335ff7b7a51cd607050fd2a1022ca0d`.
+The subsequent 70% default-volume build has the same size figures and SHA-256
+`63ede8bb3847914c1365aa16b3df319c38f249f7d2382c3bc0882e42b4bad7bd`.
+Its fourth application OTA completed successfully; the saved 70% setting was
+verified after reboot. These hashes identify the private device-validation
+images, not later CI builds made with public compile-only settings.
+
+Device-specific images, credentials, recovery backup, settings and raw evidence
+remain in a private dated archive outside the repository. Actual prayer-time
+observation and deliberate automatic-rollback fault injection were not performed.
+See the [reusable validation procedure](../../firmware/esphome/scheduler/VALIDATION.md).
