@@ -23,7 +23,11 @@ def inspect(build_dir, log, audio_image):
     lock = yaml.safe_load((build_dir / "dependencies.lock").read_text())["dependencies"]
     managed = {name: {key: entry[key] for key in ("version", "component_hash")}
                for name, entry in lock.items() if entry["source"]["type"] == "service"}
-    if managed != pins["managed_components"] or lock["idf"]["version"] != pins["esp_idf"]:
+    expected_managed = dict(pins["managed_components"])
+    for name, pin in pins.get("optional_managed_components", {}).items():
+        if name in managed:
+            expected_managed[name] = pin
+    if managed != expected_managed or lock["idf"]["version"] != pins["esp_idf"]:
         raise ValueError("Resolved firmware dependencies differ from the reviewed pins")
     # ESPHome converts its pinned encryption libraries into local IDF components;
     # dependencies.lock reports '*' for those, so inspect their actual manifests.

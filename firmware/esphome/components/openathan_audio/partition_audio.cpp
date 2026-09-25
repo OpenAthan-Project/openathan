@@ -3,9 +3,23 @@
 #include "esphome/core/log.h"
 #include <mbedtls/sha256.h>
 #include <algorithm>
+#include <cmath>
 
 namespace esphome::openathan_audio {
 static const char *const TAG = "openathan_audio";
+
+std::optional<unsigned> PartitionAudio::volume_percent() const {
+  if (!player_ || !player_->is_ready() || !std::isfinite(player_->volume) ||
+      player_->volume < 0 || player_->volume > 1) return {};
+  return player_->is_muted() ? 0U : static_cast<unsigned>(std::lround(player_->volume * 100));
+}
+bool PartitionAudio::request_volume_percent(unsigned percent) {
+  if (!player_ || !player_->is_ready() || percent > 100) return false;
+  auto call = player_->make_call();
+  call.set_volume(percent / 100.0f);
+  call.perform();  // ESPHome may drop a full-queue request; caller must check readback.
+  return true;
+}
 
 static bool hash_matches(const uint8_t *data, size_t size, const uint8_t *expected) {
   mbedtls_sha256_context ctx;

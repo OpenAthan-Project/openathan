@@ -8,6 +8,7 @@ static const char *const TAG = "oa_validation";
 void Validation::setup() {
   scheduler_->set_calculator(this);
   scheduler_->set_state_store(this);
+  scheduler_->set_settings_store(&settings_store_);
   if (nvs_open("oa_validation", NVS_READWRITE, &metadata_) != ESP_OK) return;
   char record[80]{};
   size_t size = sizeof(record);
@@ -18,9 +19,9 @@ void Validation::setup() {
   int end = 0;
   if (err != ESP_OK || std::sscanf(record, "OAT1 %ld %lld%n", &day, &first, &end) != 2 ||
       record[end] != '\0' || day < ::openathan::day_number({1900,1,1}) ||
-      day > ::openathan::day_number({2100,12,31}) || first < 1 || first > 4133980799LL) return;
-  const auto local = ESPTime::from_epoch_local(first);
-  if (!local.is_valid() || ::openathan::day_number({local.year,local.month,local.day_of_month}) != day) return;
+      day > ::openathan::day_number({2100,12,31}) || first < 1 || first > 4133980799LL ||
+      day < first / 86400 - 1 || day > first / 86400 + 1) return;
+  // The calculation-day identity is immutable even after a timezone change.
   day_ = day;
   first_ = first;
   healthy_ = true;
@@ -29,9 +30,10 @@ void Validation::setup() {
 bool Validation::start_test() {
   const auto now = scheduler_->read();
   if (!healthy_ || !now.valid) return false;
-  const auto last = ESPTime::from_epoch_local(now.utc + 180 + 4 * 120);
+  ::openathan::CivilDate last;
+  if (!scheduler_->local_date(now.utc + 180 + 4 * 120, last)) return false;
   const int32_t day = ::openathan::day_number(now.local_date);
-  if (::openathan::day_number({last.year,last.month,last.day_of_month}) != day) return false;
+  if (::openathan::day_number(last) != day) return false;
   scheduler_->stop();
   // Invalidate the timetable first. A power failure during reset must not replay
   // an old timetable with cleared consumption. Only this test namespace is touched.
@@ -52,11 +54,12 @@ bool Validation::start_test() {
   scheduler_->reload_schedule();
   return true;
 }
-bool Validation::calculate(const ::openathan::Settings &, ::openathan::CivilDate date, ::openathan::PrayerDay &out) {
+bool Validation::calculate(const ::openathan::Settings &settings, ::openathan::CivilDate date, ::openathan::PrayerDay &out) {
   out = {};
   if (!healthy_) return false;
   if (first_ && ::openathan::day_number(date) == day_) {
-    out = {first_, first_ + 1, first_ + 120, first_ + 240, first_ + 360, first_ + 480};
+    out = {first_, first_ + 90, first_ + 120, first_ + 240, first_ + 360, first_ + 480};
+    for (size_t i = 0; i < out.size(); ++i) *out[i] += settings.offsets[i] * 60;
   }
   return true;
 }

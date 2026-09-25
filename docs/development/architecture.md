@@ -29,7 +29,8 @@ Framework-independent C++ logic for:
 - prayer offsets;
 - calculation and Asr methods;
 - playback policy;
-- state model;
+- complete settings validation, versioned encoding and revision-checked saves;
+- consumed-prayer and skip state independent of saved settings;
 - future Quran/adhkar scheduling abstractions.
 
 It should not know about ESPHome entities, Home Assistant, or the Voice Pyramid.
@@ -75,11 +76,42 @@ An ESPHome user may provide equivalent capabilities from their existing configur
 - buttons, touch sensors, or other inputs for optional controls;
 - any compatible display, microphone, RTC, or storage component.
 
-The capability-binding schema has not been implemented yet. `firmware/esphome/examples/custom-hardware.yaml` documents the intended boundary without claiming a working API.
+The current component accepts `time_id`, explicit initial prayer settings and a
+`playback_id` implementing the portable `Playback` capability, including volume
+request/readback. See the [scheduler guide](../../firmware/esphome/scheduler/README.md#controls-and-reuse).
+The broader mapping of optional lights, displays and controls remains planned;
+`firmware/esphome/examples/custom-hardware.yaml` illustrates that future mapping
+and is not a buildable release configuration.
+
+### Settings and consumption
+
+`DeviceSettings` and `SettingsService` own complete snapshots and revision checks.
+The ESP32 adapter stores one checksummed settings blob at `openathan/settings`;
+the existing `openathan/scheduler` consumption/skip record remains separate.
+Successful saves commit before application or acknowledgment. A write failure
+latches settings writes and automatic playback off for that boot without erasing
+history or stopping current audio.
+
+The bridge preflights schedule changes when time is valid, then rearms future
+events without catch-up. Volume-only changes retain the armed schedule. Actual
+volume readback gates new playback while dropped commands are retried. Stored
+timezone rules affect OpenAthan's civil-date conversion without changing UTC or
+other components' timezones. See the [settings contract](../../firmware/esphome/scheduler/SETTINGS.md).
+
+The optional encrypted developer actions are a current transport for this
+service. A future phone interface must use the same validation, revision,
+application-status and persistence behavior. Prayer-settings edits must go
+through this service, preserving consumption and reading back an uncertain save
+before any retry.
 
 ### Device UI
 
-A purpose-built OpenAthan web UI served locally by the device, targeted at `openathan.local`.
+A purpose-built OpenAthan web UI served locally by the device is the intended
+interface, targeted at `openathan.local`. It is not implemented yet. Initial
+Wi-Fi provisioning/recovery, local access protection and first-run confirmation
+belong to the reference product layer. Developer firmware currently restores
+saved/default settings and arms once time and audio are ready; a completed
+ordinary-user setup flow must not be inferred from that behavior.
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 

@@ -44,7 +44,9 @@ struct Settings {
   HighLatitudeRule high_latitude{HighLatitudeRule::AUTO};
   std::array<int, 6> offsets{};  // fajr, sunrise, dhuhr, asr, maghrib, isha
   std::array<bool, 5> enabled{true, true, true, true, true};
+  bool operator==(const Settings &) const = default;
 };
+bool valid_settings(const Settings &settings);
 struct ClockSample {
   bool valid{};
   int64_t utc{};
@@ -94,11 +96,15 @@ class Scheduler {
       : clock_(clock), calculator_(calculator), store_(store), playback_(playback) {}
   bool begin(const Settings &settings);
   bool configure(const Settings &settings);
+  bool validate_schedule(const Settings &settings, CivilDate date) const;
+  void block_storage();
+  void allow_playback(bool allowed) { playback_allowed_ = allowed; }
   void tick();
   bool skip_next();
   bool cancel_skip();
   void stop() { playback_.stop(); }
   SchedulerStatus status() const;
+  const std::array<int32_t, 5> &consumed_through() const { return state_.consumed_through; }
  private:
   bool rebuild(CivilDate date);
   bool persist(const DurableState &state);
@@ -115,6 +121,7 @@ class Scheduler {
   ClockSample previous_;
   int32_t built_day_{NEVER_CONSUMED};
   bool storage_ok_{false}, configured_{false}, armed_{false}, clock_ready_{false};
+  bool playback_allowed_{true};
   Fault fault_{Fault::NONE};
 };
 }  // namespace openathan

@@ -4,6 +4,12 @@ OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project.
 
 > **Project status:** early development. The [scheduler development build](firmware/esphome/scheduler/README.md) integrates local prayer calculations, scheduled offline audio and persisted skip/duplicate-prevention state. Host tests and reference-device tests cover playback, scheduling, persistence and application OTA. Provisioning, the setup UI and release qualification remain; this is developer firmware, not an end-user release. See the [validation results](docs/development/feasibility-report.md#integrated-device-validation--2026-09-24) and [CI checks](.github/workflows/README.md).
 
+Developer firmware supports [saved runtime settings](firmware/esphome/scheduler/SETTINGS.md)
+through an encrypted local console. The guide documents persistence, replay
+protection, and the completed [power-cut and replay checks](docs/development/feasibility-report.md#saved-runtime-settings--2026-09-25).
+Phone-based provisioning and settings are the next development milestone; the
+console is currently the runtime configuration interface.
+
 ## Supported paths
 
 ### Ordinary users
@@ -78,9 +84,19 @@ hardware/                 Reference builds and optional expansions
 docs/development/         Architecture and engineering documentation
 ```
 
-## Planned functionality
+## Implemented developer functionality and next milestones
 
-The standalone Athan MVP is planned to include local prayer-time calculation, calculation and Asr methods, prayer offsets, normal and Fajr Athan playback, volume control, skip-next-Athan behavior, persisted settings, time synchronization, local configuration, and OTA updates. The official reference build may add prayer-status LEDs, touch controls, and its display through optional capability adapters; those features are not requirements of the reusable scheduler or package.
+Developer builds implement local prayer-time calculation, calculation and Asr
+methods, prayer offsets, scheduled normal/Fajr playback, durable skip and replay
+protection, saved volume and settings, time synchronization, and application OTA.
+Settings can be changed through the optional encrypted developer console.
+
+The next milestone is phone-friendly setup and ongoing local configuration,
+including Wi-Fi provisioning and recovery. The installer and official release
+entry point still need product integration and qualification. See the
+[roadmap](docs/development/roadmap.md) for completed work and remaining scope.
+The reference build may add prayer-status LEDs, touch controls, and its display
+through optional adapters; they are not requirements of the reusable scheduler.
 
 Quran streaming, reciter and passage selection, resume position, adhkar, offline Quran storage, RTC expansion, and optional Home Assistant integration are later work. Streaming audio should use PSRAM for buffering; Quran audio is not expected to fit in the AtomS3R's flash.
 

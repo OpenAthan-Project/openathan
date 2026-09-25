@@ -100,3 +100,7 @@ interval:
 media_player:
 """)
         self.validate(config, False, "same explicit timezone")
+
+    def test_settings_timezone_label_matches_boot_rules(self):
+        self.validate(self.config("  timezone_name: America/Toronto"), True)
+        self.validate(self.config("  timezone_name: Asia/Kolkata"), False, "timezone_name must resolve")

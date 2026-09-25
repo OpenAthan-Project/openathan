@@ -11,8 +11,28 @@ api:
   reboot_timeout: 0s
   encryption:
     key: !secret diagnostic_api_key
+  actions:
+    - action: get_settings
+      supports_response: only
+      then:
+        - api.respond:
+            data: !lambda id(athan_scheduler).write_settings_json(root);
+    - action: set_settings
+      supports_response: only
+      variables:
+        payload: string
+      then:
+        - lambda: id(athan_scheduler).read_settings_json(payload);
+        - api.respond:
+            success: !lambda return id(athan_scheduler).settings_request_ok();
+            error_message: !lambda return id(athan_scheduler).settings_request_error();
+            data: !lambda id(athan_scheduler).write_settings_json(root);
 
 text_sensor:
+  - platform: template
+    name: Settings application
+    update_interval: 1s
+    lambda: return std::string(id(athan_scheduler).settings_application_status());
   - platform: template
     name: Scheduler status
     update_interval: 1s
