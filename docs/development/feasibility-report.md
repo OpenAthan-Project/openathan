@@ -449,3 +449,19 @@ These results are automated. The corrected firmware has not been flashed;
 long-session phone behavior and the existing pending hardware matrix remain
 unqualified. Earlier image sizes and physical results above describe their
 original revisions.
+
+## Connected Wi-Fi discovery correction — 2026-09-25
+
+Review found that registering a scan listener alone does not request full scan
+results in pinned ESPHome 2026.9.0. While connected, USB recovery could list only
+the saved SSID. Both provisioning builds now explicitly request full results.
+The new code-generation regression failed for both configurations before the
+fix and passed afterward. A host probe uses the installed ESPHome scan methods
+to reproduce connected filtering and verify unrestricted scan requests with the
+flag, plus disconnected discovery with and without it.
+
+All 38 Python tests and seven C++ UBSan suites passed locally. Actual discovery
+of another network while connected is added to the pending hardware matrix;
+these automated results do not qualify radio behavior or resolve the earlier
+serial-associated Wi-Fi disconnect. This correction changes no API or stored
+record format.

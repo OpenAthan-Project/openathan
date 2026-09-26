@@ -55,6 +55,8 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_openathan(await cg.get_variable(config["openathan_id"])))
+    # Connected USB recovery scans must include networks beyond the saved SSID.
+    wifi.request_wifi_scan_results()
     wifi.request_wifi_scan_results_listener()
     wifi.request_wifi_connect_state_listener()
     esp32.include_builtin_idf_component("esp_http_server")

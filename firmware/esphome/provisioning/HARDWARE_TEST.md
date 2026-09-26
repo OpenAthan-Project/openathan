@@ -203,6 +203,7 @@ advance the system clock or restore old history to accelerate a test.
 | Manual setup and preview | Enter latitude/longitude, supported timezone and method; review Asr/prayers/volume/Advanced. Preview is side-effect-free. Finish setup persists settings before activation. |
 | Invalid time | Preview waits; activation may finish but playback remains blocked. After NTP returns, only future occurrences arm. |
 | Wi-Fi failure/retry | Wrong password and nonexistent SSID fail; previous working credentials survive reboot. Correct retry succeeds only after durable acknowledgment. |
+| Connected Wi-Fi discovery (pending) | While connected to the saved network, run the USB `scan` command with another visible network nearby. Require the alternative SSID in the results and normal scan completion; repeat while disconnected. Scanning must not replace saved credentials or change settings/history. Retain results privately; radio behavior remains unqualified until this test is performed. |
 | Hidden network / same SSID | Hidden SSID connects; a wrong replacement password for the currently connected SSID cannot succeed using the old connection. |
 | USB reconnection | Disconnect during a command; reconnect, inspect status, reconcile before explicitly retrying. No reflash/reset is required for ordinary recovery. |
 | Password recovery | Replace password over USB. Old authentication fails; a fresh browser signs in with the new password. Settings, revision and history do not change. |

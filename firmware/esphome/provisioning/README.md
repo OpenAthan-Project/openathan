@@ -212,7 +212,11 @@ existing initialization behavior unless the product activation gate is attached.
 Automated checks cover the production settings/JSON API, activation and storage
 faults, side-effect-free previews, timezone preservation, revision conflicts,
 occurrence-bound skips, Digest replay/expiry, USB framing, credential corruption,
-interrupted commits, and the Wi-Fi disconnect/join/timeout state machine. Browser
+interrupted commits, and the Wi-Fi disconnect/join/timeout state machine.
+Real ESPHome code-generation checks verify that both
+provisioning builds request full scan results. A host probe exercises the pinned
+ESPHome scan methods for connected recovery and disconnected discovery; actual
+radio discovery remains a hardware acceptance item. Browser
 tests run the production C++ Digest verifier with simulated settings endpoints in
 Chromium and WebKit. They cover 100 authenticated requests, concurrent reads,
 two expiry/renewal cycles (including a settings POST), setup, conflicts, lost
