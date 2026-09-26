@@ -12,7 +12,9 @@ build also tests the production settings JSON bridge with the exact resolved
 ArduinoJson library. The host suite exercises interrupted settings writes and
 the bridge against pinned ESPHome timezone conversion code. Additional host tests
 cover the production local API, USB protocol, activation/credential storage, Digest
-authentication and Wi-Fi transactions. A separate browser job builds the production
+authentication and Wi-Fi transactions. Python tests generate both provisioning
+configurations and exercise the pinned ESPHome scan policy to protect discovery
+of alternative networks while connected. A separate browser job builds the production
 C++ Digest verifier and runs the embedded UI with simulated settings endpoints in
 Chromium and WebKit. It covers sustained authentication, client-nonce rotation,
 expiry renewal on reads and writes, revision conflicts, dropped responses and
