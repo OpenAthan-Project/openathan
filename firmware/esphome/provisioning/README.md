@@ -174,6 +174,12 @@ material, not the plaintext device password. HA1 is password-equivalent and
 must remain private. Nonces are random, expire after five minutes, and are checked
 against bounded nonce-count replay windows, the actual request method/target,
 and the configured realm. Password replacement and reboot invalidate old nonces.
+The request count is tracked per server nonce, including when browsers rotate
+their client nonce. A recognized expired nonce with valid credentials and an
+unused request count receives `stale=true`, allowing the browser to renew without
+another sign-in prompt. Invalid credentials, replayed counts and invalidated or
+unknown nonces do not receive that renewal signal. See
+[HTTP Digest renewal](https://www.rfc-editor.org/rfc/rfc7616.html#section-3.6).
 
 This is a trusted-home-LAN interface, not an encrypted or Internet-facing service.
 HTTP content can be observed or modified by an active network attacker, and
@@ -207,8 +213,12 @@ Automated checks cover the production settings/JSON API, activation and storage
 faults, side-effect-free previews, timezone preservation, revision conflicts,
 occurrence-bound skips, Digest replay/expiry, USB framing, credential corruption,
 interrupted commits, and the Wi-Fi disconnect/join/timeout state machine. Browser
-tests use a simulated device to exercise native Digest login, setup, conflicts,
-lost responses, invalid time and narrow-screen layout in Chromium and WebKit.
+tests run the production C++ Digest verifier with simulated settings endpoints in
+Chromium and WebKit. They cover 100 authenticated requests, concurrent reads,
+two expiry/renewal cycles (including a settings POST), setup, conflicts, lost
+responses, invalid time and narrow-screen layout. Chromium additionally rejects
+any credential prompt after the initial sign-in. The test clock advances expiry
+without waiting five minutes; WebKit uses the test runner's credential handler.
 They do not establish physical iPhone/Android or radio/USB operation.
 
 ```sh

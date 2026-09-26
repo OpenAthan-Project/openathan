@@ -1,23 +1,25 @@
-/* Browser contract tests with a simulated device. Production settings/API,
- * activation, and Digest validation have separate C++ tests. */
+/* Browser tests use the production Digest implementation and simulated device
+ * settings. Production settings/API and activation have separate C++ tests. */
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {createServer}=require('node:http');
 const {readFile}=require('node:fs/promises');
 const {join}=require('node:path');
-const {createHash,randomBytes}=require('node:crypto');
+const firmwareDigest=require('./device_digest.cjs');
 const {chromium,webkit}=require(require.resolve('playwright',{paths:[join(__dirname,'../web/device-ui')]}));
-const md5=(s)=>createHash('md5').update(s).digest('hex');
 const rules={standard_offset:0,daylight_offset:0,start:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0},end:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0}};
 function initial(){return {schema:1,revision:1,setup:'incomplete',application:'applied',automatic_ready:false,clock_ready:true,scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times:[{name:'Fajr',local:'2026-09-25 05:30'},{name:'Dhuhr',local:'2026-09-25 12:30'}],conflicts:[]}};}
 async function fixture(){
-  const state={device:initial(),mutations:0,drop:false,failRead:false,posts:[],authenticated:0};
-  const nonce=randomBytes(24).toString('hex'),realm='OpenAthan-test';
+  const state={device:initial(),mutations:0,drop:false,failRead:false,posts:[],authenticated:0,
+    now:100, challenges:[],cnonces:new Set()};
+  const auth=firmwareDigest();
   const server=createServer(async(req,res)=>{
-    const params={};for(const m of (req.headers.authorization||'').matchAll(/(\w+)=(?:"([^"]*)"|([^, ]+))/g))params[m[1]]=m[2]??m[3];
-    const ha1=md5(`admin:${realm}:browser test password`);
-    const expected=md5(`${ha1}:${nonce}:${params.nc}:${params.cnonce}:auth:${md5(`${req.method}:${req.url}`)}`);
-    if(params.username!=='admin'||params.nonce!==nonce||params.response!==expected){res.writeHead(401,{'WWW-Authenticate':`Digest realm="${realm}", nonce="${nonce}", algorithm=MD5, qop="auth"`});res.end();return;}
+    const header=req.headers.authorization||'';
+    let challenge;
+    try{challenge=await auth.authorize(state.now,req.method,req.url,header);}
+    catch(error){res.writeHead(500);res.end(error.message);return;}
+    if(challenge){state.challenges.push(challenge);res.writeHead(401,{'WWW-Authenticate':challenge});res.end();return;}
+    state.cnonces.add(/cnonce="([^"]*)"/.exec(header)?.[1]);
     state.authenticated++;
     if(!req.url.startsWith('/api/')){
       const files={'/':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css']};
@@ -45,9 +47,58 @@ async function fixture(){
     send(200,state.device);
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  return {state,url:`http://127.0.0.1:${server.address().port}`,close:()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);})};
+  return {state,url:`http://127.0.0.1:${server.address().port}`,close:async()=>{
+    await new Promise(resolve=>{server.closeAllConnections();server.close(resolve);});await auth.close();
+  }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: sustained authentication and transparent nonce renewal`,async()=>{
+  const f=await fixture();f.state.device.setup='active';
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async(error)=>{await f.close();throw error;});
+  const context=await browser.newContext(browserName==='chromium'?{}:{httpCredentials:{username:'admin',password:'browser test password'}});
+  const page=await context.newPage();let prompts=0;
+  try{
+    if(browserName==='chromium'){
+      // Model one user sign-in. Reject any later credential prompt so the
+      // test cannot hide a broken renewal by silently supplying the password.
+      const cdp=await context.newCDPSession(page);
+      await cdp.send('Fetch.enable',{handleAuthRequests:true});
+      cdp.on('Fetch.requestPaused',e=>cdp.send('Fetch.continueRequest',{requestId:e.requestId}));
+      cdp.on('Fetch.authRequired',e=>{
+        prompts++;
+        cdp.send('Fetch.continueWithAuth',{requestId:e.requestId,authChallengeResponse:prompts===1
+          ?{response:'ProvideCredentials',username:'admin',password:'browser test password'}:{response:'CancelAuth'}});
+      });
+    }
+    await page.goto(f.url);await page.waitForFunction(()=>document.querySelector('#message').textContent==='Connected to your OpenAthan.');
+    const initialChallenges=f.state.challenges.length;
+    const responses=await page.evaluate(async()=>{
+      const result=[];
+      for(let i=0;i<25;i++)result.push(...await Promise.all(Array.from({length:4},()=>fetch('/api/status').then(r=>r.status))));
+      return result;
+    });
+    assert.ok(responses.every(code=>code===200));
+    assert.equal(f.state.challenges.length,initialChallenges);
+    if(browserName==='chromium'){assert.ok(f.state.cnonces.size>8);assert.equal(prompts,1);}
+    // Expire the real verifier's nonce; a challenged POST must renew before it
+    // reaches the mutation handler and commit only once.
+    f.state.now+=300000;
+    const saved=await page.evaluate(async body=>{
+      return fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)}).then(r=>r.status);
+    },{schema:1,expected_revision:f.state.device.revision,settings:{...f.state.device.settings,volume:35}});
+    assert.equal(saved,200);assert.equal(f.state.mutations,1);
+    const renewed=f.state.challenges.slice(initialChallenges);
+    assert.equal(renewed.length,1);assert.match(renewed[0],/stale=true/);
+    if(browserName==='chromium')assert.equal(prompts,1);
+    assert.equal(f.state.device.settings.volume,35);
+    f.state.now+=300000;
+    assert.equal(await page.evaluate(()=>fetch('/api/status').then(r=>r.status)),200);
+    assert.equal(f.state.challenges.length,initialChallenges+2);
+    assert.match(f.state.challenges.at(-1),/stale=true/);
+    if(browserName==='chromium')assert.equal(prompts,1);
+  }finally{await context.close();await browser.close();await f.close();}
+ });
  test(`${browserName}: coordinate precision survives volume saves and lost responses`,async()=>{
   const f=await fixture();f.state.device.setup='active';
   const latitude=43.653212345678909,longitude=-79.383212345678913;

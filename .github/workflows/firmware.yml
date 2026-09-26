@@ -97,6 +97,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Build production authentication test adapter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libssl-dev
+          cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
+          cmake --build build --target digest_test_bridge --parallel 2
       - name: Install browser test dependencies
         working-directory: web/device-ui
         run: |

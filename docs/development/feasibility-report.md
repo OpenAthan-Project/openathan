@@ -426,3 +426,26 @@ factory/application consistency and shared-audio checks using the CI fixture.
 Only the isolated build enables test storage. The original roadmap task wording
 and phase order were retained. These rebuilt images have not been flashed;
 the physical results above continue to describe the earlier isolated image.
+
+## Digest browser compatibility correction — 2026-09-25
+
+Review identified two gaps in the earlier simulated authentication fixture:
+Chromium rotates its client nonce on each request, exhausting the verifier's
+eight-client limit, and expiry lacked the `stale=true` renewal signal. Replay
+counts now belong to each server nonce. Expired requests receive the renewal
+signal only after credentials, request target and replay checks pass. Password
+replacement still invalidates all outstanding nonces.
+
+Seven C++ UBSan suites and eight Chromium/WebKit browser tests passed locally.
+Browser tests now run the production C++ verifier with simulated settings
+endpoints. New cases make 100 requests with concurrent reads, then advance the
+clock through two expiry cycles, including a settings POST that commits once.
+Chromium permits only the initial credential prompt; WebKit checks the renewal
+challenge and successful requests through its test credential handler. C++ tests
+also cover replay windows, reordered counts, invalid credentials and nonce
+eviction. The adapter is built in the browser CI job.
+
+These results are automated. The corrected firmware has not been flashed;
+long-session phone behavior and the existing pending hardware matrix remain
+unqualified. Earlier image sizes and physical results above describe their
+original revisions.

@@ -71,25 +71,69 @@ void authentication() {
   CHECK(!auth.available() && auth.challenge(0, nonce).empty());
   auth.configure("device", md5_hex("admin:device:a longer password"));
   CHECK(auth.challenge(100, nonce).find(nonce) != std::string::npos);
-  CHECK(!auth.authorize(authorization(nonce), "POST", "/api/activate", 101));
-  CHECK(!auth.authorize(authorization(nonce), "GET", "/api/settings", 101));
-  CHECK(!auth.authorize(authorization(nonce) + ", nc=00000001", "POST", "/api/settings", 101));
-  CHECK(auth.authorize(authorization(nonce), "POST", "/api/settings", 101));
-  CHECK(!auth.authorize(authorization(nonce), "POST", "/api/settings", 101));
-  CHECK(auth.authorize(authorization(nonce, "00000003"), "POST", "/api/settings", 101));
-  CHECK(auth.authorize(authorization(nonce, "00000002"), "POST", "/api/settings", 101));
-  CHECK(!auth.authorize(authorization(nonce, "00000002"), "POST", "/api/settings", 101));
-  CHECK(!auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 300100));
-  CHECK(!auth.authorize(authorization(std::string(48, 'b')), "POST", "/api/settings", 102));
-  CHECK(!auth.authorize(authorization(nonce, "00000000"), "POST", "/api/settings", 102));
-  CHECK(!auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 99));
+  CHECK(auth.authorize(authorization(nonce), "POST", "/api/activate", 101) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce), "GET", "/api/settings", 101) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce) + ", nc=00000001", "POST", "/api/settings", 101) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce), "POST", "/api/settings", 101) == DigestAuth::Result::ACCEPTED);
+  CHECK(auth.authorize(authorization(nonce), "POST", "/api/settings", 101) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce, "00000003"), "POST", "/api/settings", 101) == DigestAuth::Result::ACCEPTED);
+  CHECK(auth.authorize(authorization(nonce, "00000002"), "POST", "/api/settings", 101) == DigestAuth::Result::ACCEPTED);
+  CHECK(auth.authorize(authorization(nonce, "00000002"), "POST", "/api/settings", 101) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 300100) == DigestAuth::Result::STALE);
+  CHECK(auth.authorize(authorization(std::string(48, 'b')), "POST", "/api/settings", 102) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce, "00000000"), "POST", "/api/settings", 102) == DigestAuth::Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 99) == DigestAuth::Result::REJECTED);
   // A password reset clears all outstanding nonces, including authenticated sessions.
   auth.configure("device", md5_hex("admin:device:another password"));
-  CHECK(!auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 102));
+  CHECK(auth.authorize(authorization(nonce, "00000004"), "POST", "/api/settings", 102) == DigestAuth::Result::REJECTED);
   CHECK(same_origin("http://device.local", "device.local", "same-origin"));
   CHECK(!same_origin("http://attacker.test", "device.local", "cross-site"));
   CHECK(!same_origin("null", "device.local", "same-origin"));
   CHECK(!same_origin("", "device.local", ""));
+}
+void authentication_rotation() {
+  using Result = DigestAuth::Result;
+  DigestAuth auth;
+  const auto verifier = md5_hex("admin:device:a longer password");
+  auth.configure("device", verifier);
+  const std::string nonce(48, 'a'), replacement(48, 'b');
+  CHECK(auth.challenge(100, nonce).find("stale=true") == std::string::npos);
+  // Chromium rotates cnonce on every request while incrementing nc.
+  for (unsigned i = 1; i <= 100; ++i) {
+    char count[9]; std::snprintf(count, sizeof(count), "%08x", i);
+    const auto header = authorization(nonce, count, "browser-" + std::to_string(i));
+    CHECK(auth.authorize(header, "POST", "/api/settings", 101) == Result::ACCEPTED);
+    CHECK(auth.authorize(header, "POST", "/api/settings", 101) == Result::REJECTED);
+  }
+  CHECK(auth.authorize(authorization(nonce, "00000064", "different-client-nonce"),
+                       "POST", "/api/settings", 101) == Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce), "POST", "/api/settings", 101) == Result::REJECTED);
+  // Unseen out-of-order counts within the window are accepted exactly once.
+  CHECK(auth.authorize(authorization(nonce, "00000067", "new"), "POST", "/api/settings", 102) == Result::ACCEPTED);
+  CHECK(auth.authorize(authorization(nonce, "00000065", "another"), "POST", "/api/settings", 102) == Result::ACCEPTED);
+  CHECK(auth.authorize(authorization(nonce, "00000065", "another"), "POST", "/api/settings", 102) == Result::REJECTED);
+  // Verify credentials, target and replay state before returning STALE.
+  const auto next = authorization(nonce, "00000068");
+  CHECK(auth.authorize(next, "POST", "/api/settings", 300099) == Result::ACCEPTED);
+  CHECK(auth.authorize(next, "POST", "/api/settings", 300100) == Result::REJECTED);
+  const auto expired = authorization(nonce, "00000069");
+  CHECK(auth.authorize(expired, "POST", "/api/settings", 300100) == Result::STALE);
+  CHECK(auth.authorize(expired, "POST", "/api/activate", 300100) == Result::REJECTED);
+  CHECK(auth.authorize(authorization(nonce, "00000069", "browser", "POST", "/api/settings", md5_hex("wrong")),
+                       "POST", "/api/settings", 300100) == Result::REJECTED);
+  CHECK(auth.challenge(300100, replacement, true).find(", stale=true") != std::string::npos);
+  CHECK(auth.authorize(authorization(replacement), "POST", "/api/settings", 300101) == Result::ACCEPTED);
+  // A bad digest must never consume a count needed by a legitimate request.
+  CHECK(auth.authorize(authorization(replacement, "00000002", "browser", "POST", "/api/settings", md5_hex("wrong")),
+                       "POST", "/api/settings", 300102) == Result::REJECTED);
+  CHECK(auth.authorize(authorization(replacement, "00000002"), "POST", "/api/settings", 300102) == Result::ACCEPTED);
+  auth.configure("device", md5_hex("admin:device:another password"));
+  CHECK(auth.authorize(expired, "POST", "/api/settings", 300102) == Result::REJECTED);
+  auth.configure("device", verifier);
+  // Nonce storage stays bounded; eviction never makes an old nonce acceptable.
+  for (char c = '0'; c <= '8'; ++c) auth.challenge(400000, std::string(48, c));
+  CHECK(auth.authorize(authorization(std::string(48, '0')), "POST", "/api/settings", 700000) == Result::REJECTED);
+  CHECK(auth.authorize(authorization(std::string(48, '8')), "POST", "/api/settings", 700000) == Result::STALE);
 }
 void credentials() {
   nvs_test::reset();
@@ -205,6 +249,7 @@ void wifi_attempts() {
 int main() {
   frames();
   authentication();
+  authentication_rotation();
   credentials();
   activation();
   wifi_attempts();

@@ -50,6 +50,13 @@ if(NOT APPLE)
 endif()
 add_test(NAME provisioning_safety COMMAND provisioning_tests)
 
+add_executable(digest_test_bridge tests/digest_test_bridge.cpp
+  firmware/esphome/components/openathan_device/digest.cpp)
+target_include_directories(digest_test_bridge PRIVATE tests/stubs firmware/esphome/components/openathan_device)
+if(NOT APPLE)
+  target_link_libraries(digest_test_bridge PRIVATE OpenSSL::Crypto)
+endif()
+
 foreach(mode IN ITEMS production isolated)
   add_executable(storage_${mode}_tests tests/storage_isolation_tests.cpp
     firmware/esphome/components/openathan/nvs_settings_store.cpp
