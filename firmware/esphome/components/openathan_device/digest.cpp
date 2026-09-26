@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <map>
 #include <vector>
 
 namespace esphome::openathan_device {
@@ -70,32 +71,35 @@ bool parse(const std::string& header, std::map<std::string, std::string>& out) {
   return true;
 }
 }  // namespace
-std::string DigestAuth::challenge(uint64_t now, const std::string& random_hex) {
+std::string DigestAuth::challenge(uint64_t now, const std::string& random_hex, bool stale) {
   if (!available() || !hex(random_hex, 48)) return {};
   if (nonces_.size() >= 8) nonces_.pop_front();
   nonces_.push_back({random_hex, now, {}});
-  return "Digest realm=\"" + realm_ + "\", nonce=\"" + random_hex + "\", algorithm=MD5, qop=\"auth\"";
+  return "Digest realm=\"" + realm_ + "\", nonce=\"" + random_hex + "\", algorithm=MD5, qop=\"auth\"" +
+         (stale ? ", stale=true" : "");
 }
-bool DigestAuth::authorize(const std::string& header, const std::string& method, const std::string& uri, uint64_t now) {
+DigestAuth::Result DigestAuth::authorize(const std::string& header, const std::string& method,
+                                       const std::string& uri, uint64_t now) {
   std::map<std::string, std::string> p;
   if (!available() || !parse(header, p) || p["username"] != "admin" || p["realm"] != realm_ || p["uri"] != uri ||
       p["qop"] != "auth" || (!p["algorithm"].empty() && p["algorithm"] != "MD5") || !hex(p["response"], 32) ||
       !hex(p["nc"], 8) || p["cnonce"].empty() || p["cnonce"].size() > 64)
-    return false;
+    return Result::REJECTED;
   auto found = std::find_if(nonces_.begin(), nonces_.end(), [&](const auto& n) { return n.value == p["nonce"]; });
-  if (found == nonces_.end() || now < found->issued || now - found->issued >= 300000) return false;
+  if (found == nonces_.end() || now < found->issued) return Result::REJECTED;
   uint32_t count = 0;
   for (char c : p["nc"]) count = (count << 4) | uint32_t(c <= '9' ? c - '0' : c - 'a' + 10);
-  if (!count) return false;
-  auto client = found->clients.find(p["cnonce"]);
-  if (client == found->clients.end() && found->clients.size() >= 8) return false;
-  const Replay previous = client == found->clients.end() ? Replay{} : client->second;
+  if (!count) return Result::REJECTED;
+  const auto previous = found->replay;
   if (count <= previous.highest &&
       (previous.highest - count >= 32 || (previous.seen & (1U << (previous.highest - count)))))
-    return false;
+    return Result::REJECTED;
   const auto expected = md5_hex(verifier_ + ":" + p["nonce"] + ":" + p["nc"] + ":" + p["cnonce"] +
                                 ":auth:" + md5_hex(method + ":" + uri));
-  if (!equal_secret(expected, p["response"])) return false;
+  if (!equal_secret(expected, p["response"])) return Result::REJECTED;
+  // Renew only a recognized expired nonce with otherwise valid credentials.
+  // Replays, password resets and unknown nonces must not get transparent renewal.
+  if (now - found->issued >= 300000) return Result::STALE;
   auto next = previous;
   if (count > next.highest) {
     const auto distance = count - next.highest;
@@ -103,8 +107,8 @@ bool DigestAuth::authorize(const std::string& header, const std::string& method,
     next.highest = count;
   } else
     next.seen |= 1U << (next.highest - count);
-  found->clients[p["cnonce"]] = next;
-  return true;
+  found->replay = next;
+  return Result::ACCEPTED;
 }
 bool same_origin(const std::string& origin, const std::string& host, const std::string& site) {
   return !origin.empty() && origin == "http://" + host && (site.empty() || site == "same-origin" || site == "none");

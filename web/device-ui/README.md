@@ -20,5 +20,20 @@ remaining hardware acceptance. `index.html`, `app.js`, and `style.css` are
 compressed into firmware during code generation; no public website build is
 involved. The npm dependency is for browser testing only.
 
+Browser tests use the production C++ Digest verifier with simulated settings
+endpoints. Build its host adapter from the repository root before running tests:
+
+```sh
+cmake -S . -B build
+cmake --build build --target digest_test_bridge
+cd web/device-ui
+npm ci --ignore-scripts
+npx playwright install chromium webkit
+OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
+```
+
+Linux requires OpenSSL development headers. To use a different build directory,
+set `OPENATHAN_DIGEST_TEST_BRIDGE` to the adapter's absolute path.
+
 Quran/adhkar, LED settings, product OTA, and the public browser installer remain
 separate work.

@@ -12,9 +12,11 @@ build also tests the production settings JSON bridge with the exact resolved
 ArduinoJson library. The host suite exercises interrupted settings writes and
 the bridge against pinned ESPHome timezone conversion code. Additional host tests
 cover the production local API, USB protocol, activation/credential storage, Digest
-authentication and Wi-Fi transactions. A separate browser job runs the embedded
-UI against a simulated device in Chromium and WebKit, including native Digest
-login, revision conflicts, dropped responses and narrow-screen layout.
+authentication and Wi-Fi transactions. A separate browser job builds the production
+C++ Digest verifier and runs the embedded UI with simulated settings endpoints in
+Chromium and WebKit. It covers sustained authentication, client-nonce rotation,
+expiry renewal on reads and writes, revision conflicts, dropped responses and
+narrow-screen layout. Chromium checks that renewal causes no second sign-in prompt.
 
 Production and isolated host builds exercise the same storage implementations.
 Tests prove cleanup rejects production namespaces, preserves unrelated records,

@@ -406,9 +406,10 @@ void Device::handle_http_(HttpExchange& request) {
     error(request, 429, "Too many authentication attempts");
     return;
   }
-  if (!auth_.authorize(request.authorization, request.method, request.uri, now)) {
+  const auto authorization = auth_.authorize(request.authorization, request.method, request.uri, now);
+  if (authorization != DigestAuth::Result::ACCEPTED) {
     error(request, 401, "Sign in as admin with your device password");
-    request.challenge = auth_.challenge(now, random_nonce());
+    request.challenge = auth_.challenge(now, random_nonce(), authorization == DigestAuth::Result::STALE);
     return;
   }
   constexpr const char* paths[] = {"/", "/app.js", "/style.css"};
