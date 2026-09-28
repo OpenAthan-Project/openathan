@@ -9,15 +9,15 @@ from importlib.metadata import version
 import json
 from pathlib import Path
 import re
-import struct
 import yaml
 
-from audio_image import PARTITIONS, PARTITION_SIZE, ROOT, validate_partitions
+from audio_image import ROOT, validate_partitions
 
 
-def inspect(build_dir, log, audio_image):
-    validate_partitions()
-    pins = json.loads((ROOT / "firmware/esphome/feasibility/dependencies.json").read_text())
+def inspect_firmware(build_dir, log, root=ROOT):
+    partitions = root / "firmware/esphome/feasibility/partitions.csv"
+    validate_partitions(partitions)
+    pins = json.loads((root / "firmware/esphome/feasibility/dependencies.json").read_text())
     if version("esphome") != pins["esphome"]:
         raise ValueError("ESPHome version differs from the stable pin")
     lock = yaml.safe_load((build_dir / "dependencies.lock").read_text())["dependencies"]
@@ -40,7 +40,7 @@ def inspect(build_dir, log, audio_image):
         manifest = json.loads((Path(entry["source"]["path"]) / "library.json").read_text())
         if manifest["version"] != diagnostic[name]:
             raise ValueError(f"Diagnostic library version differs from the reviewed pin: {name}")
-    if (build_dir / "partitions.csv").read_bytes() != PARTITIONS.read_bytes():
+    if (build_dir / "partitions.csv").read_bytes() != partitions.read_bytes():
         raise ValueError("Generated build uses a different partition table")
     compile_commands = (build_dir / "build/compile_commands.json").read_text()
     if pins["xtensa_esp_elf"] not in compile_commands:
@@ -55,18 +55,8 @@ def inspect(build_dir, log, audio_image):
     # The factory image contains exactly the same app at the first OTA slot.
     if factory[0x10000:0x10000 + len(app)] != app:
         raise ValueError("Factory and OTA application payloads differ")
-    media = audio_image.read_bytes()
-    if (len(media) != PARTITION_SIZE or media[:8] != b"OAUDIO01" or
-            struct.unpack_from("<I", media, 12)[0] != 2 or
-            hashlib.sha256(media[:112]).digest() != media[112:144]):
-        raise ValueError("Invalid audio image metadata")
-    for index in range(2):
-        _, offset, length, _, digest = struct.unpack_from("<IIII32s", media, 16 + index * 48)
-        payload = media[offset:offset + length]
-        if not length or len(payload) != length or hashlib.sha256(payload).digest() != digest:
-            raise ValueError("Invalid audio payload")
-        if payload[:4096] in app:
-            raise ValueError("Recording data found embedded in the application")
+    from release_artifacts import validate_firmware_images
+    validate_firmware_images(factory, app)
     log_text = log.read_text().replace("\r", "\n")
     ram = re.search(r"RAM:.*used (\d+) bytes from (\d+) bytes", log_text)
     flash = re.search(r"Flash:.*used (\d+) bytes from (\d+) bytes", log_text)
@@ -76,7 +66,22 @@ def inspect(build_dir, log, audio_image):
                 static_ram_bytes=int(ram[1]), application_slot_bytes=0x200000,
                 slot_free_bytes=0x200000-len(app), growth_target_passed=True,
                 application_sha256=hashlib.sha256(app).hexdigest(),
-                audio_in_application=False, managed_components=managed)
+                application_budget_remaining_bytes=0x180000-len(app),
+                managed_components=managed)
+
+
+def inspect_audio(app, audio_image):
+    from release_artifacts import audio_payloads
+    for payload in audio_payloads(audio_image.read_bytes()):
+        if payload[:4096] in app:
+            raise ValueError("Recording data found embedded in the application")
+    return dict(audio_in_application=False)
+
+
+def inspect(build_dir, log, audio_image):
+    result = inspect_firmware(build_dir, log)
+    result.update(inspect_audio((build_dir / "build/firmware.ota.bin").read_bytes(), audio_image))
+    return result
 
 
 def main():

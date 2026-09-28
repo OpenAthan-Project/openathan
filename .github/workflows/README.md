@@ -29,7 +29,11 @@ CI uses Python 3.13 on Ubuntu 24.04 and the pinned ESPHome requirements. The
 macOS-specific constraints file must not be installed on Linux. Builds use
 public compile-only settings and generated, non-decodable audio-image fixtures;
 no credentials, recordings, hardware connection or private archive is needed.
-The workflow does not upload firmware artifacts or create releases.
+The workflow does not upload firmware artifacts or create releases. Release tests
+exercise temporary synthetic bundles and mocked draft uploads. The host job also
+uses Node 24.19.0 and the pinned website validator to check installer compatibility.
+See [release preparation](../../docs/development/releases.md) for the explicit
+build, package and draft-upload commands.
 
 ## Reproduce from a clean checkout
 

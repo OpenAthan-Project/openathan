@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "tracks": [
+    {"role": "normal", "sha256": null, "source": null, "license": null, "attribution": null, "approved": false},
+    {"role": "fajr", "sha256": null, "source": null, "license": null, "attribution": null, "approved": false}
+  ]
+}

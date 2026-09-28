@@ -10,6 +10,9 @@ protection, and the completed [power-cut and replay checks](docs/development/fea
 The [reference provisioning candidate](firmware/esphome/provisioning/README.md)
 adds USB Wi-Fi/password recovery and a device-hosted settings interface around
 the same service. The public website/installer remains separate work.
+[Release preparation tooling](docs/development/releases.md) builds exact source
+commits and packages approved media for explicit draft uploads. No release
+recordings are currently approved.
 
 ## Supported paths
 
