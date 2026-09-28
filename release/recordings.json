@@ -1,7 +1,21 @@
 {
   "schema": 1,
   "tracks": [
-    {"role": "normal", "sha256": null, "source": null, "license": null, "attribution": null, "approved": false},
-    {"role": "fajr", "sha256": null, "source": null, "license": null, "attribution": null, "approved": false}
+    {
+      "role": "normal",
+      "sha256": "a87cea35f8bc83e81e64b3d3e1265de5af60954c9c5566ac2a30f66d11e31013",
+      "source": "https://aladhan.com/download-adhans",
+      "license": "https://community.islamic.network/d/255-permission-to-bundle-an-adhan-audio-file-in-our-android-app-nurafiq",
+      "attribution": "Adhan recited by Mishary Rashid Alafasy. Audio source: AlAdhan.com / Islamic Network. Supplied as a compressed MP3; copyright remains with the respective rights holders.",
+      "approved": true
+    },
+    {
+      "role": "fajr",
+      "sha256": "2005993def65a985d6c68fa8a327e2d504f328261cba9f893b2912038fe980e6",
+      "source": "https://aladhan.com/download-adhans",
+      "license": "https://community.islamic.network/d/255-permission-to-bundle-an-adhan-audio-file-in-our-android-app-nurafiq",
+      "attribution": "Fajr Adhan recited by Mishary Rashid Alafasy. Audio source: AlAdhan.com / Islamic Network. Supplied as a compressed MP3; copyright remains with the respective rights holders.",
+      "approved": true
+    }
   ]
 }

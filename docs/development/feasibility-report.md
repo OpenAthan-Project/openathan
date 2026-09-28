@@ -471,7 +471,9 @@ record format.
 The release CLI builds an exact committed reference configuration, packages only
 recordings approved at that revision, and supports explicit GitHub draft uploads.
 The [release guide](releases.md) describes inputs, artifact validation and the
-separate publication and hardware-qualification gates. No recordings are approved.
+separate publication and hardware-qualification gates. No recordings were approved
+at this tooling milestone; subsequent approvals are recorded in
+[AUDIO-LICENSES.md](../../AUDIO-LICENSES.md).
 
 Baseline `3ec1481` and implementation `73d005b` were compiled with Python 3.13.5,
 ESPHome 2026.9.0, ESP-IDF 5.5.5 and `esp-14.2.0_20260121` using the same reference
