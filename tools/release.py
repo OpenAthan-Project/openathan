@@ -269,9 +269,10 @@ def upload_draft(bundle, github=None):
         snapshot = Path(temporary)
         for name, data in files.items():
             (snapshot / name).write_bytes(data)
-        validate_audio_cpp(commit, snapshot / ASSETS[2])
         github.call("auth", "status", "--hostname", "github.com")
         release_gate(github, commit, tag)
+        # Establish the source is reviewed main before executing its CMake code.
+        validate_audio_cpp(commit, snapshot / ASSETS[2])
         release = find_release(github, tag)
         if release is None:
             notes = snapshot / "notes.md"

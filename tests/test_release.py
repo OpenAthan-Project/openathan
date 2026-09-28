@@ -176,10 +176,11 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn(str(self.base), json.dumps(report))
         self.assertEqual(set(files), set(artifacts.ASSETS))
 
-    def test_current_registry_is_unapproved(self):
-        current = artifacts.read_json((ROOT / artifacts.MEDIA_REGISTRY).read_bytes())
+    def test_unapproved_registry_is_rejected(self):
+        unapproved = copy.deepcopy(self.registry)
+        unapproved['tracks'][0]['approved'] = False
         with self.assertRaisesRegex(ValueError, 'not been approved'):
-            artifacts.approved_tracks(current, (ROOT / artifacts.LICENSE_PATH).read_bytes(), self.payloads)
+            artifacts.approved_tracks(unapproved, release.source_file(self.commit, artifacts.LICENSE_PATH), self.payloads)
 
     def test_media_approval_is_from_commit_not_working_tree(self):
         (self.repo / artifacts.MEDIA_REGISTRY).write_text('{"schema":1,"tracks":[]}')
@@ -298,9 +299,11 @@ class ReleaseTests(unittest.TestCase):
         for key, value in [('commit', 'b' * 40), ('main', 'b' * 40), ('success', False)]:
             github = FakeGitHub(self.commit)
             setattr(github, key, value)
+            release.validate_audio_cpp.reset_mock()
             with self.subTest(key=key), self.assertRaises(ValueError):
                 release.upload_draft(self.bundle, github)
             self.assertFalse(any(c[0] == 'release' for c in github.calls))
+            release.validate_audio_cpp.assert_not_called()
         self.github.extra_runs = [dict(id=2, head_sha=self.commit, head_branch='main', event='push',
                                        head_repository={'full_name': artifacts.REPOSITORY}, status='in_progress', conclusion=None)]
         with self.assertRaisesRegex(ValueError, 'latest'):
