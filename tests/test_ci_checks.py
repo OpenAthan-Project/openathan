@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import audio_image
 import check_feasibility
 import prepare_ci
+from release_fixtures import firmware
 
 
 class CiFixtureTests(unittest.TestCase):
@@ -49,9 +50,9 @@ class CapacityChecksTests(unittest.TestCase):
         self.lock["idf"] = {"version": self.pins["esp_idf"], "source": {"type": "idf"}}
         (self.build / "partitions.csv").write_bytes(audio_image.PARTITIONS.read_bytes())
         (self.build / "build/compile_commands.json").write_text(self.pins["xtensa_esp_elf"])
-        app = b"test-application" * 100
+        factory, app = firmware()
         (self.build / "build/firmware.ota.bin").write_bytes(app)
-        (self.build / "build/firmware.factory.bin").write_bytes(b"\xff" * 0x10000 + app)
+        (self.build / "build/firmware.factory.bin").write_bytes(factory)
         self.log = self.root / "compile.log"
         self.log.write_text("RAM: used 100 bytes from 1000 bytes\n"
                             "Flash: used 1500 bytes from 2000000 bytes\nSuccessfully compiled program")

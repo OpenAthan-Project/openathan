@@ -465,3 +465,30 @@ of another network while connected is added to the pending hardware matrix;
 these automated results do not qualify radio behavior or resolve the earlier
 serial-associated Wi-Fi disconnect. This correction changes no API or stored
 record format.
+
+## Release preparation tooling — 2026-09-28
+
+The release CLI builds an exact committed reference configuration, packages only
+recordings approved at that revision, and supports explicit GitHub draft uploads.
+The [release guide](releases.md) describes inputs, artifact validation and the
+separate publication and hardware-qualification gates. No recordings are approved.
+
+Baseline `3ec1481` and implementation `73d005b` were compiled with Python 3.13.5,
+ESPHome 2026.9.0, ESP-IDF 5.5.5 and `esp-14.2.0_20260121` using the same reference
+configuration. Actual OTA images were **1,128,736 bytes before and after**, a
+**0-byte delta**, leaving **444,128 bytes** within the 1.5 MiB application budget
+and **968,416 bytes** free in each 2 MiB slot. Partition/header/integrity checks,
+factory/OTA consistency and dependency checks passed. Later changes in this
+milestone affect host tooling, tests and documentation only.
+
+Seven C++ UBSan suites and 59 Python tests passed. Producer-generated synthetic
+artifacts passed the pinned website validator. The new CLI completed a real
+reference build; its relocated evidence revalidated, the production audio-format
+validator accepted a synthetic partition, and packaging rejected unapproved media
+without creating a bundle. Mocked GitHub tests cover source/tag/CI gates, partial
+uploads, retry, conflicts and published-release rejection.
+
+No hardware was accessed and no release assets were uploaded. Synthetic fixtures
+are not playable or installable release media. These checks do not establish
+recording rights, audible quality, physical installation/recovery acceptance or
+runtime heap/PSRAM headroom.

@@ -34,6 +34,18 @@ jobs:
           cmake --build build --parallel 2
           ctest --test-dir build --output-on-failure
           python tools/run_tests.py
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+      - name: Check out the pinned installer contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OpenAthan-Project/website
+          ref: ba356c80f00ff07046b7433c03e0fdc9802f64b0
+          path: .installer-contract
+          persist-credentials: false
+      - name: Verify producer output with the real installer validator
+        run: python tests/check_installer_contract.py --website .installer-contract
       - name: Validate developer configurations
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
