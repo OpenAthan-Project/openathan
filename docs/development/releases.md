@@ -5,10 +5,11 @@ reviewed release; it never compiles firmware. The [installer contract](https://g
 remains schema v1, for AtomS3R C126 + Voice Pyramid A167, ESP32-S3 with 8 MiB flash
 and the dual-2 MiB application / 3.5 MiB shared-audio layout.
 
-**No recordings are currently approved.** Building firmware is available now;
-packaging and uploading require a later committed [media review](../../AUDIO-LICENSES.md).
-Private test recordings, CI audio fixtures and historical recovery images are not
-release inputs. This tooling never flashes, publishes, or selects a website release.
+The selected normal and Fajr recordings have a documented
+[media approval](../../AUDIO-LICENSES.md). Packaging and uploading require a source
+revision containing that approval and the exact approved MP3 files. Other private
+test recordings, CI audio fixtures and historical recovery images are not release
+inputs. This tooling never flashes, publishes, or selects a website release.
 
 ## Prerequisites
 
