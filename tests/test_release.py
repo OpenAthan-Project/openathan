@@ -353,3 +353,21 @@ class ImageTests(unittest.TestCase):
             artifacts.validate_firmware_images(factory[:0x10000] + app)
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             artifacts.read_json(b'{"schema":1,"schema":2}')
+
+
+class GitHubAdapterTests(unittest.TestCase):
+    def test_forces_public_github_host_and_flattens_paginated_results(self):
+        with patch.dict(os.environ, {'GH_HOST': 'example.org'}):
+            with patch.object(release, 'command', return_value=b'[[{"id":1}],[{"id":2}]]') as call:
+                result = release.GitHub().api('releases?per_page=100', paginate=True)
+        self.assertEqual(result, [{'id': 1}, {'id': 2}])
+        self.assertEqual(call.call_args.kwargs['env']['GH_HOST'], 'github.com')
+        self.assertIn('--slurp', call.call_args.args[0])
+
+    def test_annotated_tags_resolve_to_commit(self):
+        github = release.GitHub()
+        with patch.object(github, 'api', side_effect=[
+            {'object': {'type': 'tag', 'sha': 'b' * 40}},
+            {'object': {'type': 'commit', 'sha': 'a' * 40}},
+        ]):
+            self.assertEqual(github.tag_commit('v0.1.0'), 'a' * 40)

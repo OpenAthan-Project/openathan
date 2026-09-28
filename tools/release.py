@@ -198,7 +198,9 @@ def package(build_dir, tag, normal, fajr, output):
 
 class GitHub:
     def call(self, *args):
-        return command(["gh", *args])
+        environment = os.environ.copy()
+        environment["GH_HOST"] = "github.com"
+        return command(["gh", *args], env=environment)
 
     def api(self, path, paginate=False):
         args = ["api", f"repos/{REPOSITORY}/{path}"]
