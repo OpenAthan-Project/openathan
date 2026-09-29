@@ -15,6 +15,12 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
  public:
   OpenAthan() : PollingComponent(1000) {}
   void set_clock(time::RealTimeClock *clock) { clock_ = clock; }
+  void set_light_output(::openathan::LightOutput *output) { light_output_ = output; }
+  bool has_lights() const { return light_output_ != nullptr; }
+  const ::openathan::LightPreferences &light_preferences() const { return light_preferences_; }
+  ::openathan::LightSaveResult change_lights(::openathan::LightSettings value, uint32_t revision);
+  const char *light_application_status() const;
+  ::openathan::LightMode current_light_mode() const { return light_mode_; }
   void set_playback(::openathan::Playback *playback) { playback_ = playback; }
   // Internal injection points, wired before setup by the developer test harness.
   void set_calculator(::openathan::DayCalculator *calculator) { calculator_source_ = calculator; }
@@ -63,6 +69,17 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   const char *settings_application_status() const;
  private:
   void log_status_();
+  void update_lights_();
+  ::openathan::LightOutput *light_output_{};
+  NvsLightStore light_store_;
+  ::openathan::LightPreferences light_preferences_{light_store_};
+  ::openathan::LightSchedule light_schedule_;
+  ::openathan::LightMode light_mode_{::openathan::LightMode::OFF};
+  std::optional<::openathan::LightFrame> light_applied_;
+  int32_t light_day_{::openathan::NEVER_CONSUMED};
+  int64_t light_last_utc_{};
+  uint64_t light_next_frame_{}, light_retry_at_{};
+  bool light_schedule_ok_{}, light_output_ok_{};
   void apply_volume_();
   time::RealTimeClock *clock_{};
   ::openathan::Playback *playback_{};

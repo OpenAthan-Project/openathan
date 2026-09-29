@@ -10,7 +10,7 @@ const {chromium,webkit}=require(require.resolve('playwright',{paths:[join(__dirn
 const rules={standard_offset:0,daylight_offset:0,start:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0},end:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0}};
 function initial(){return {schema:1,revision:1,setup:'incomplete',application:'applied',automatic_ready:false,clock_ready:true,scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times:[{name:'Fajr',local:'2026-09-25 05:30'},{name:'Dhuhr',local:'2026-09-25 12:30'}],conflicts:[]}};}
 async function fixture(){
-  const state={device:initial(),mutations:0,drop:false,failRead:false,posts:[],authenticated:0,
+  const state={device:initial(),lightMutations:0,lightDrop:false,lightFailRead:false,mutations:0,drop:false,failRead:false,posts:[],authenticated:0,
     now:100, challenges:[],cnonces:new Set()};
   const auth=firmwareDigest();
   const server=createServer(async(req,res)=>{
@@ -27,10 +27,17 @@ async function fixture(){
       res.writeHead(200,{'Content-Type':files[req.url][1],'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"});res.end(await readFile(join(__dirname,'../web/device-ui',files[req.url][0])));return;
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+    if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
     if(req.method==='GET'){if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}send(200,req.url==='/api/timezones'?{names:['UTC','America/Toronto']}:state.device);return;}
     let body='';for await(const data of req)body+=data;
     const payload=JSON.parse(body);state.posts.push({url:req.url,payload,origin:req.headers.origin});
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
+    if(req.url==='/api/lights'){
+      if(payload.expected_revision!==state.device.lights.revision){send(409,{error:'Reload light settings'});return;}
+      state.lightMutations++;state.device.lights.settings=payload.settings;state.device.lights.revision++;
+      if(state.lightDrop){state.lightDrop=false;req.socket.destroy();return;}
+      send(200,state.device.lights);return;
+    }
     if(req.url==='/api/preview'){send(200,state.device.clock_ready?state.device.schedule:{state:'waiting_for_time'});return;}
     if(['/api/settings','/api/activate'].includes(req.url)){
       if(payload.expected_revision!==state.device.revision){send(409,{error:'Settings changed on another client; reload before saving'});return;}
@@ -52,6 +59,45 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: light preferences, conflicts and uncertain saves`,async()=>{
+  const f=await fixture();f.state.device.setup='active';
+  f.state.device.lights={supported:true,schema:1,revision:1,application:'applied',mode:'green',settings:{enabled:true,brightness_percent:20}};
+  const original=structuredClone(f.state.device.settings);
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({viewport:{width:390,height:844},httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#lights-fields').disabled);
+    await page.locator('#lights-brightness').fill('35');
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>!document.querySelector('#lights-save').disabled);
+    assert.equal(await page.locator('#lights-brightness').inputValue(),'35');
+    f.state.lightDrop=true;await page.locator('#lights-save').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-message').textContent.includes('confirmed after reconnecting'));
+    assert.equal(f.state.lightMutations,1);assert.deepEqual(f.state.device.settings,original);
+    await page.locator('#lights-brightness').fill('45');f.state.device.lights.revision++;
+    await page.locator('#lights-save').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-message').textContent.includes('another client'));
+    assert.equal(await page.locator('#lights-brightness').inputValue(),'45');assert.equal(f.state.lightMutations,1);
+    page.on('dialog',dialog=>dialog.accept());await page.locator('#lights-reload').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-brightness').value==='35');
+    await page.locator('#lights-enabled').uncheck();
+    assert.ok(await page.locator('#lights-brightness').isDisabled());
+    f.state.lightDrop=true;f.state.lightFailRead=true;await page.locator('#lights-save').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-message').textContent.includes('Connection lost'));
+    assert.ok(await page.locator('#lights-save').isDisabled());assert.equal(f.state.lightMutations,2);
+    f.state.lightFailRead=false;await page.locator('#lights-reload').click();
+    await page.waitForFunction(()=>!document.querySelector('#lights-save').disabled);
+    assert.equal(await page.locator('#lights-enabled').isChecked(),false);
+    if(process.env.OPENATHAN_UI_SCREENSHOTS)await page.screenshot({path:join(process.env.OPENATHAN_UI_SCREENSHOTS,'ui-mobile-'+browserName+'.png'),fullPage:true});
+    await page.setViewportSize({width:1280,height:960});
+    if(process.env.OPENATHAN_UI_SCREENSHOTS)await page.screenshot({path:join(process.env.OPENATHAN_UI_SCREENSHOTS,'ui-desktop-'+browserName+'.png'),fullPage:true});
+    f.state.device.lights.application='output_unavailable';await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-message').textContent.includes('unavailable'));
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    f.state.device.lights.supported=false;await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#lights-card').hidden);
+  } finally {await browser.close();await f.close();}
+ });
  test(`${browserName}: sustained authentication and transparent nonce renewal`,async()=>{
   const f=await fixture();f.state.device.setup='active';
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async(error)=>{await f.close();throw error;});

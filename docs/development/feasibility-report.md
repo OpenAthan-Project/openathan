@@ -494,3 +494,123 @@ No hardware was accessed and no release assets were uploaded. Synthetic fixtures
 are not playable or installable release media. These checks do not establish
 recording rights, audible quality, physical installation/recovery acceptance or
 runtime heap/PSRAM headroom.
+
+## Prayer-light candidate — 2026-09-29 UTC
+
+The [prayer-light implementation](lights.md) passed automated checks and the
+pinned firmware capacity checks. The baseline is `aa34109` (v0.1.0 source);
+before/after use identical ESPHome 2026.9.0, ESP-IDF 5.5.5, compiler
+esp-14.2.0_20260121 and per-variant configuration, with only the intended LED
+configuration and implementation added. These are actual `firmware.ota.bin`
+measurements, not linked-image estimates.
+
+| Variant | Before bytes | After bytes | Delta | Remaining 1.5 MiB budget | Free 2 MiB slot |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| reference | 1,128,736 | 1,135,216 | +6,480 | 437,648 | 961,936 |
+| provisioning-validation | 1,130,736 | 1,137,248 | +6,512 | 435,616 | 959,904 |
+| device | 1,116,544 | 1,119,104 | +2,560 | 453,760 | 978,048 |
+| validation | 1,134,048 | 1,136,640 | +2,592 | 436,224 | 960,512 |
+
+Both application slots and the 3.5 MiB audio partition remain unchanged. All four
+variants pass dependency, partition, factory/OTA consistency and capacity checks.
+The reference static RAM figure remains 112,983 bytes; this does not include the
+new runtime component state or establish runtime headroom. The countdown uses a
+fixed-size timetable, animation uses no heap allocation, and brightness pulses
+write at most two registers per frame. Heap minimum, largest free block,
+fragmentation and PSRAM require runtime measurement; the bounded hardware
+observations below are separate from these static figures.
+
+Validation: 10 CTest cases with UBSan; all 59 Python tests without skips, including
+both production and isolated production-JSON bridges; all 10 Chromium/WebKit
+browser cases; eight ESPHome configuration checks; desktop/mobile visual review;
+whitespace and relative documentation-link checks. Focused tests exercise
+countdown boundaries, skip/mute independence, date/DST/clock changes, failed
+wall-clock reads, record corruption and interrupted writes, status precedence,
+I2C failure/retry, storage isolation and save-response loss. Chromium's transport
+retry is rejected by the revision guard, then reconciled through readback.
+
+### Attended LED checks — 2026-09-29 UTC
+
+A subsequent attended session used the same AtomS3R C126 + A167 on bottom-only
+power. A private diagnostic application added an encrypted status channel and
+synthetic timetable controls to the candidate, using the existing isolated
+`oa_test`/`oa_setup_test`/`oa_network_test` storage. It retained the real clock and
+approved shared recordings. Its application was 1,201,872 bytes; diagnostics are
+absent from the normal reference image measured above.
+
+The operator confirmed both complete groups showed matching steady green,
+orange and red, smooth white setup pulses and smooth red fault pulses. During
+about 75 seconds of approved normal-recording playback, blue pulses and saved
+brightness changes (40%, 5%, 20%, disabled, zero, then 20%) worked without audible
+interruption. All 64 authenticated status samples during the control exercise
+reported playback active; prayer-settings revision and consumption stayed
+unchanged. The longest status request was 318 ms. This measures HTTP response
+time, not worst-case main-loop latency. Explicit Stop returned to green.
+
+Two-second encrypted diagnostic samples during playback recorded at least
+224,552 bytes free internal heap, a 180,224-byte largest internal block and
+7,236,328 bytes free PSRAM. After Stop, sampled free internal heap returned to
+247,464 bytes and PSRAM to 8,372,348 bytes; the largest internal block remained
+180,224 bytes versus 200,704 before playback. No reset or unavailable light
+output was reported during the bottom-power checks. These are sampled values
+from a bounded diagnostic run, not lifetime internal-heap minima, a fragmentation
+soak test or a guarantee of production runtime headroom.
+
+A physical ten-second power interruption preserved light revision 7, enabled
+20% brightness, prayer settings and history; the operator confirmed lights
+returned and the speaker stayed quiet. Countdown thresholds, skipped/muted
+prayers, midnight/DST rollover and failure injection retain their automated
+evidence. Exact threshold crossings, offline operation, a new physical phone-UI
+run and a long concurrent-activity soak were not observed in this LED session.
+The synthetic timetable tests establish displayed states, not attendance of a
+new real scheduled prayer. Synthetic CI audio was never installed or played.
+
+The session closed with the normal 1,135,216-byte LED reference application
+installed and independently verified, both groups green at 20%, and the normal
+saved schedule ready. Test records were cleared. Fresh production settings,
+credentials, consumption and skip state, partition/OTA metadata and approved
+shared audio passed preservation checks. The operator confirmed quiet operation
+on bottom-only power. This development candidate has not been published or
+qualified as a new public release.
+
+## Replacement normal recording — 2026-09-29 UTC
+
+The maintainer selected the 1,221,602-byte `Adhan-Mishary_compressed.mp3` and
+confirmed the existing AlAdhan source/permission basis. Its exact SHA-256 is
+recorded in [the media approval](../../AUDIO-LICENSES.md) and release registry.
+The 257.15-second MP3 is retained without further conversion; Fajr remains
+byte-identical. Both canonical image extraction and the production C++ audio
+validator passed, along with a full FFmpeg decode and all 21 release-tooling tests.
+
+The replacement shared image uses 2,994,044 of 3,670,016 bytes, leaving 675,972
+bytes. It was installed through a verified audio-partition-only write on the
+reference speaker. The installed LED application remains exactly 1,135,216 bytes
+(application delta **0**); no embedded asset, firmware source, toolchain or
+partition-layout change required an application rebuild. Fresh paired metadata
+reads, before/after application verification and post-write audio verification
+passed. Settings, credentials, consumption/skip and OTA metadata were preserved.
+Published v0.1.0 artifacts retain their original recordings; this selection
+applies to future builds from the updated registry. No new physical listening
+pass or public release is claimed by these format and preservation checks.
+
+## Pre-PR review follow-up — 2026-09-29 UTC
+
+Review fixed stale light countdowns after an explicit developer schedule reload
+and integer pulse rounding that could keep an enabled 1% setting dark. New
+regressions exercise same-day reloads and non-peak animation sampling at 0%/1%.
+All 10 UBSan CTest cases, 59 Python tests without skips and 10 Chromium/WebKit
+cases passed after the fixes. Recompiled all four variants with the same pinned
+toolchain and baseline configurations used above; dependency, partition,
+factory/OTA and capacity checks passed again.
+
+| Variant | Baseline bytes | Final review bytes | Delta | Remaining 1.5 MiB budget | Free 2 MiB slot |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| reference | 1,128,736 | 1,135,216 | +6,480 | 437,648 | 961,936 |
+| provisioning-validation | 1,130,736 | 1,137,264 | +6,528 | 435,600 | 959,888 |
+| device | 1,116,544 | 1,119,120 | +2,576 | 453,744 | 978,032 |
+| validation | 1,134,048 | 1,136,656 | +2,608 | 436,208 | 960,496 |
+
+These are the reviewed-source build measurements. The earlier physical results
+remain evidence for the pre-review image, which stays installed with the new
+normal recording. The two review fixes have not been physically installed or
+retested; the review session did not access or alter the speaker.

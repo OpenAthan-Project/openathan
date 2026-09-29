@@ -52,6 +52,10 @@ void fill_test_records() {
   openathan::DurableState state;
   state.consumed_through[0] = 20721;
   CHECK(history.save(state));
+  NvsLightStore lights;
+  openathan::SavedLights previous_lights;
+  CHECK(lights.load(previous_lights)==LoadResult::EMPTY);
+  CHECK(lights.save({2,{true,35}}));
   CHECK(gate.activate());
   CredentialStore credentials;
   CHECK(credentials.save_wifi({"test network", "test password"}));
@@ -80,6 +84,7 @@ int main() {
   CHECK(std::string(openathan_storage::NETWORK) == "oa_network_test");
   fill_test_records();
   CHECK(protected_records() == baseline);
+  CHECK(nvs_test::committed.count({"oa_test", "lights"}));
   CHECK(nvs_test::committed.count({"oa_test", "settings"}) && nvs_test::committed.count({"oa_test", "scheduler"}));
   CHECK(nvs_test::committed.count({"oa_setup_test", "state"}) &&
         nvs_test::committed.count({"oa_network_test", "wifi"}));

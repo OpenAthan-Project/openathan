@@ -35,5 +35,8 @@ OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
 Linux requires OpenSSL development headers. To use a different build directory,
 set `OPENATHAN_DIGEST_TEST_BRIDGE` to the adapter's absolute path.
 
-Quran/adhkar, LED settings, product OTA, and the public browser installer remain
+See the [light contract](../../docs/development/lights.md) for countdown/status
+colors, separate persistence, and LED hardware acceptance.
+
+Quran/adhkar, product OTA, and the public browser installer remain
 separate work.

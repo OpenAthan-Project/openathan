@@ -24,6 +24,7 @@ class LocalApi {
   void handle(ApiExchange& request);
 
  private:
+  void lights_(JsonObject root);
   void snapshot_(JsonObject root);
   void preview_(JsonObject root, const ::openathan::DeviceSettings& settings);
   bool resolve_timezone_(JsonObject settings);

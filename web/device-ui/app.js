@@ -5,9 +5,35 @@ const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 const methods = {muslim_world_league:"Muslim World League",egyptian:"Egyptian",karachi:"Karachi",umm_al_qura:"Umm al-Qura",dubai:"Dubai",moonsighting_committee:"Moonsighting Committee",north_america:"North America (ISNA)",kuwait:"Kuwait",qatar:"Qatar",singapore:"Singapore",tehran:"Tehran",turkey:"Turkey"};
 const faults = {"invalid settings":"Review the location, timezone and calculation settings, then save again","invalid prayer schedule":"These settings cannot produce a valid schedule. Review the location, method and offsets","durable state unavailable":"Saved data could not be read or written. Restart the device; do not erase its storage","audio unavailable":"Audio is unavailable. Check the device power and compatible audio installation","playback request rejected":"Audio could not start. Check the device power and audio installation"};
 let snapshot, editing, dirty = false, busy = false, loading = false, generation = 0;
+let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
 const title = (s) => s[0].toUpperCase()+s.slice(1);
 function message(text, error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
+function lightMessage(text,error=false) { $("lights-message").textContent=text;$("lights-message").classList.toggle("error",error); }
+function fillLights(state) {
+  lightEditing=structuredClone(state);lightDirty=false;lightUncertain=false;
+  if(state.settings) {
+    $("lights-enabled").checked=state.settings.enabled;
+    $("lights-brightness").value=state.settings.brightness_percent;
+    $("lights-brightness-value").value=`${state.settings.brightness_percent}%`;
+  }
+}
+function renderLights(state) {
+  lightSnapshot=state;$("lights-card").hidden=!state?.supported;
+  if(!state?.supported)return;
+  if(!lightEditing || (!lightDirty && !lightUncertain))fillLights(state);
+  if(state.application==="storage_fault")lightMessage("Light settings could not be read. Lights are off. Restart the device; existing data has been retained.",true);
+  else if(state.application==="save_failed")lightMessage("Light settings could not be saved. The last confirmed settings remain active until restart. Restart the device and reload light settings.",true);
+  else if(state.application==="output_unavailable")lightMessage("The lights are unavailable. The device will retry; prayer scheduling continues.",true);
+  else if(lightUncertain)lightMessage("The save response was lost. Reload light settings before trying again.",true);
+  else if(lightDirty && state.revision!==lightEditing.revision)lightMessage("Light settings changed on another client. Your edits are preserved; reload before saving.",true);
+  else if(!lightDirty)lightMessage("Light settings loaded.");
+}
 function controls() {
+  const lightsBlocked=busy || loading || !lightEditing?.settings || ["storage_fault","save_failed"].includes(lightSnapshot?.application);
+  $("lights-fields").disabled=lightsBlocked;
+  $("lights-brightness").disabled=!$("lights-enabled").checked;
+  $("lights-save").disabled=lightsBlocked || lightUncertain;
+  $("lights-reload").disabled=busy || loading || !lightSnapshot?.supported;
   const unavailable=busy || !editing || snapshot?.application==="storage_fault" || snapshot?.setup==="storage_fault";
   $("fields").disabled=unavailable;
   for(const id of ["save","preview"]) $(id).disabled=unavailable;
@@ -35,6 +61,7 @@ function times(id, schedule) {
 function render(state) {
   $("test-banner").hidden=state.test_mode!==true;
   snapshot=state;
+  renderLights(state.lights);
   $("setup-state").textContent=state.setup==="active"?"Setup complete":state.setup==="incomplete"?"Setup incomplete":"Storage fault";
   $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${state.next.local}`:"No upcoming announcement available";
   const status=[];
@@ -124,6 +151,44 @@ $("reload").addEventListener("click",async()=>{if(dirty && !confirm("Replace you
 $("stop").addEventListener("click",()=>action("/api/stop",{}));
 $("skip").addEventListener("click",()=>action("/api/skip",{expected_revision:snapshot.revision,occurrence:snapshot.next}));
 $("cancel-skip").addEventListener("click",()=>action("/api/cancel-skip",{expected_revision:snapshot.revision,occurrence:snapshot.skip}));
+$("lights-form").addEventListener("input",()=>{
+  lightDirty=true;$("lights-brightness-value").value=`${$("lights-brightness").value}%`;controls();
+});
+$("lights-reload").addEventListener("click",async()=>{
+  if(busy || loading || (lightDirty && !confirm("Replace your unsaved light edits with the saved settings?")))return;
+  busy=true;++generation;controls();
+  try {const state=await request("/api/lights");fillLights(state);renderLights(state);}
+  catch(error){lightMessage(error.message+". Check the device connection.",true);}
+  finally{busy=false;controls();}
+});
+$("lights-form").addEventListener("submit",async(event)=>{
+  event.preventDefault();if(busy || loading || lightUncertain || !lightEditing?.settings)return;
+  const settings={enabled:$("lights-enabled").checked,brightness_percent:Number($("lights-brightness").value)};
+  const revision=lightEditing.revision;
+  busy=true;++generation;controls();
+  try {
+    const state=await request("/api/lights",{schema:1,expected_revision:revision,settings});
+    fillLights(state);renderLights(state);
+    if(state.application==="applied")lightMessage("Light settings saved.");
+  } catch(error) {
+    lightUncertain=!error.status;lightMessage(error.message,true);
+    // Reconcile a lost acknowledgement once; never repeat the write automatically.
+    try {
+      const state=await request("/api/lights");
+      const matches=state.settings?.enabled===settings.enabled && state.settings?.brightness_percent===settings.brightness_percent;
+      // Chromium may retry a transport-failed POST; its stale revision is rejected.
+      // A matching committed revision also reconciles that resulting 409 safely.
+      if((!error.status || error.status===409) && matches &&
+          (state.revision===revision+1 || (!error.status && state.revision===revision))) {
+        fillLights(state);renderLights(state);
+        if(state.application==="applied")lightMessage("Saved light settings confirmed after reconnecting.");
+      } else {
+        renderLights(state);
+        if(error.status===409)lightMessage("Light settings changed on another client. Your edits are preserved; reload before saving.",true);
+      }
+    } catch {lightUncertain=true;lightMessage("Connection lost. Reload light settings before trying again.",true);}
+  } finally {busy=false;controls();}
+});
 async function start() {
   await refresh();
   try {const data=await request("/api/timezones");for(const name of data.names)$("zones").append(new Option(name,name));if(editing)message("Connected to your OpenAthan.");}

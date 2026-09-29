@@ -21,17 +21,19 @@ struct Audio : Playback {
 };
 struct Calculator : DayCalculator {
   Settings last_settings;
+  int shift_seconds{};
   bool calculate(const Settings &s, CivilDate date, PrayerDay &out) override {
     last_settings = s;
     constexpr unsigned hours[] = {5,6,12,15,18,20};
-    for (unsigned i=0; i<6; ++i) out[i] = epoch(date,hours[i])+60*s.offsets[i];
+    for (unsigned i=0; i<6; ++i) out[i] = epoch(date,hours[i])+60*s.offsets[i]+shift_seconds;
     return true;
   }
 };
 struct Device : esphome::openathan_component::OpenAthan {
   int64_t utc{epoch({2026,9,25},4)};
-  bool valid{true};
+  bool valid{true}, failed_clock_read{};
   ClockSample read() override {
+    if (failed_clock_read) return {};
     CivilDate date;
     const bool known = local_date(utc,date);
     return {valid && known, utc, mono, date, 0};
@@ -55,6 +57,83 @@ struct Fixture {
     return device.change_settings(value, device.settings_service()->saved()->revision);
   }
 };
+struct LightOutputProbe : LightOutput {
+  unsigned calls{}; bool fail{}; LightFrame frame;
+  bool apply(LightFrame value) override { ++calls; frame=value; return !fail; }
+};
+static void light_integration() {
+  Fixture f; LightOutputProbe output; f.device.set_light_output(&output); f.begin();
+  CHECK(f.device.current_light_mode()==LightMode::GREEN);
+  // Developer timetable reloads must invalidate the independent LED cache too.
+  f.calculator.shift_seconds=-40*60;
+  mono+=50; f.device.reload_schedule();
+  CHECK(f.device.current_light_mode()==LightMode::ORANGE);
+  f.calculator.shift_seconds=0;
+  mono+=50; f.device.reload_schedule();
+  CHECK(f.device.current_light_mode()==LightMode::GREEN);
+  const auto original=*f.device.settings_service()->saved();
+  CHECK(f.device.change_lights({true,37},1)==LightSaveResult::SAVED);
+  CHECK(*f.device.settings_service()->saved()==original);
+  auto quiet=f.value(); quiet.prayer.enabled[0]=false; CHECK(f.save(quiet)==SettingsResult::SAVED);
+  f.device.utc=epoch({2026,9,25},5)-600; f.device.step(0);
+  mono+=50; f.device.loop(); CHECK(f.device.current_light_mode()==LightMode::RED);
+  CHECK(f.device.status().next->key.prayer==Prayer::DHUHR);
+  output.fail=true; mono+=50; f.device.change_lights({true,38},2);
+  CHECK(std::string(f.device.light_application_status())=="output_unavailable");
+  const auto calls=output.calls;
+  for (unsigned i=0;i<19;++i) { mono+=50; f.device.loop(); }
+  CHECK(output.calls==calls && f.device.status().automatic_ready);
+  output.fail=false; mono+=50; f.device.loop(); CHECK(output.calls==calls+1);
+  nvs_test::fail_commit=true;
+  CHECK(f.device.change_lights({false,38},3)==LightSaveResult::STORAGE);
+  CHECK(f.device.status().automatic_ready && f.device.light_preferences().saved()->value.enabled);
+  nvs_test::fail_commit=false;
+  f.device.utc=epoch({2026,9,25},12)-1; mono+=1000; f.device.update();
+  f.device.step(1); mono+=50; f.device.loop();
+  CHECK(f.audio.starts==1 && f.device.current_light_mode()==LightMode::PLAYING);
+  f.device.quiesce_for_maintenance(); CHECK(output.frame==LightFrame{});
+  CHECK(f.device.change_lights({true,50},3)==LightSaveResult::STORAGE);
+}
+static void light_time_and_setup() {
+  Fixture f; LightOutputProbe output; f.device.set_light_output(&output); f.device.require_setup(); f.begin();
+  CHECK(f.device.current_light_mode()==LightMode::WAITING);
+  CHECK(f.device.finish_setup(f.device.settings_service()->saved()->revision));
+  mono+=50; f.device.loop(); CHECK(f.device.current_light_mode()==LightMode::GREEN);
+  CHECK(f.device.skip_next());
+  f.device.utc=epoch({2026,9,25},5)-600; mono+=1000; f.device.update();
+  CHECK(f.device.current_light_mode()==LightMode::RED);
+  f.device.valid=false; mono+=50; f.device.loop(); CHECK(f.device.current_light_mode()==LightMode::WAITING);
+  f.device.failed_clock_read=true; mono+=1500; f.device.loop();
+  CHECK(output.frame==light_frame(LightMode::WAITING,20,mono));
+  f.device.failed_clock_read=false;
+  f.device.valid=true;
+  f.device.utc=epoch({2026,9,26},4)+45*60; mono+=1000; f.device.update();
+  CHECK(f.device.current_light_mode()==LightMode::ORANGE);
+  f.device.utc=epoch({2026,9,25},4); mono+=1000; f.device.update();
+  CHECK(f.device.current_light_mode()==LightMode::GREEN);
+  auto changed=f.value(); changed.prayer.offsets[0]=-35;
+  CHECK(f.save(changed)==SettingsResult::SAVED); mono+=50; f.device.loop();
+  CHECK(f.device.current_light_mode()==LightMode::ORANGE);
+  // A real timezone/date change invalidates the timetable without replaying history.
+  changed.timezone={"America/Toronto",18000,14400,
+      {7200,0,DstRuleType::MONTH_WEEK_DAY,3,2,0},{7200,0,DstRuleType::MONTH_WEEK_DAY,11,1,0}};
+  CHECK(f.save(changed)==SettingsResult::SAVED);
+  for(const CivilDate date : {CivilDate{2026,3,8},CivilDate{2026,11,1}}) {
+    for(unsigned hour : {4U,5U,6U,7U,8U}) {
+      f.device.utc=epoch(date,hour); mono+=3600000; f.device.update();
+      LightSchedule expected;
+      const auto now=f.device.read();
+      CHECK(now.valid && expected.rebuild(f.calculator,changed.prayer,now.local_date));
+      CHECK(f.device.current_light_mode()==light_mode({true,20},
+          {false,false,true,true,f.audio.playing(),expected.next(now.utc),now.utc}));
+    }
+  }
+  nvs_test::fail_commit=true; changed.volume=50; CHECK(f.save(changed)==SettingsResult::STORAGE);
+  mono+=50; f.device.loop(); CHECK(f.device.current_light_mode()==LightMode::FAULT);
+  nvs_test::fail_commit=false;
+  CHECK(f.device.change_lights({false,20},1)==LightSaveResult::SAVED);
+  CHECK(f.device.current_light_mode()==LightMode::OFF);
+}
 static void updates_and_replay() {
   Fixture f; f.begin();
   CHECK(f.device.status().automatic_ready);
@@ -176,6 +255,44 @@ static void maintenance_latches_writes() {
 }
 #ifdef OPENATHAN_JSON_TEST
 #include "../firmware/esphome/components/openathan_device/local_api.h"
+static void light_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; LightOutputProbe output; f.device.set_light_output(&output); f.begin();
+  LocalApi api(&f.device,nullptr,0);
+  const auto prayer=*f.device.settings_service()->saved();
+  auto call=[&](const char *method, const std::string &body="") {
+    ApiExchange request;request.method=method;request.uri="/api/lights";request.body=body;
+    api.handle(request);return request;
+  };
+  auto get=call("GET"); CHECK(get.code==200);
+  JsonDocument response; CHECK(!deserializeJson(response,get.response));
+  CHECK(response["supported"].as<bool>() && response["revision"]==1);
+  JsonDocument document;
+  document["schema"]=1;document["expected_revision"]=1;
+  document["settings"]["enabled"]=true;document["settings"]["brightness_percent"]=32;
+  auto body=[&] { std::string text;serializeJson(document,text);return text; };
+  CHECK(call("POST",body()).code==200);
+  CHECK(call("POST",body()).code==409);
+  CHECK(*f.device.settings_service()->saved()==prayer);
+  document["expected_revision"]=2;
+  CHECK(call("POST",body()).code==200);
+  const auto committed=nvs_test::committed;
+  for(const char *bad : {"true","-1","101","1.5","null","\"32\""}) {
+    document["settings"]["brightness_percent"]=serialized(bad);
+    CHECK(call("POST",body()).code==400);
+  }
+  document["settings"]["brightness_percent"]=32;
+  document["settings"]["enabled"]=1; CHECK(call("POST",body()).code==400);
+  document["settings"]["enabled"]=true;
+  document["settings"]["extra"]=0; CHECK(call("POST",body()).code==400);
+  document["settings"].remove("extra");
+  CHECK(nvs_test::committed==committed);
+  nvs_test::fail_commit=true;
+  document["settings"]["brightness_percent"]=40; CHECK(call("POST",body()).code==503);
+  CHECK(f.device.status().automatic_ready);
+  nvs_test::fail_commit=false;
+  f.device.set_light_output(nullptr); CHECK(call("POST",body()).code==404);
+}
 static void local_api() {
   using namespace esphome::openathan_device;
   Fixture f;f.device.require_setup();f.begin();
@@ -397,8 +514,8 @@ static void json_transport() {
 }
 #endif
 int main() {
-  updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
+  light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
+  light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
 #endif
 }

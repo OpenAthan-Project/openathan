@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB ADHAN_SOURCES CONFIGURE_DEPENDS third_party/adhan-cpp/src/*.cpp)
 add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp
-  lib/openathan-core/src/settings.cpp ${ADHAN_SOURCES})
+  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp ${ADHAN_SOURCES})
 target_include_directories(openathan_core PUBLIC lib/openathan-core/include third_party/adhan-cpp/include)
 add_executable(prayer_tests tests/prayer_tests.cpp)
 target_link_libraries(prayer_tests PRIVATE openathan_core)
@@ -73,3 +73,21 @@ foreach(mode IN ITEMS production isolated)
   endif()
   add_test(NAME storage_${mode} COMMAND storage_${mode}_tests)
 endforeach()
+
+foreach(mode IN ITEMS production isolated)
+  add_executable(lights_${mode}_tests tests/light_tests.cpp
+    firmware/esphome/components/openathan/nvs_settings_store.cpp)
+  target_include_directories(lights_${mode}_tests PRIVATE tests/stubs firmware/esphome/components/openathan)
+  target_link_libraries(lights_${mode}_tests PRIVATE openathan_core)
+  if(mode STREQUAL "isolated")
+    target_compile_definitions(lights_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)
+  endif()
+  add_test(NAME lights_${mode} COMMAND lights_${mode}_tests)
+endforeach()
+
+add_executable(light_adapter_tests tests/light_adapter_tests.cpp
+  firmware/esphome/components/voice_pyramid/lights.cpp)
+target_include_directories(light_adapter_tests PRIVATE tests/stubs lib/openathan-core/include
+  firmware/esphome/components/voice_pyramid)
+target_compile_definitions(light_adapter_tests PRIVATE USE_OPENATHAN_LIGHTS)
+add_test(NAME light_register_safety COMMAND light_adapter_tests)

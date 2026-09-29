@@ -1,6 +1,6 @@
 #pragma once
 namespace esphome {
-namespace setup_priority { constexpr float LATE = -100; }
+namespace setup_priority { constexpr float LATE = -100; constexpr float HARDWARE = 800; }
 class Component {
  public:
   virtual ~Component() = default;

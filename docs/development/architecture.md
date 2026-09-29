@@ -29,6 +29,7 @@ Framework-independent C++ logic for:
 - prayer offsets;
 - calculation and Asr methods;
 - playback policy;
+- optional prayer-light policy and independent light preferences;
 - complete settings validation, versioned encoding and revision-checked saves;
 - consumed-prayer and skip state independent of saved settings;
 - future Quran/adhkar scheduling abstractions.
@@ -79,7 +80,10 @@ An ESPHome user may provide equivalent capabilities from their existing configur
 The current component accepts `time_id`, explicit initial prayer settings and a
 `playback_id` implementing the portable `Playback` capability, including volume
 request/readback. See the [scheduler guide](../../firmware/esphome/scheduler/README.md#controls-and-reuse).
-The broader mapping of optional lights, displays and controls remains planned;
+Optional lights now use `light_output_id` and the portable `LightOutput` capability;
+see the [light contract](lights.md). Light preferences have independent persistence
+and revisions, and light failures never gate the scheduler.
+The broader mapping of displays and controls remains planned;
 `firmware/esphome/examples/custom-hardware.yaml` illustrates that future mapping
 and is not a buildable release configuration.
 
