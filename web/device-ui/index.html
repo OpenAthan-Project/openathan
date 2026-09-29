@@ -33,6 +33,22 @@
       <div class="actions"><button id="preview" type="button" class="secondary" disabled>Preview schedule</button><button id="save" type="submit" disabled>Finish setup</button><button id="reload" type="button" class="quiet" disabled>Reload saved settings</button></div>
     </form>
   </section>
+  <section id="lights-card" class="card" aria-labelledby="lights-title" hidden>
+    <h2 id="lights-title">Lights</h2>
+    <p class="hint">Green: more than 30 minutes until prayer. Orange: within 30 minutes. Red: within 10 minutes. Reminders include prayers with the Athan turned off or skipped.</p>
+    <form id="lights-form">
+      <fieldset id="lights-fields" disabled>
+        <legend class="sr-only">Light settings</legend>
+        <label class="check"><input id="lights-enabled" type="checkbox">Enable lights</label>
+        <label for="lights-brightness">Brightness <output id="lights-brightness-value" for="lights-brightness">20%</output></label>
+        <input id="lights-brightness" type="range" min="0" max="100" step="1" value="20">
+        <p class="hint">Changes apply when you save. Zero turns all lights off, including status signals.</p>
+      </fieldset>
+      <p class="hint">Gentle pulses: blue during Athan, white during setup or time synchronization, red when the device needs attention.</p>
+      <p id="lights-message" role="status" aria-live="polite"></p>
+      <div class="actions"><button id="lights-save" type="submit" disabled>Save light settings</button><button id="lights-reload" type="button" class="quiet" disabled>Reload light settings</button></div>
+    </form>
+  </section>
   <footer><span id="address"></span><p>Wi‑Fi or password changed? Connect by USB to recover access. Keep your phone on the same network as the device.</p></footer>
 </main>
 </body>

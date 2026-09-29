@@ -52,7 +52,20 @@ void LocalApi::preview_(JsonObject root, const ::openathan::DeviceSettings& sett
   auto notices = root["conflicts"].to<JsonArray>();
   for (const auto& conflict : conflicts) notices.add(::openathan::describe_conflict(conflict));
 }
+void LocalApi::lights_(JsonObject root) {
+  root["supported"] = athan_->has_lights();
+  root["application"] = athan_->light_application_status();
+  root["mode"] = ::openathan::light_mode_name(athan_->current_light_mode());
+  root["schema"] = 1;
+  const auto &saved = athan_->light_preferences().saved();
+  root["revision"] = saved ? saved->revision : 0;
+  if (saved) {
+    root["settings"]["enabled"] = saved->value.enabled;
+    root["settings"]["brightness_percent"] = saved->value.brightness_percent;
+  }
+}
 void LocalApi::snapshot_(JsonObject root) {
+  lights_(root["lights"].to<JsonObject>());
   root["test_mode"] = openathan_storage::TEST_MODE;
   athan_->write_settings_json(root);
   root["setup"] = athan_->setup_state();
@@ -92,6 +105,8 @@ void LocalApi::handle(ApiExchange& request) {
   auto root = output.to<JsonObject>();
   if (request.method == "GET" && request.uri == "/api/status")
     snapshot_(root);
+  else if (request.method == "GET" && request.uri == "/api/lights")
+    lights_(root);
   else if (request.method == "GET" && request.uri == "/api/timezones") {
     root["tzdata"] = "2026.4";
     auto names = root["names"].to<JsonArray>();
@@ -105,7 +120,23 @@ void LocalApi::handle(ApiExchange& request) {
     auto payload = input.as<JsonObject>();
     const bool settings_action =
         request.uri == "/api/settings" || request.uri == "/api/preview" || request.uri == "/api/activate";
-    if (settings_action) {
+    if (request.uri == "/api/lights") {
+      if (!athan_->has_lights()) { error(request, 404, "Lights are not supported on this device"); return; }
+      const auto settings = payload["settings"];
+      if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
+          !payload["expected_revision"].is<uint32_t>() || !settings.is<JsonObject>() || settings.size() != 2 ||
+          !settings["enabled"].is<bool>() || !settings["brightness_percent"].is<unsigned>() ||
+          settings["brightness_percent"].as<unsigned>() > 100) {
+        error(request, 400, "Invalid light settings"); return;
+      }
+      const auto result = athan_->change_lights({settings["enabled"].as<bool>(), settings["brightness_percent"].as<uint8_t>()},
+          payload["expected_revision"].as<uint32_t>());
+      using ::openathan::LightSaveResult;
+      if (result == LightSaveResult::CONFLICT) { error(request, 409, "Reload saved light settings before saving"); return; }
+      if (result == LightSaveResult::STORAGE) { error(request, 503, "Light settings could not be saved; restart the device"); return; }
+      if (result == LightSaveResult::INVALID) { error(request, 400, "Invalid light settings"); return; }
+      lights_(root);
+    } else if (settings_action) {
       if (!payload["refresh_timezone"].isUnbound() && !payload["refresh_timezone"].is<bool>()) {
         error(request, 400, "Invalid timezone refresh");
         return;

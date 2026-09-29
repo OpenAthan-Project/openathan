@@ -1,5 +1,6 @@
 #pragma once
 #include "openathan/settings.h"
+#include "openathan/lights.h"
 #include "storage_config.h"
 #include <nvs.h>
 
@@ -14,6 +15,15 @@ class NvsSettingsStore : public ::openathan::SettingsStore {
   bool save(const ::openathan::SavedSettings &settings) override;
  private:
   std::string namespace_;
+  nvs_handle_t handle_{};
+  bool opened_{};
+};
+class NvsLightStore : public ::openathan::LightStore {
+ public:
+  ~NvsLightStore() override { if (opened_) nvs_close(handle_); }
+  ::openathan::LoadResult load(::openathan::SavedLights &value) override;
+  bool save(const ::openathan::SavedLights &value) override;
+ private:
   nvs_handle_t handle_{};
   bool opened_{};
 };

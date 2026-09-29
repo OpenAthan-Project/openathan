@@ -12,7 +12,9 @@ validation on the reference unit; see the
 
 No third-party M5Stack component checkout is required. The register settings
 come from the verified diagnostic; the reusable implementation is OpenAthan
-code. Touch, LEDs, microphone and display are not implemented here.
+code. Optional LEDs use the STM32 controller through checked I2C writes; see the
+[light contract](../../../../docs/development/lights.md). Touch, microphone and
+display are not implemented here.
 
 M5Stack's current official documentation calls SKU A167 Echo Pyramid. OpenAthan retains Voice Pyramid as its project-facing name for the same product.
 

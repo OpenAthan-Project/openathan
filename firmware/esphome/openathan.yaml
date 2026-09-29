@@ -50,6 +50,12 @@ media_player:
       sample_rate: 44100
       num_channels: 1
 
+voice_pyramid:
+  lights:
+    id: pyramid_lights
+    i2c_id: pyramid_bus
+    address: 0x1A
+
 openathan_audio:
   id: athan_audio
   media_player_id: athan_player
@@ -60,6 +66,7 @@ openathan:
   id: athan_scheduler
   time_id: athan_clock
   playback_id: athan_audio
+  light_output_id: pyramid_lights
   latitude: 0
   longitude: 0
   method: muslim_world_league

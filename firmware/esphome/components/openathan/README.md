@@ -7,7 +7,9 @@ interfaces, state persistence, actions and verification.
 This component owns OpenAthan-facing state and scheduling integration, and
 communicates with audio through the portable `Playback` interface. Audio playback
 is fundamental. Status lights, displays, controls, microphone input, RTC,
-removable storage, and Home Assistant integration are optional.
+removable storage, and Home Assistant integration are optional. `light_output_id`
+accepts the portable `LightOutput` capability; see the
+[light contract](../../../../docs/development/lights.md).
 
 The bridge loads separate settings and consumption records, uses saved timezone
 rules for OpenAthan dates, preflights scheduling edits, and verifies requested

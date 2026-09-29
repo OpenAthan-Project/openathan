@@ -14,6 +14,7 @@ static time::DSTRule applied_rule(const ::openathan::DstRule &r) {
   return {r.time_seconds, r.day, static_cast<time::DSTRuleType>(r.type), r.month, r.week, r.day_of_week};
 }
 void OpenAthan::setup() {
+  if (light_output_) light_preferences_.begin();
   scheduler_ = std::make_unique<::openathan::Scheduler>(*this, *calculator_source_, *state_store_, *playback_);
   settings_service_ = std::make_unique<::openathan::SettingsService>(*settings_store_);
   const auto &tz = time::get_global_tz();
@@ -49,6 +50,7 @@ void OpenAthan::setup() {
 void OpenAthan::reload_schedule() {
   if (maintenance_) return;
   if (scheduler_ && settings_service_ && settings_service_->healthy()) {
+    light_day_ = ::openathan::NEVER_CONSUMED;
     scheduler_->begin(settings_service_->saved()->value.prayer);
     scheduler_->allow_playback(volume_applied_ && activated());
     update();
@@ -95,7 +97,7 @@ std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz
   if (result == SettingsResult::STORAGE) scheduler_->block_storage();
   if (result != SettingsResult::SAVED) return result;
   const bool schedule_changed = !old || old->value.prayer != candidate.prayer || old->value.timezone != candidate.timezone;
-  if (schedule_changed) scheduler_->configure(candidate.prayer);
+  if (schedule_changed) { scheduler_->configure(candidate.prayer); light_day_ = ::openathan::NEVER_CONSUMED; }
   if (!old || old->value.volume != candidate.volume) {
     volume_applied_ = false; volume_attempts_ = 0; next_volume_check_ = 0;
     apply_volume_();
@@ -116,6 +118,7 @@ void OpenAthan::apply_volume_() {
   } else volume_attempts_ = 0;
 }
 void OpenAthan::loop() {
+  update_lights_();
   const auto now = static_cast<uint64_t>(esp_timer_get_time() / 1000);
   if (now >= next_volume_check_) {
     apply_volume_();
@@ -134,6 +137,7 @@ void OpenAthan::update() {
   if (!scheduler_) return;
   apply_volume_();
   if (activated()) scheduler_->tick();
+  update_lights_();
   log_status_();
 }
 void OpenAthan::stop() {
@@ -207,8 +211,58 @@ void OpenAthan::log_status_() {
     }
   }
 }
+::openathan::LightSaveResult OpenAthan::change_lights(::openathan::LightSettings value, uint32_t revision) {
+  if (!has_lights() || maintenance_) return ::openathan::LightSaveResult::STORAGE;
+  const auto result = light_preferences_.update(value, revision);
+  light_next_frame_ = 0;
+  update_lights_();
+  return result;
+}
+const char *OpenAthan::light_application_status() const {
+  if (!has_lights()) return "unsupported";
+  if (!light_preferences_.saved()) return "storage_fault";
+  if (!light_preferences_.writable()) return "save_failed";
+  if (!light_output_ok_) return "output_unavailable";
+  return "applied";
+}
+void OpenAthan::update_lights_() {
+  if (!light_output_) return;
+  const auto monotonic_ms = static_cast<uint64_t>(esp_timer_get_time() / 1000);
+  if (monotonic_ms < light_next_frame_) return;
+  light_next_frame_ = monotonic_ms + 50;
+  const auto now = read();
+  const bool time_jump = now.utc < light_last_utc_ || now.utc - light_last_utc_ > 2;
+  light_last_utc_ = now.utc;
+  if (now.valid && activated() && settings_service_ && settings_service_->healthy()) {
+    const auto day = ::openathan::day_number(now.local_date);
+    if (day != light_day_ || time_jump) {
+      light_day_ = day;
+      const auto &settings = settings_service_->saved()->value.prayer;
+      light_schedule_ok_ = scheduler_ && scheduler_->validate_schedule(settings, now.local_date) &&
+          light_schedule_.rebuild(*calculator_source_, settings, now.local_date);
+    }
+  } else {
+    light_day_ = ::openathan::NEVER_CONSUMED;
+    light_schedule_ok_ = false;
+  }
+  const bool fault = (scheduler_ && scheduler_->fault() != ::openathan::Fault::NONE) ||
+      (settings_service_ && !settings_service_->healthy()) ||
+      (setup_gate_ && !setup_gate_->healthy()) || volume_attempts_ >= 20 ||
+      (now.valid && activated() && !light_schedule_ok_);
+  const auto &saved = light_preferences_.saved();
+  light_mode_ = saved ? ::openathan::light_mode(saved->value,
+      {maintenance_, fault, activated(), now.valid, playback_ && playback_->playing(),
+       light_schedule_ok_ ? light_schedule_.next(now.utc) : std::nullopt, now.utc}) : ::openathan::LightMode::OFF;
+  const auto frame = ::openathan::light_frame(light_mode_, saved ? saved->value.brightness_percent : 0, monotonic_ms);
+  if (monotonic_ms < light_retry_at_ || (light_applied_ && *light_applied_ == frame)) return;
+  light_output_ok_ = light_output_->apply(frame);
+  if (light_output_ok_) { light_applied_ = frame; light_retry_at_ = 0; }
+  else { light_applied_.reset(); light_retry_at_ = monotonic_ms + 1000; }
+}
 void OpenAthan::quiesce_for_maintenance() {
   maintenance_ = true;
+  light_next_frame_ = light_retry_at_ = 0;
+  update_lights_();
   if (scheduler_) { scheduler_->stop(); scheduler_->block_storage(); }
 }
 }  // namespace esphome::openathan_component

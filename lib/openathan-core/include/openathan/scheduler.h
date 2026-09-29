@@ -106,6 +106,7 @@ class Scheduler {
   bool cancel_skip();
   void stop() { playback_.stop(); }
   SchedulerStatus status() const;
+  Fault fault() const { return fault_; }
   const std::array<int32_t, 5> &consumed_through() const { return state_.consumed_through; }
  private:
   bool rebuild(CivilDate date);

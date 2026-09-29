@@ -244,3 +244,10 @@ validation report above. Remaining acceptance includes hidden networks, phone
 playback controls, Android Chrome, deliberate setup/save interruptions, audio
 during Wi-Fi loss/recovery, production migration and qualified release media.
 The later coordinate-precision integration is automated-tested only.
+
+## Optional lights
+
+Reference firmware includes standalone prayer countdown and status lights with
+independent on/off and brightness preferences. See the [light API and validation
+contract](../../../docs/development/lights.md). Both light endpoints use the
+existing authentication and same-origin protection.
