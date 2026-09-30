@@ -13,6 +13,8 @@ from the address bar; only supported timezones are suggested. The device require
 a ready timetable preview before a returned location can be saved. If its clock
 has not synchronized, wait and preview again. Manual entry remains available
 without the helper or internet access.
+If status or the timezone list is temporarily unavailable, the proposal waits
+in the open page; **Refresh** retries both reads.
 Deploy the public helper before shipping firmware with this link.
 The isolated acceptance build displays a prominent **Test firmware** banner;
 its authenticated status identifies it with `test_mode: true`.

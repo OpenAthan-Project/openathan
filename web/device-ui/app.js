@@ -8,7 +8,7 @@ let snapshot, editing, dirty = false, busy = false, loading = false, generation 
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
 let locationProposal, locationNeedsPreview=false, settingsVersion=0;
 const supportedZones=new Set();
-let timezonesReady=false;
+let timezonesReady=false, timezonesLoading=false;
 const title = (s) => s[0].toUpperCase()+s.slice(1);
 function message(text, error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
 function lightMessage(text,error=false) { $("lights-message").textContent=text;$("lights-message").classList.toggle("error",error); }
@@ -206,7 +206,7 @@ $("preview").addEventListener("click",async()=>{
   try {const data=await request("/api/preview",body);if(version!==settingsVersion)return;times("preview-times",data);$("preview-message").textContent=data.state==="waiting_for_time"?locationProposal?"Waiting for time synchronization. Preview the timetable after the clock is ready before saving this location.":"Waiting for time synchronization. You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings do not produce a valid schedule. Review the location, method and offsets.":(data.conflicts || []).join(" ");$("preview-section").hidden=false;if(locationProposal && data.state==="ready"){locationNeedsPreview=false;controls();}}
   catch(error){message(error.message,true);}finally{busy=false;controls();}
 });
-$("refresh").addEventListener("click",()=>refresh());
+$("refresh").addEventListener("click",()=>refreshWithTimezones());
 $("reload").addEventListener("click",async()=>{if(dirty && !confirm("Replace your unsaved edits with the device's saved settings?"))return;if(await refresh(true))message("Saved settings loaded.");});
 $("stop").addEventListener("click",()=>action("/api/stop",{}));
 $("skip").addEventListener("click",()=>action("/api/skip",{expected_revision:snapshot.revision,occurrence:snapshot.next}));
@@ -249,11 +249,25 @@ $("lights-form").addEventListener("submit",async(event)=>{
     } catch {lightUncertain=true;lightMessage("Connection lost. Reload light settings before trying again.",true);}
   } finally {busy=false;controls();}
 });
-async function start() {
+async function loadTimezones() {
+  if(timezonesReady || timezonesLoading)return;
+  timezonesLoading=true;
+  try {
+    const data=await request("/api/timezones");
+    if(!Array.isArray(data.names) || !data.names.length || data.names.some(name=>typeof name!=="string"))throw new Error("Invalid timezone list");
+    for(const name of data.names){supportedZones.add(name);$("zones").append(new Option(name,name));}
+    timezonesReady=true;
+    if(editing)message("Connected to your OpenAthan.");
+    applyPendingLocation();
+  }catch(error){message(proposedLocation && !proposedLocation.error?"Timezone list unavailable. Your location suggestion is waiting. Select Refresh to retry.":"Timezone list unavailable. Select Refresh to retry.",true);}
+  finally{timezonesLoading=false;}
+}
+async function refreshWithTimezones() {
   await refresh();
-  try {const data=await request("/api/timezones");for(const name of data.names){supportedZones.add(name);$("zones").append(new Option(name,name));}if(editing)message("Connected to your OpenAthan.");}
-  catch(error){message("Timezone list unavailable. Refresh the page to retry.",true);}
-  timezonesReady=true;applyPendingLocation();
-  setInterval(()=>{if(!document.hidden)refresh();},5000);
+  if(!timezonesReady)await loadTimezones();
+}
+async function start() {
+  await refreshWithTimezones();
+  setInterval(()=>{if(!document.hidden)refreshWithTimezones();},5000);
 }
 start();

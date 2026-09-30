@@ -28,7 +28,15 @@ async function fixture(){
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
-    if(req.method==='GET'){if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}send(200,req.url==='/api/timezones'?{names:['UTC','America/Toronto']}:state.device);return;}
+    if(req.method==='GET'){
+      if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}
+      if(req.url==='/api/timezones'){
+        state.timezoneReads=(state.timezoneReads||0)+1;
+        if(state.failTimezones){send(503,{error:'Timezone list unavailable'});return;}
+        send(200,{names:['UTC','America/Toronto']});return;
+      }
+      send(200,state.device);return;
+    }
     let body='';for await(const data of req)body+=data;
     const payload=JSON.parse(body);state.posts.push({url:req.url,payload,origin:req.headers.origin});
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
@@ -64,6 +72,29 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: pending handoff survives a transient timezone-list failure`,async()=>{
+  const f=await fixture();f.state.failTimezones=true;f.state.device.setup='active';
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url+'/#v=1&latitude=44.4&longitude=-79.7&timezone=America%2FToronto&source=browser');
+    await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('location suggestion is waiting'));
+    assert.equal(new URL(page.url()).hash,'');
+    assert.equal(await page.locator('#location-review').isVisible(),false);
+    assert.equal(await page.locator('#latitude').inputValue(),'0');
+    assert.equal(await page.locator('#timezone').inputValue(),'UTC');
+    assert.equal(f.state.mutations,0);
+    f.state.failTimezones=false;
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+    assert.equal(await page.locator('#longitude').inputValue(),'-79.7');
+    assert.equal(await page.locator('#timezone').inputValue(),'America/Toronto');
+    assert.ok(await page.locator('#save').isDisabled());
+    assert.ok(f.state.timezoneReads>=2);
+    assert.equal(f.state.mutations,0);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: pending handoff survives an initial status failure`,async()=>{
   const f=await fixture();f.state.failRead=true;
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
