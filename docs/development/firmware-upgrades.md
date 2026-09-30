@@ -1,0 +1,115 @@
+# Firmware upgrades
+
+Official reference firmware can check for published stable releases and install
+application-only updates from its authenticated device page. Prayer calculation,
+scheduling and recordings continue to work independently of the release service.
+This implementation requires physical qualification before release. See the
+[dated build report](upgrade-validation-2026-09-30.md).
+
+## Owner flow
+
+The Firmware section shows the installed version, the available release, its
+release notes and the last successful check. The device checks after networking
+and clock synchronization, then approximately daily. **Check for updates** also
+starts a check. A failed check retains the current application and does not pause
+the scheduler.
+
+**Install update** durably queues that specific offered release. Closing the page
+or restarting does not cancel the request. Installation waits until playback ends
+and the next announcement is at least 15 minutes away. An activated device must
+have a healthy schedule and a valid clock. **Cancel queued update** cancels before
+boot selection, including during a download; the old application remains active.
+
+The worker streams into the inactive application slot. Interrupted downloads
+restart from the beginning after a five-minute retry delay and a fresh safe-window
+check. If playback starts or scheduling becomes unsafe, staging stops. A verified,
+staged image waits for the final safe-window check before boot selection/restart.
+The page reconnects and reads actual device status instead of assuming success
+from a disconnected HTTP response. Failed startup is reported as restored firmware.
+
+Existing settings, credentials, prayer consumption/skip records, light preferences
+and shared recordings are preserved. Upgrade bookkeeping has its own NVS namespace
+(`oa_upgrade`, or `oa_upgrade_test` in isolated builds). Storage failures fail
+closed without erasing or restoring existing records.
+
+## Local API
+
+All endpoints use the existing Digest authentication and same-origin policy.
+
+| Endpoint | Input | Result |
+| --- | --- | --- |
+| `GET /api/firmware` | None | Installed identity, offered release, queue/progress, last check and outcome |
+| `POST /api/firmware/check` | `{}` | Starts an asynchronous check |
+| `POST /api/firmware/install` | `{"version":"vX.Y.Z"}` | Persists the exact offered version |
+| `POST /api/firmware/cancel` | `{}` | Cancels before boot selection |
+
+`GET /api/status` includes the same state as `firmware`. Conflicting actions return
+409; unavailable initialization/storage returns 503. An uncertain POST response
+must be reconciled with a GET, never automatically repeated.
+
+## Release contract and trust
+
+Keep the existing five fresh-install assets and schema-1 installer manifest.
+Upgrade-capable releases add `firmware.ota.bin` and `upgrade.json` to the bundle
+and checksum list. The OTA application must equal the factory application's bytes.
+The website's pinned importer selects its known assets; extra upgrade assets do
+not alter the fresh-install manifest.
+
+`upgrade.json` contains `payload` (the exact signed JSON string) and `signature`
+(lowercase hexadecimal DER ECDSA signature). SHA-256/P-256 verification uses the
+committed public key. The payload binds schema, stable version, exact source
+commit, hardware/layout, settings/audio format compatibility, rollback requirement,
+application byte count and SHA-256. The firmware derives release asset URLs from
+the verified tag; callers cannot supply URLs. TLS certificate verification is
+mandatory, and redirects are restricted to GitHub release-storage HTTPS hosts.
+
+`release/firmware.json` owns the candidate version and format identifiers. Keep
+the official YAML project version aligned. `tools/release.py build` embeds its
+exact source commit; ad-hoc builds identify their commit as `development`.
+Do not publish a candidate merely because it declares a stable-format version.
+
+Generate/manage the private P-256 key outside Git and outside release bundles.
+Pass its path to `tools/release.py package --signing-key PATH` alongside the
+existing packaging arguments. Packaging rejects a key that differs from the
+committed trust key, an embedded version mismatch, image corruption or excessive
+application size. Draft upload re-verifies the signature against the release's
+source commit and retains the existing main/CI/tag gates. Keep the key backed up
+privately; changing the embedded trust key requires a separately planned rotation.
+
+## Startup recovery and existing devices
+
+New official builds enable bootloader application rollback and suppress
+ESPHome's immediate application confirmation. After 30 seconds, OpenAthan
+confirms only healthy settings/setup storage, update storage, required audio and
+volume initialization, and local server/credential-storage initialization.
+Internet connectivity and clock synchronization are not required for confirmation.
+A pending application that fails these checks rolls back after 90 seconds;
+crashes/restarts before confirmation are handled by the rollback-enabled bootloader.
+Confirmation does not establish audible quality or long-term runtime stability.
+
+The previously compiled public/reference bootloader did **not** enable rollback.
+The device hashes its entire 32 KiB bootloader region against the committed
+rollback-enabled bootloader allowlist and refuses Wi-Fi installation when it does
+not match. Keep older compatible hashes when releasing newer firmware; packaging
+also checks the factory bootloader against this list. Build identity establishes
+the configured capability; physical failure/interruption qualification is still
+required before publishing it.
+
+The updater follows GitHub's published stable `latest` release. Draft preparation
+keeps `--latest=false`; after physical qualification and explicit publication
+approval, select the intended stable release as latest. Publishing assets without
+that selection does not make them available through the periodic update check.
+An application-only USB transition cannot change that bootloader. Before installing
+this feature on an existing speaker, inspect its current bootloader and use a
+separately reviewed preservation procedure if a bootloader transition is required.
+Do not use the fresh installer, erase NVS, rewrite audio, restore historical prayer
+history, or promise startup rollback with the old bootloader.
+Isolated diagnostic firmware cannot install production releases and does not
+automatically contact the release service.
+
+Use the existing [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
+for fresh preflight and scoped preservation evidence. Qualification must test
+successful slot switching, power/network interruption, failed startup, queue
+cancellation/restoration and concurrent networking/audio heap/fragmentation.
+Synthetic CI audio must never be installed or played. Publication and physical
+installation remain separate approvals.

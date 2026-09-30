@@ -111,8 +111,9 @@ its generated-audio fixture for CI, or approved media for a separately authorize
 hardware test.
 
 A compatible ordinary update replaces only an application slot and preserves
-NVS and shared audio. The reference candidate does not expose a product OTA UI
-or an unauthenticated upload endpoint. A merged factory image can overwrite NVS
+NVS and shared audio. The reference candidate now exposes an authenticated
+[application-only upgrade flow](../../../docs/development/firmware-upgrades.md).
+It has no arbitrary upload endpoint. A merged factory image can overwrite NVS
 even without a full-chip erase. Existing developer devices therefore require a
 separately controlled compatible application upgrade, not the fresh-install path.
 Historical full-flash backups restore old consumption history and are unsuitable

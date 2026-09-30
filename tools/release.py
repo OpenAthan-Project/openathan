@@ -86,6 +86,7 @@ def build(commit, output):
         environment = os.environ.copy()
         # ESPHome must not inherit an operator-selected build directory.
         environment["ESPHOME_BUILD_PATH"] = str(stage / "compiled")
+        environment["OPENATHAN_BUILD_COMMIT"] = commit
         log = stage / "compile.log"
         print(f"Compiling {commit}; build output will be retained in {output}", flush=True)
         with log.open("wb") as handle:
@@ -176,10 +177,12 @@ def validate_audio_cpp(commit, path):
         command([build_dir / "audio_validator", path.resolve()])
 
 
-def package(build_dir, tag, normal, fajr, output):
+def package(build_dir, tag, normal, fajr, output, signing_key=None):
     require(TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
     record = validate_build(build_dir)
     commit = record["commit"]
+    upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
+    require(not upgrade_capable or signing_key is not None, "Upgrade-capable releases require --signing-key")
     payloads = (audio_image.read_recording(normal), audio_image.read_recording(fajr))
     approved_tracks(read_json(source_file(commit, MEDIA_REGISTRY)), source_file(commit, LICENSE_PATH), payloads)
     media, _ = audio_image.build_image(*payloads)
@@ -188,6 +191,18 @@ def package(build_dir, tag, normal, fajr, output):
         files = {ASSETS[1]: factory, ASSETS[2]: media,
                  "manifest.json": json_bytes(make_manifest(commit, tag, factory, media)),
                  "build-report.json": json_bytes(public_report(record))}
+        if signing_key is not None:
+            require(not signing_key.resolve().is_relative_to(ROOT.resolve()), "Keep the private signing key outside the repository")
+            from upgrade_artifacts import sign
+            release_config = read_json(source_file(commit, "release/firmware.json"))
+            require(release_config["version"] == tag, "Release tag differs from committed firmware version")
+            public = source_file(commit, "release/upgrade-public-key.pem")
+            bootloaders = read_json(source_file(commit, "release/rollback-bootloaders.json"))
+            require(bootloaders["regionBytes"] == 32768 and digest(factory[:32768]) in bootloaders["sha256"],
+                    "Factory bootloader is not in the reviewed rollback allowlist")
+            app = (build_dir / "firmware.ota.bin").read_bytes()
+            files["firmware.ota.bin"] = app
+            files["upgrade.json"] = sign(tag, commit, app, signing_key.read_bytes(), public)
         files["SHA256SUMS"] = checksums(files)
         for name, data in files.items():
             (stage / name).write_bytes(data)
@@ -262,6 +277,15 @@ def upload_draft(bundle, github=None):
     manifest, report, files, payloads = validate_bundle(bundle)
     commit, tag = manifest["commit"], manifest["tag"]
     source_commit(commit)
+    upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
+    require(not upgrade_capable or "upgrade.json" in files, "Upgrade-capable release is missing signed upgrade assets")
+    if "upgrade.json" in files:
+        from upgrade_artifacts import validate
+        bootloaders = read_json(source_file(commit, "release/rollback-bootloaders.json"))
+        require(bootloaders["regionBytes"] == 32768 and digest(files["firmware.factory.bin"][:32768]) in bootloaders["sha256"],
+                "Factory bootloader is not in the reviewed rollback allowlist")
+        validate(files["upgrade.json"], files["firmware.ota.bin"],
+                 source_file(commit, "release/upgrade-public-key.pem"), tag, commit)
     validate_report(report, commit)
     approved_tracks(read_json(source_file(commit, MEDIA_REGISTRY)), source_file(commit, LICENSE_PATH), payloads)
     github = github or GitHub()
@@ -286,7 +310,7 @@ def upload_draft(bundle, github=None):
             release = find_release(github, tag)
             require(release is not None, "Draft creation outcome is uncertain; rerun to reconcile")
         found = verify_assets(github, release, files)
-        for name in ASSETS:
+        for name in files:
             if name not in found:
                 # Recheck state/tag before each mutation; never clobber assets.
                 require(find_release(github, tag)["id"] == release["id"], "Draft identity changed")
@@ -294,7 +318,7 @@ def upload_draft(bundle, github=None):
                 github.call("release", "upload", tag, snapshot / name, "--repo", REPOSITORY)
         require(find_release(github, tag)["id"] == release["id"], "Draft identity changed")
         require(github.tag_commit(tag) == commit, "Remote tag changed during upload")
-        require(set(verify_assets(github, release, files)) == set(ASSETS), "Upload is incomplete; rerun to reconcile")
+        require(set(verify_assets(github, release, files)) == set(files), "Upload is incomplete; rerun to reconcile")
     return dict(url=release["html_url"], manifest_sha256=digest(files["manifest.json"]), status="draft",
                 remaining="Hardware qualification, explicit publication, and reviewed website release selection")
 
@@ -308,6 +332,7 @@ def main():
     package_parser = commands.add_parser("package", help="Package firmware with approved recordings")
     package_parser.add_argument("--build-dir", required=True, type=Path)
     package_parser.add_argument("--tag", required=True)
+    package_parser.add_argument("--signing-key", type=Path, help="Private P-256 key outside the repository")
     package_parser.add_argument("--normal", required=True, type=Path)
     package_parser.add_argument("--fajr", required=True, type=Path)
     package_parser.add_argument("--output-dir", required=True, type=Path)
@@ -318,7 +343,7 @@ def main():
         if args.action == "build":
             result = build(args.commit, args.output_dir)
         elif args.action == "package":
-            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir)
+            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key)
         else:
             result = upload_draft(args.bundle)
         print(json.dumps(result, indent=2))

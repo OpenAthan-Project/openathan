@@ -101,6 +101,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
           cmake --build build --target openathan_core --parallel 2
           python -m unittest discover -s tests -p test_settings_adapter.py -v
+          python tools/check_upgrade_runtime.py --arduinojson "$OPENATHAN_ARDUINOJSON_INCLUDE"
 
   device-ui:
     runs-on: ubuntu-24.04

@@ -5,6 +5,9 @@ esphome:
   name: openathan
   name_add_mac_suffix: true
   min_version: 2026.9.0
+  project:
+    name: OpenAthan.reference
+    version: v0.2.0
 
 packages:
   openathan: !include packages/openathan.yaml

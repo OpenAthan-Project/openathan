@@ -27,3 +27,11 @@ inline int mbedtls_sha256_finish(mbedtls_sha256_context *ctx, uint8_t *digest) {
 }
 inline void mbedtls_sha256_free(mbedtls_sha256_context *ctx) { EVP_MD_CTX_free(ctx->ctx); }
 #endif
+inline int mbedtls_sha256(const uint8_t *data, size_t size, uint8_t *digest, int mode) {
+  mbedtls_sha256_context context;
+  mbedtls_sha256_init(&context);
+  const int result = mbedtls_sha256_starts(&context, mode) || mbedtls_sha256_update(&context, data, size) ||
+      mbedtls_sha256_finish(&context, digest);
+  mbedtls_sha256_free(&context);
+  return result;
+}

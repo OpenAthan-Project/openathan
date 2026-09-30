@@ -67,6 +67,7 @@ const char* http_status(int code) {
 }  // namespace
 void Device::setup() {
   api_ = std::make_unique<LocalApi>(athan_, zones_, zone_count_);
+  api_->set_upgrade(&upgrade_);
   hostname_ = std::string(App.get_name().c_str()) + ".local";
   realm_ = "OpenAthan-" + get_mac_address();
   wifi_record_ = store_.load_wifi(saved_wifi_);
@@ -85,6 +86,7 @@ void Device::setup() {
   config.send_wait_timeout = 3;
   config.uri_match_fn = httpd_uri_match_wildcard;
   if (httpd_start(&server_, &config) != ESP_OK) {
+    upgrade_.begin(athan_, false);
     mark_failed();
     return;
   }
@@ -98,8 +100,11 @@ void Device::setup() {
     server_ = nullptr;
     mark_failed();
   }
+  upgrade_.begin(athan_, server_ != nullptr && wifi_record_ != ::openathan::LoadResult::ERROR &&
+      password_record_ != ::openathan::LoadResult::ERROR);
 }
 void Device::on_shutdown() {
+  upgrade_.shutdown();
   if (server_) {
     httpd_stop(server_);
     server_ = nullptr;
@@ -266,6 +271,7 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
   scanning_ = false;
 }
 void Device::loop() {
+  upgrade_.loop(wifi::global_wifi_component->is_connected());
   const auto now = now_ms();
   if (wifi_attempt_.active()) {
     auto* wifi = wifi::global_wifi_component;

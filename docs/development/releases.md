@@ -1,5 +1,11 @@
 # Firmware release preparation
 
+Upgrade-capable firmware also publishes signed application-only assets. Pass
+`--signing-key PATH` (a private P-256 key outside Git) to the packaging command;
+see the [upgrade contract and recovery requirements](firmware-upgrades.md).
+Legacy five-asset releases remain supported, and the fresh-install manifest stays
+schema 1.
+
 The firmware repository builds and packages releases. The website consumes a
 reviewed release; it never compiles firmware. The [installer contract](https://github.com/OpenAthan-Project/website/blob/ba356c80f00ff07046b7433c03e0fdc9802f64b0/installer/README.md)
 remains schema v1, for AtomS3R C126 + Voice Pyramid A167, ESP32-S3 with 8 MiB flash
@@ -57,7 +63,8 @@ and `approved: true`. Approval records human review; tooling cannot establish ri
 
 ```sh
 python tools/release.py package --build-dir /tmp/openathan-build \
-  --tag v0.1.0 --normal /path/to/normal.mp3 --fajr /path/to/fajr.mp3 \
+  --tag v0.2.0 --normal /path/to/normal.mp3 --fajr /path/to/fajr.mp3 \
+  --signing-key /private/path/release-signing-key.pem \
   --output-dir /tmp/openathan-bundle
 ```
 
@@ -89,15 +96,15 @@ main-push Firmware CI run must have passed. Deliberately create and push the
 version tag at that exact commit before uploading, after checking it is unused:
 
 ```sh
-git tag -a v0.1.0 <full-40-character-commit-sha> -m 'OpenAthan v0.1.0'
-git push origin refs/tags/v0.1.0
+git tag -a v0.2.0 <full-40-character-commit-sha> -m 'OpenAthan v0.2.0'
+git push origin refs/tags/v0.2.0
 python tools/release.py upload-draft --bundle /tmp/openathan-bundle
 ```
 
 The upload command never creates or moves a tag. It revalidates local files and
 committed media approval, checks the remote tag and main ancestry, and uses
-`gh release create --draft --verify-tag --latest=false`. It uploads only the five
-assets and downloads them to verify exact bytes. There is no automatic publication
+`gh release create --draft --verify-tag --latest=false`. It uploads the validated
+bundle assets and downloads them to verify exact bytes. There is no automatic publication
 or background upload from CI.
 
 After a network failure, rerun the same command. It reconciles the existing draft
