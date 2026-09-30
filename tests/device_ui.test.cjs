@@ -64,6 +64,26 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: pending handoff survives an initial status failure`,async()=>{
+  const f=await fixture();f.state.failRead=true;
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url+'/#v=1&latitude=44.4&longitude=-79.7&timezone=America%2FToronto&source=browser');
+    await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('Status unavailable'));
+    assert.equal(new URL(page.url()).hash,'');
+    assert.equal(await page.locator('#location-review').isVisible(),false);
+    assert.ok(await page.locator('#latitude').isDisabled());
+    f.state.failRead=false;
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+    assert.equal(await page.locator('#longitude').inputValue(),'-79.7');
+    assert.equal(await page.locator('#timezone').inputValue(),'America/Toronto');
+    assert.ok(await page.locator('#save').isDisabled());
+    assert.equal(f.state.mutations,0);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: suggested location requires review and never saves automatically`,async()=>{
   const f=await fixture();
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});

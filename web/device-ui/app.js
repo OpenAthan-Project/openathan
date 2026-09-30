@@ -8,6 +8,7 @@ let snapshot, editing, dirty = false, busy = false, loading = false, generation 
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
 let locationProposal, locationNeedsPreview=false, settingsVersion=0;
 const supportedZones=new Set();
+let timezonesReady=false;
 const title = (s) => s[0].toUpperCase()+s.slice(1);
 function message(text, error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
 function lightMessage(text,error=false) { $("lights-message").textContent=text;$("lights-message").classList.toggle("error",error); }
@@ -56,9 +57,14 @@ function applyLocationProposal(proposal) {
   $("location-review").hidden=false;
   message("Location suggested. Review it and preview the timetable before saving.");
 }
+function applyPendingLocation() {
+  if(!editing || !timezonesReady || !proposedLocation)return;
+  const proposal=proposedLocation;proposedLocation=null;
+  applyLocationProposal(proposal);
+}
 addEventListener("hashchange",()=>{
   proposedLocation=incomingLocation();
-  if(editing){applyLocationProposal(proposedLocation);proposedLocation=null;}
+  applyPendingLocation();
 });
 function fillLights(state) {
   lightEditing=structuredClone(state);lightDirty=false;lightUncertain=false;
@@ -163,6 +169,7 @@ async function refresh(replace=false) {
     if(replace || !editing)fill(state);
     else if(state.revision!==editing.revision && !dirty)fill(state);
     else if(state.revision!==editing.revision)message("Settings changed on another client. Your edits are preserved; reload the saved settings before saving.",true);
+    applyPendingLocation();
     return true;
   }catch(error){message(error.message+". Check the device connection.",true);return false;}
   finally{loading=false;controls();}
@@ -246,8 +253,7 @@ async function start() {
   await refresh();
   try {const data=await request("/api/timezones");for(const name of data.names){supportedZones.add(name);$("zones").append(new Option(name,name));}if(editing)message("Connected to your OpenAthan.");}
   catch(error){message("Timezone list unavailable. Refresh the page to retry.",true);}
-  applyLocationProposal(proposedLocation);
-  proposedLocation=null;
+  timezonesReady=true;applyPendingLocation();
   setInterval(()=>{if(!document.hidden)refresh();},5000);
 }
 start();
