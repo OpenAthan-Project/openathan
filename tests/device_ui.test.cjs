@@ -59,6 +59,63 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: suggested location requires review and never saves automatically`,async()=>{
+  const f=await fixture();
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    const handoff='#v=1&latitude=44.4113861&longitude=-79.6819456&timezone=America%2FToronto&source=ip&accuracy=1000';
+    await page.goto(f.url+'/'+handoff);
+    await page.waitForFunction(()=>!document.querySelector('#fields').disabled);
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    assert.equal(new URL(page.url()).hash,'');
+    assert.equal(await page.locator('#latitude').inputValue(),'44.4113861');
+    assert.equal(await page.locator('#longitude').inputValue(),'-79.6819456');
+    assert.equal(await page.locator('#timezone').inputValue(),'America/Toronto');
+    assert.match(await page.locator('#location-review').textContent(),/Approximate IP location.*1000 km/);
+    assert.ok(await page.locator('#save').isDisabled());assert.equal(f.state.mutations,0);
+    await page.locator('#method').selectOption('north_america');
+    await page.locator('#preview').click();
+    await page.waitForFunction(()=>!document.querySelector('#save').disabled);
+    assert.equal(f.state.mutations,0);
+    await page.locator('#longitude').fill('-80');assert.ok(await page.locator('#save').isDisabled());
+    await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#save').disabled);
+    await page.locator('#save').click();
+    await page.waitForFunction(()=>document.querySelector('#setup-state').textContent==='Setup complete');
+    assert.equal(f.state.mutations,1);
+    assert.equal(f.state.device.settings.longitude,-80);
+    assert.equal(f.state.device.settings.timezone,'America/Toronto');
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: unsupported timezone and invalid handoff keep manual settings safe`,async()=>{
+  const f=await fixture();
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url+'/#v=1&latitude=0&longitude=0&timezone=Not%2FSupported&source=browser&accuracy=12');
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    assert.equal(await page.locator('#latitude').inputValue(),'0');
+    assert.equal(await page.locator('#longitude').inputValue(),'0');
+    assert.equal(await page.locator('#timezone').inputValue(),'');
+    assert.match(await page.locator('#location-review').textContent(),/Choose a timezone supported by this device/);
+    assert.equal(f.state.mutations,0);
+    await page.goto(f.url+'/#v=1&latitude=999&longitude=0&source=ip');
+    await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('Location link was invalid'));
+    assert.equal(await page.locator('#latitude').inputValue(),'0');
+    assert.equal(f.state.mutations,0);
+    await page.locator('#latitude').fill('12');
+    const handoff='#v=1&latitude=44.4&longitude=-79.7&source=browser';
+    page.once('dialog',dialog=>dialog.dismiss());
+    await page.evaluate(hash=>{location.hash=hash;},handoff);
+    await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('unsaved edits were kept'));
+    assert.equal(await page.locator('#latitude').inputValue(),'12');
+    page.once('dialog',dialog=>dialog.accept());
+    await page.evaluate(hash=>{location.hash=hash;},handoff);
+    await page.waitForFunction(()=>document.querySelector('#latitude').value==='44.4');
+    assert.ok(await page.locator('#save').isDisabled());
+    assert.equal(f.state.mutations,0);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: light preferences, conflicts and uncertain saves`,async()=>{
   const f=await fixture();f.state.device.setup='active';
   f.state.device.lights={supported:true,schema:1,revision:1,application:'applied',mode:'green',settings:{enabled:true,brightness_percent:20}};
