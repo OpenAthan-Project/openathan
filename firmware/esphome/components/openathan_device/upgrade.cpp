@@ -162,10 +162,7 @@ void Upgrade::begin(openathan_component::OpenAthan *athan, bool server_ready) {
   if (!expected_.empty() && !release_version(expected_)) { storage_ok_ = false; return; }
   const auto queue = doc["queue"].as<std::string>();
   if (!queue.empty()) {
-    if (!descriptor_(queue, queued_) ||
-        (!expected_.empty() && queued_.version != expected_) ||
-        (!newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION) &&
-         !(queued_.version == OPENATHAN_FIRMWARE_VERSION && expected_ == queued_.version))) {
+    if (!descriptor_(queue, queued_) || (!expected_.empty() && queued_.version != expected_)) {
       storage_ok_ = false; return;
     }
     state_ = "queued";
@@ -281,6 +278,9 @@ void Upgrade::run_() {
   if (cancel_) return;
   if (!safe_) { fail_("Waiting for a safe time between prayers"); return; }
   if (!partition || partition->size != 0x200000 || esp_ota_begin(partition, release.bytes, &handle) != ESP_OK) {
+    // Pinned IDF allocates the handle before erasing. An erase failure leaves
+    // it live, whereas failures before allocation leave our zero sentinel.
+    if (handle) esp_ota_abort(handle);
     fail_("The inactive application slot is unavailable"); return;
   }
   mbedtls_sha256_context hash;
@@ -337,6 +337,15 @@ void Upgrade::loop(bool connected) {
     confirmed_ = true;
   }
   if (!storage_ok_ || active_) return;
+  if (!queued_.envelope.empty() && !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION)) {
+    // A preserving USB update can fulfill or supersede a queued Wi-Fi request
+    // without setting our handoff marker. A valid old request is not corruption.
+    const bool fulfilled = queued_.version == OPENATHAN_FIRMWARE_VERSION;
+    result_ = fulfilled ? "success" : "superseded";
+    state_ = fulfilled ? "success" : "current";
+    if (persist_("", "")) { expected_.clear(); queued_ = {}; }
+  }
+  if (!storage_ok_) return;
   if (!expected_.empty()) {
     const auto *candidate = esp_ota_get_next_update_partition(nullptr);
     esp_app_desc_t description{};

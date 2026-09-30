@@ -81,6 +81,20 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: a superseded queue clears its reconnect hint and permits checks`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.4.0',state:'current',result:'superseded',error:''};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  await page.addInitScript(()=>sessionStorage.setItem('firmware-expected','v0.3.0'));
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-section').hidden);
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('firmware-expected')),null);
+    assert.ok(await page.locator('#firmware-check').isEnabled());
+    await page.locator('#firmware-check').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('available'));
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/check').length,1);
+  }finally{await browser.close();await f.close();}
+ });
  for(const denied of ['access','getItem','setItem','removeItem']) {
   test(`${browserName}: denied storage ${denied} preserves settings and firmware actions`,async()=>{
    const f=await fixture();f.state.device.setup='active';f.state.device.automatic_ready=true;

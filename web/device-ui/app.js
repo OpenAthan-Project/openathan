@@ -290,7 +290,7 @@ function renderFirmware(state,confirmed=false) {
   if(!state)return;
   if(firmwareExpected && state.version===firmwareExpected && state.result==="success") {
     rememberFirmware();
-  } else if(state.result==="rolled_back") {
+  } else if(["rolled_back","superseded"].includes(state.result)) {
     rememberFirmware();
   }
   $("firmware-version").textContent=`Installed: ${state.version}${state.queued_version?` · Queued: ${state.queued_version}`:state.available?` · Available: ${state.available.version}`:""}`;

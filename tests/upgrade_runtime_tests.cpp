@@ -29,7 +29,7 @@ void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
 int action(Upgrade &update,const char *name,const char *version=nullptr){JsonDocument doc;auto root=doc.to<JsonObject>();if(version)root["version"]=version;std::string error;return update.action(name,root,error);}
-void reset(){now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=0;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
+void reset(){now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
   application_response=std::string(512,'a');uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
   std::string hash;for(auto b:bytes){hash+="0123456789abcdef"[b>>4];hash+="0123456789abcdef"[b&15];}
   JsonDocument payload;payload["schema"]=1;payload["version"]="v0.3.0";payload["commit"]=std::string(40,'a');payload["hardware"]="atoms3r-c126-pyramid-a167";payload["layout"]="dual-2m-audio-3_5m-v1";payload["storageFormat"]=1;payload["audioFormat"]=1;payload["rollback"]=true;payload["bytes"]=512;payload["sha256"]=hash;
@@ -60,7 +60,28 @@ int main(){
     reset();serializeJson(doc,saved_record);running_state=ESP_OTA_IMG_PENDING_VERIFY;a.health=false;
     Upgrade unhealthy;begin(unhealthy,a);now_us=90000000;unhealthy.loop(false);
     assert(confirmations==0 && rollbacks==1);expect_record(descriptor_response,"v0.3.0");
-    std::cout<<"Updated application confirms the retained handoff request\n";return 0;
+    std::cout<<"Updated application confirms the retained handoff request\n";
+  }
+  if(std::string(OPENATHAN_FIRMWARE_VERSION)!="v0.2.0") {
+    for(const char *expected:{"","v0.3.0"}) {
+      reset();JsonDocument doc;doc["schema"]=1;doc["queue"]=descriptor_response;doc["expected"]=expected;
+      serializeJson(doc,saved_record);inactive_state=ESP_OTA_IMG_ABORTED;
+      Upgrade installed;esphome::openathan_component::OpenAthan a;begin(installed,a);
+      const bool fulfilled=std::string(OPENATHAN_FIRMWARE_VERSION)=="v0.3.0";
+      assert(state(installed)==(fulfilled?"success":"current"));
+      expect_result(installed,fulfilled?"success":"superseded");expect_record("","");
+      assert(erases==0 && writes==0 && boot_selections==0 && rollbacks==0);
+      assert(action(installed,"cancel")==200 && action(installed,"check")==200);run_worker();assert(state(installed)=="current");
+      now_us=0;Upgrade rebooted;begin(rebooted,a);assert(action(rebooted,"cancel")==200 && state(rebooted)=="idle");
+    }
+    reset();JsonDocument doc;doc["schema"]=1;doc["queue"]=descriptor_response;doc["expected"]="";
+    serializeJson(doc,saved_record);signature_valid=false;
+    Upgrade corrupt;esphome::openathan_component::OpenAthan a;begin(corrupt,a);
+    assert(state(corrupt)=="storage_fault" && action(corrupt,"cancel")==503 && erases==0);
+    reset();serializeJson(doc,saved_record);commit_ok=false;
+    Upgrade failed_clear;begin(failed_clear,a);assert(state(failed_clear)=="storage_fault");expect_record(descriptor_response,"");
+    commit_ok=true;now_us=0;Upgrade retry_clear;begin(retry_clear,a);expect_record("","");assert(action(retry_clear,"cancel")==200);
+    std::cout<<"Fulfilled/superseded requests reconcile after preserving USB updates\n";return 0;
   }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);assert(action(u,"install","v0.3.0")==409);a.sample.next->utc=1800;u.loop(true);assert(!pending_worker);a.sample.next->utc=9000;u.loop(true);run_worker();assert(flashed==application_response);assert(boot_selections==0);u.loop(true);assert(boot_selections==1 && esphome::App.reboots==1);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);Upgrade restored;begin(restored,a);assert(state(restored)=="queued");assert(action(restored,"cancel")==200);assert(state(restored)=="idle");}
@@ -74,6 +95,17 @@ int main(){
   }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);application_response[20]='b';u.loop(true);run_worker();u.loop(true);assert(boot_selections==0 && aborts==1);assert(state(u)=="queued");}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);image_valid=false;u.loop(true);run_worker();u.loop(true);assert(boot_selections==0);}
+  for(const bool allocation_failure:{false,true}) {
+    reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);
+    begin_allocation_fails=allocation_failure;begin_erase_fails=!allocation_failure;
+    const auto request=saved_record;
+    for(unsigned attempt=0;attempt<3;++attempt) {
+      u.loop(true);run_worker();assert(state(u)=="queued" && live_ota_handles==0 && saved_record==request);
+      assert(aborts==(allocation_failure?0:attempt+1) && writes==0 && boot_selections==0);
+      now_us+=300000000;
+    }
+    assert(action(u,"cancel")==200 && live_ota_handles==0);
+  }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);offer(u);commit_ok=false;assert(action(u,"install","v0.3.0")==503);assert(state(u)=="storage_fault");u.loop(true);assert(!pending_worker && boot_selections==0);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);signature_valid=false;assert(action(u,"check")==200);run_worker();assert(state(u)=="failed");assert(action(u,"install","v0.3.0")==409);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;a.health=false;running_state=ESP_OTA_IMG_PENDING_VERIFY;begin(u,a);now_us=90000000;u.loop(false);assert(rollbacks==1 && confirmations==0);}

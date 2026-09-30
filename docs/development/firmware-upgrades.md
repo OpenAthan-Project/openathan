@@ -31,6 +31,8 @@ settings or update controls, and device status remains authoritative.
 Safety and cancellation are rechecked after blocking network operations and
 immediately before flash erase/write/finalization. If the worker cannot be created,
 the durable request remains queued and cancellable, with a five-minute retry delay.
+Failed OTA starts release any handle allocated before an erase failure; retries
+retain the request without accumulating those allocations.
 
 Existing settings, credentials, prayer consumption/skip records, light preferences
 and shared recordings are preserved. Upgrade bookkeeping has its own NVS namespace
@@ -100,6 +102,10 @@ Startup reports rollback only when the requested inactive image is marked invali
 or aborted by OTA metadata; the running requested version reports success after
 health confirmation. Legacy handoff markers without a descriptor require a new
 owner request if no actual rejection can be established.
+After a preserving USB update, a valid request for the running version or an
+older version is fulfilled or superseded after startup health confirmation. Its
+bookkeeping is cleared without installing older firmware. Invalid signatures or
+failed bookkeeping commits still fail closed; they are not silently discarded.
 
 The previously compiled public/reference bootloader did **not** enable rollback.
 The device hashes its entire 32 KiB bootloader region against the committed

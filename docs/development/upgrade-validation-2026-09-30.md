@@ -12,8 +12,8 @@ Builds use synthetic, non-playable audio fixtures outside the repository.
 
 | Variant | Baseline OTA bytes | Candidate OTA bytes | Delta | Application budget remaining | Slot free |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Official reference | 1,136,752 | 1,211,344 | +74,592 | 361,520 | 885,808 |
-| Isolated provisioning | 1,138,800 | 1,213,296 | +74,496 | 359,568 | 883,856 |
+| Official reference | 1,136,752 | 1,211,664 | +74,912 | 361,200 | 885,488 |
+| Isolated provisioning | 1,138,800 | 1,213,568 | +74,768 | 359,296 | 883,584 |
 
 Both affected variants passed dependency/partition/capacity checks, exact
 factory/OTA application consistency and absence of fixture audio in applications.
@@ -42,7 +42,7 @@ reviewed rollback-enabled bootloader hash.
   previous-version recovery, corrupt records and unsupported bootloaders.
   Signature success is injected in these runtime tests; the Python tests exercise
   real cryptography. They do not simulate physical flash timing or power loss.
-- Thirty-eight Chromium/WebKit browser cases pass, covering authentication, edits,
+- Forty Chromium/WebKit browser cases pass, covering authentication, edits,
   uncertain responses, cancellation, reconnect outcomes and phone layout.
 - The pinned public-site validator accepts producer output and rejects mutated
   audio using Node 24.19.0. The fresh-install schema remains unchanged.
@@ -81,6 +81,20 @@ These adapters model the pinned IDF's inactive-metadata invalidation during OTA
 begin; they do not qualify physical power loss. Chromium and WebKit deny storage
 access, reads, writes and removals while settings, install/cancel, reconnect
 outcomes and subsequent actions continue without script errors.
+
+The next review baseline was `1c4dfd814a2d9ff0d3d8916b57ba9de29b67610f`.
+Fulfilled/superseded queue reconciliation and failed-erase handle cleanup add 320
+reference bytes (1,211,344 → 1,211,664) and 272 isolated provisioning bytes
+(1,213,296 → 1,213,568) with the same pinned toolchain/configuration.
+
+The updater harness now compiles as v0.2.0, v0.3.0 and v0.4.0. It exercises
+preserved queues with/without a handoff marker after installing the queued version
+or a newer version, durable cleanup, reboot and subsequent Check/Cancel actions,
+invalid-signature rejection, and failed-cleanup recovery. Three retries after
+erase failures leave zero live OTA handles; failures before allocation do not
+attempt an abort. Browser coverage clears superseded reconnect hints and permits
+new checks. An initial Chromium uncertain-response case timed out; its focused
+Chromium/WebKit rerun passed, and the complete suite was rerun afterward.
 
 ## Physical qualification still required
 

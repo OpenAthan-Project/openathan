@@ -2,6 +2,7 @@
 #include <esp_partition.h>
 #include <cstring>
 #include <string>
+#include <cassert>
 using esp_ota_handle_t=unsigned;
 enum esp_ota_img_states_t {ESP_OTA_IMG_UNDEFINED,ESP_OTA_IMG_NEW,ESP_OTA_IMG_PENDING_VERIFY,
   ESP_OTA_IMG_VALID,ESP_OTA_IMG_INVALID,ESP_OTA_IMG_ABORTED};
@@ -15,14 +16,16 @@ inline std::string inactive_version="v0.3.0";
 inline std::string flashed;
 inline unsigned boot_selections{},aborts{},rollbacks{},confirmations{};
 inline unsigned erases{},writes{};
+inline unsigned live_ota_handles{};
+inline bool begin_allocation_fails=false,begin_erase_fails=false;
 inline bool image_valid=true;
 inline const esp_partition_t *esp_ota_get_running_partition(){return &running;}
 inline const esp_partition_t *esp_ota_get_boot_partition(){return boot_partition;}
 inline const esp_partition_t *esp_ota_get_next_update_partition(void *){return &inactive;}
-inline int esp_ota_begin(const esp_partition_t *,unsigned,unsigned *handle){++erases;*handle=1;flashed.clear();inactive_state=ESP_OTA_IMG_UNDEFINED;return 0;}
+inline int esp_ota_begin(const esp_partition_t *,unsigned,unsigned *handle){if(begin_allocation_fails)return -1;*handle=++live_ota_handles;++erases;if(begin_erase_fails)return -1;flashed.clear();inactive_state=ESP_OTA_IMG_UNDEFINED;return 0;}
 inline int esp_ota_write(unsigned,const void *data,size_t size){++writes;flashed.append(static_cast<const char *>(data),size);return 0;}
-inline int esp_ota_abort(unsigned){++aborts;return 0;}
-inline int esp_ota_end(unsigned){return image_valid?0:-1;}
+inline int esp_ota_abort(unsigned handle){assert(handle && live_ota_handles);++aborts;--live_ota_handles;return 0;}
+inline int esp_ota_end(unsigned handle){assert(handle && live_ota_handles);--live_ota_handles;return image_valid?0:-1;}
 inline int esp_ota_get_partition_description(const esp_partition_t *,esp_app_desc_t *desc){strcpy(desc->version,inactive_version.c_str());return 0;}
 inline int esp_ota_get_state_partition(const esp_partition_t *partition,esp_ota_img_states_t *state){*state=partition==&running?running_state:inactive_state;return *state==ESP_OTA_IMG_UNDEFINED?-1:0;}
 inline int esp_ota_mark_app_valid_cancel_rollback(){++confirmations;running_state=ESP_OTA_IMG_VALID;return 0;}
