@@ -12,8 +12,8 @@ Builds use synthetic, non-playable audio fixtures outside the repository.
 
 | Variant | Baseline OTA bytes | Candidate OTA bytes | Delta | Application budget remaining | Slot free |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Official reference | 1,136,752 | 1,210,272 | +73,520 | 362,592 | 886,880 |
-| Isolated provisioning | 1,138,800 | 1,211,680 | +72,880 | 361,184 | 885,472 |
+| Official reference | 1,136,752 | 1,210,384 | +73,632 | 362,480 | 886,768 |
+| Isolated provisioning | 1,138,800 | 1,211,792 | +72,992 | 361,072 | 885,360 |
 
 Both affected variants passed dependency/partition/capacity checks, exact
 factory/OTA application consistency and absence of fixture audio in applications.
@@ -42,7 +42,7 @@ reviewed rollback-enabled bootloader hash.
   previous-version recovery, corrupt records and unsupported bootloaders.
   Signature success is injected in these runtime tests; the Python tests exercise
   real cryptography. They do not simulate physical flash timing or power loss.
-- Twenty-six Chromium/WebKit browser cases pass, covering authentication, edits,
+- Twenty-eight Chromium/WebKit browser cases pass, covering authentication, edits,
   uncertain responses, cancellation, reconnect outcomes and phone layout.
 - The pinned public-site validator accepts producer output and rejects mutated
   audio using Node 24.19.0. The fresh-install schema remains unchanged.
