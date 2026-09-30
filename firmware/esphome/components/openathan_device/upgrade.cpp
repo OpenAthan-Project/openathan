@@ -226,7 +226,11 @@ bool Upgrade::start_(bool install) {
   active_ = true; cancel_ = false; install_job_ = install; received_ = 0;
   state_ = install ? "downloading" : "checking"; error_.clear();
   if (xTaskCreate(worker_, "oa_upgrade", 8192, this, 1, nullptr) != pdPASS) {
-    active_ = false; state_ = "failed"; error_ = "Not enough memory to start the update"; return false;
+    active_ = false; state_ = install ? "queued" : "failed";
+    error_ = "Not enough memory to start the update; retrying after five minutes";
+    retry_ms_ = milliseconds() + 300000;
+    if (!install) next_check_ms_ = retry_ms_;
+    return false;
   }
   return true;
 }
@@ -269,6 +273,10 @@ void Upgrade::run_() {
       esp_http_client_get_content_length(response.client) != release.bytes) { fail_("Could not download the verified firmware"); return; }
   const auto *partition = esp_ota_get_next_update_partition(nullptr);
   esp_ota_handle_t handle = 0;
+  // HTTP open/header processing can block while the main loop publishes a
+  // new playback/cancellation state. esp_ota_begin may erase the entire image.
+  if (cancel_) return;
+  if (!safe_) { fail_("Waiting for a safe time between prayers"); return; }
   if (!partition || partition->size != 0x200000 || esp_ota_begin(partition, release.bytes, &handle) != ESP_OK) {
     fail_("The inactive application slot is unavailable"); return;
   }
@@ -281,7 +289,10 @@ void Upgrade::run_() {
   while (total < release.bytes && ok && !cancel_ && safe_ && milliseconds() < deadline) {
     const int count = esp_http_client_read(response.client, reinterpret_cast<char *>(buffer.data()),
         std::min<size_t>(buffer.size(), release.bytes - total));
-    if (count <= 0 || mbedtls_sha256_update(&hash, buffer.data(), count) != 0 || esp_ota_write(handle, buffer.data(), count) != ESP_OK) { ok = false; break; }
+    if (count <= 0 || mbedtls_sha256_update(&hash, buffer.data(), count) != 0) { ok = false; break; }
+    // Never use the safety sample from before a blocking read to authorize a
+    // flash write. Cancellation also stops a successfully received chunk.
+    if (cancel_ || !safe_ || esp_ota_write(handle, buffer.data(), count) != ESP_OK) { ok = false; break; }
     total += count; received_ = total;
     vTaskDelay(1);
   }
@@ -291,6 +302,7 @@ void Upgrade::run_() {
   mbedtls_sha256_free(&hash);
   if (!ok || cancel_ || !safe_) { esp_ota_abort(handle); if (!cancel_) fail_("Download paused; waiting for a safe time or a retry"); return; }
   { std::lock_guard<std::mutex> lock(mutex_); if (!cancel_) state_ = "verifying"; }
+  if (cancel_ || !safe_) { esp_ota_abort(handle); if (!cancel_) fail_("Waiting for a safe time between prayers"); return; }
   if (esp_ota_end(handle) != ESP_OK) { fail_("The firmware image failed validation"); return; }
   esp_app_desc_t description{};
   if (esp_ota_get_partition_description(partition, &description) != ESP_OK || release.version != description.version) {
@@ -305,7 +317,8 @@ void Upgrade::loop(bool connected) {
   const auto clock = athan_->read();
   const auto *settings = athan_->settings_service();
   const bool health = server_ready_ && !athan_->is_failed() && settings && settings->healthy() &&
-      std::string(athan_->setup_state()) != "storage_fault" && athan_->upgrade_health();
+      std::string(athan_->setup_state()) != "storage_fault" && athan_->upgrade_health() &&
+      boot_scheduler_healthy(status.fault);
   safe_ = upgrade_window(status.playing, clock.valid, athan_->activated(),
       health && status.automatic_ready, clock.utc, status.next ? std::optional<int64_t>(status.next->utc) : std::nullopt);
   std::lock_guard<std::mutex> lock(mutex_);

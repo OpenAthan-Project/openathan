@@ -12,8 +12,8 @@ Builds use synthetic, non-playable audio fixtures outside the repository.
 
 | Variant | Baseline OTA bytes | Candidate OTA bytes | Delta | Application budget remaining | Slot free |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Official reference | 1,136,752 | 1,210,384 | +73,632 | 362,480 | 886,768 |
-| Isolated provisioning | 1,138,800 | 1,211,792 | +72,992 | 361,072 | 885,360 |
+| Official reference | 1,136,752 | 1,210,528 | +73,776 | 362,336 | 886,624 |
+| Isolated provisioning | 1,138,800 | 1,211,984 | +73,184 | 360,880 | 885,168 |
 
 Both affected variants passed dependency/partition/capacity checks, exact
 factory/OTA application consistency and absence of fixture audio in applications.
@@ -42,12 +42,31 @@ reviewed rollback-enabled bootloader hash.
   previous-version recovery, corrupt records and unsupported bootloaders.
   Signature success is injected in these runtime tests; the Python tests exercise
   real cryptography. They do not simulate physical flash timing or power loss.
-- Twenty-eight Chromium/WebKit browser cases pass, covering authentication, edits,
+- Thirty Chromium/WebKit browser cases pass, covering authentication, edits,
   uncertain responses, cancellation, reconnect outcomes and phone layout.
 - The pinned public-site validator accepts producer output and rejects mutated
   audio using Node 24.19.0. The fresh-install schema remains unchanged.
 - Desktop and phone captures were inspected. The new controls fit narrow screens;
   the mechanical detector also reported pre-existing header typography warnings.
+
+## Independent-review fixes
+
+The review baseline was `cdf5e4cead4cc222898c15a0867a000d8fa6e30b`.
+Using the same pinned toolchain/configuration, these fixes add 144 application
+bytes to the reference image (1,210,384 → 1,210,528) and 192 bytes to isolated
+provisioning (1,211,792 → 1,211,984).
+
+Startup confirmation now rejects every scheduler fault. The real scheduler test
+reproduces failed consumption persistence while settings, activation and audio
+remain healthy; a healthy scheduler waiting for clock synchronization still passes
+the startup policy. Updater adapters verify the pending image remains unconfirmed
+and requests rollback on scheduler faults, with no internet/clock dependency.
+
+Transport callbacks inject playback/cancellation during open and read. The
+production worker tests assert zero erase/write after an open callback and zero
+writes after a read callback. Task creation failures keep the durable queue intact,
+remain cancellable, and cannot retry before five minutes; browser tests exercise
+the visible Cancel control. All affected local checks pass without hardware I/O.
 
 ## Physical qualification still required
 

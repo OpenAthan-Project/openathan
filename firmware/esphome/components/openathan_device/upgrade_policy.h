@@ -4,8 +4,13 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include "openathan/scheduler.h"
 
 namespace esphome::openathan_device {
+// A valid clock is a separate readiness condition, not a startup-health fault.
+inline bool boot_scheduler_healthy(::openathan::Fault fault) {
+  return fault == ::openathan::Fault::NONE;
+}
 inline std::optional<std::array<uint32_t, 3>> release_version(std::string_view value) {
   if (value.empty() || value.front() != 'v') return {};
   value.remove_prefix(1);

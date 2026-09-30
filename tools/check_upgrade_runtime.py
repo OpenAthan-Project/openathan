@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
         '-DOPENATHAN_FIRMWARE_VERSION="v0.2.0"', '-DOPENATHAN_BUILD_COMMIT="test"', '-DOPENATHAN_UPGRADE_PUBLIC_KEY="test key"',
         "-I"+str(ROOT / "tests/upgrade_stubs"), "-I"+str(ROOT / "tests/stubs"), "-I"+str(args.arduinojson),
         "-I"+str(ROOT / "firmware/esphome/components/openathan_device"),
+        "-I"+str(ROOT / "lib/openathan-core/include"),
         str(ROOT / "tests/upgrade_runtime_tests.cpp"), str(ROOT / "firmware/esphome/components/openathan_device/upgrade.cpp"),
         *([] if os.uname().sysname == "Darwin" else ["-lcrypto"]), "-o", str(output)], check=True)
     subprocess.run([output], check=True)

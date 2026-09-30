@@ -1,5 +1,6 @@
 #include "openathan.h"
 #include "nvs_memory.h"
+#include "../firmware/esphome/components/openathan_device/upgrade_policy.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -57,6 +58,28 @@ struct Fixture {
     return device.change_settings(value, device.settings_service()->saved()->revision);
   }
 };
+static void upgrade_boot_scheduler_health() {
+  // Only consumption persistence fails; settings, activation and audio remain
+  // healthy. Exercise the real scheduler and the policy used by confirmation.
+  struct History : StateStore {
+    DurableState saved;
+    bool present{}, fail{};
+    LoadResult load(DurableState &state) override { state=saved; return present?LoadResult::LOADED:LoadResult::EMPTY; }
+    bool save(const DurableState &state) override { if(fail)return false;saved=state;present=true;return true; }
+  } history;
+  Fixture f; f.device.set_state_store(&history); f.device.require_setup(); f.begin();
+  CHECK(f.device.finish_setup(f.device.settings_service()->saved()->revision));
+  history.fail=true; f.device.utc=epoch({2026,9,25},5)-1; f.device.update(); f.device.step(1);
+  CHECK(f.device.status().fault==Fault::STORAGE && !f.device.status().automatic_ready);
+  CHECK(f.device.settings_service()->healthy() && std::string(f.device.setup_state())=="active");
+  CHECK(f.device.upgrade_health() && f.audio.starts==0);
+  CHECK(!esphome::openathan_device::boot_scheduler_healthy(f.device.status().fault));
+
+  Fixture offline; offline.device.valid=false; offline.begin();
+  CHECK(offline.device.settings_service()->healthy() && offline.device.upgrade_health());
+  CHECK(!offline.device.status().clock_ready && !offline.device.status().automatic_ready);
+  CHECK(esphome::openathan_device::boot_scheduler_healthy(offline.device.status().fault));
+}
 struct LightOutputProbe : LightOutput {
   unsigned calls{}; bool fail{}; LightFrame frame;
   bool apply(LightFrame value) override { ++calls; frame=value; return !fail; }
@@ -514,6 +537,7 @@ static void json_transport() {
 }
 #endif
 int main() {
+  upgrade_boot_scheduler_health();
   light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
   light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();

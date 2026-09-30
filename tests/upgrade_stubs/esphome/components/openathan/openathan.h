@@ -2,11 +2,12 @@
 #include "esphome/components/json/json_util.h"
 #include "esphome/components/openathan/storage_config.h"
 #include <optional>
+#include "openathan/scheduler.h"
 namespace esphome::openathan_component {
 struct Settings { bool healthy() const { return true; } };
 struct Clock { bool valid{true}; int64_t utc{1000}; };
 struct Next { int64_t utc{9000}; };
-struct Status { bool playing{}, automatic_ready{true}; std::optional<Next> next{Next{}}; };
+struct Status { bool playing{}, automatic_ready{true}; std::optional<Next> next{Next{}}; ::openathan::Fault fault{::openathan::Fault::NONE}; };
 class OpenAthan {
  public:
   bool health{true}, active{true}, ready{true}, failed{};

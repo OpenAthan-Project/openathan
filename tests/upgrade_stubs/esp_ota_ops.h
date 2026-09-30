@@ -9,11 +9,12 @@ inline esp_partition_t running{0x200000},inactive{0x200000};
 inline esp_ota_img_states_t running_state=ESP_OTA_IMG_VALID;
 inline std::string flashed;
 inline unsigned boot_selections{},aborts{},rollbacks{},confirmations{};
+inline unsigned erases{},writes{};
 inline bool image_valid=true;
 inline const esp_partition_t *esp_ota_get_running_partition(){return &running;}
 inline const esp_partition_t *esp_ota_get_next_update_partition(void *){return &inactive;}
-inline int esp_ota_begin(const esp_partition_t *,unsigned,unsigned *handle){*handle=1;flashed.clear();return 0;}
-inline int esp_ota_write(unsigned,const void *data,size_t size){flashed.append(static_cast<const char *>(data),size);return 0;}
+inline int esp_ota_begin(const esp_partition_t *,unsigned,unsigned *handle){++erases;*handle=1;flashed.clear();return 0;}
+inline int esp_ota_write(unsigned,const void *data,size_t size){++writes;flashed.append(static_cast<const char *>(data),size);return 0;}
 inline int esp_ota_abort(unsigned){++aborts;return 0;}
 inline int esp_ota_end(unsigned){return image_valid?0:-1;}
 inline int esp_ota_get_partition_description(const esp_partition_t *,esp_app_desc_t *desc){strcpy(desc->version,"v0.3.0");return 0;}

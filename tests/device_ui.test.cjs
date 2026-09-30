@@ -81,6 +81,21 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: a queued task-start failure stays visibly cancellable`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',error:'Not enough memory to start the update; retrying after five minutes'};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden);
+    assert.match(await page.locator('#firmware-status').textContent(),/retrying after five minutes/);
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isEnabled());
+    await page.locator('#firmware-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-cancel').hidden);
+    assert.equal(f.state.device.firmware.queued_version,'');
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/cancel').length,1);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: uncertain install blocks another action until status returns`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'available',available:{version:'v0.3.0'},result:'',error:''};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

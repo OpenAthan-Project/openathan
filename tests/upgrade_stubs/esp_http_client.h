@@ -11,9 +11,10 @@ using esp_http_client_handle_t=Http *;
 inline std::string descriptor_response,application_response;
 inline bool transfer_fail=false;
 inline void (*on_read)()=nullptr;
+inline void (*on_open)()=nullptr;
 inline Http *esp_http_client_init(const esp_http_client_config_t *c){return new Http{std::string(c->url).ends_with("upgrade.json")?descriptor_response:application_response};}
 inline int esp_http_client_cleanup(Http *h){delete h;return 0;}
-inline int esp_http_client_open(Http *,int){return 0;}
+inline int esp_http_client_open(Http *,int){if(on_open){auto callback=on_open;on_open=nullptr;callback();}return 0;}
 inline int esp_http_client_fetch_headers(Http *h){return h->data.size();}
 inline int esp_http_client_get_status_code(Http *){return 200;}
 inline int esp_http_client_get_content_length(Http *h){return h->data.size();}

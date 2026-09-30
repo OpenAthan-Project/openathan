@@ -26,6 +26,9 @@ check. If playback starts or scheduling becomes unsafe, staging stops. A verifie
 staged image waits for the final safe-window check before boot selection/restart.
 The page reconnects and reads actual device status instead of assuming success
 from a disconnected HTTP response. Failed startup is reported as restored firmware.
+Safety and cancellation are rechecked after blocking network operations and
+immediately before flash erase/write/finalization. If the worker cannot be created,
+the durable request remains queued and cancellable, with a five-minute retry delay.
 
 Existing settings, credentials, prayer consumption/skip records, light preferences
 and shared recordings are preserved. Upgrade bookkeeping has its own NVS namespace
@@ -80,8 +83,9 @@ privately; changing the embedded trust key requires a separately planned rotatio
 
 New official builds enable bootloader application rollback and suppress
 ESPHome's immediate application confirmation. After 30 seconds, OpenAthan
-confirms only healthy settings/setup storage, update storage, required audio and
-volume initialization, and local server/credential-storage initialization.
+confirms only a fault-free scheduler, healthy settings/setup storage, update
+storage, required audio and volume initialization, and local
+server/credential-storage initialization.
 Internet connectivity and clock synchronization are not required for confirmation.
 A pending application that fails these checks rolls back after 90 seconds;
 crashes/restarts before confirmation are handled by the rollback-enabled bootloader.
