@@ -10,8 +10,9 @@ An optional **Find my location** link opens the public HTTPS helper in a new tab
 It can suggest browser coordinates or an approximate IP location, then returns
 proposed values in a versioned URL fragment. The fragment is checked and removed
 from the address bar; only supported timezones are suggested. The device requires
-a schedule preview before a returned location can be saved. Manual entry remains
-available without the helper or internet access.
+a ready timetable preview before a returned location can be saved. If its clock
+has not synchronized, wait and preview again. Manual entry remains available
+without the helper or internet access.
 The isolated acceptance build displays a prominent **Test firmware** banner;
 its authenticated status identifies it with `test_mode: true`.
 

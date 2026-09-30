@@ -6,7 +6,7 @@ const methods = {muslim_world_league:"Muslim World League",egyptian:"Egyptian",k
 const faults = {"invalid settings":"Review the location, timezone and calculation settings, then save again","invalid prayer schedule":"These settings cannot produce a valid schedule. Review the location, method and offsets","durable state unavailable":"Saved data could not be read or written. Restart the device; do not erase its storage","audio unavailable":"Audio is unavailable. Check the device power and compatible audio installation","playback request rejected":"Audio could not start. Check the device power and audio installation"};
 let snapshot, editing, dirty = false, busy = false, loading = false, generation = 0;
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
-let locationProposal, locationNeedsPreview=false;
+let locationProposal, locationNeedsPreview=false, settingsVersion=0;
 const supportedZones=new Set();
 const title = (s) => s[0].toUpperCase()+s.slice(1);
 function message(text, error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
@@ -44,7 +44,7 @@ function applyLocationProposal(proposal) {
   }
   $("latitude").value=String(proposal.latitude);$("longitude").value=String(proposal.longitude);
   const zoneSupported=!!proposal.timezone && supportedZones.has(proposal.timezone);
-  if(zoneSupported)$("timezone").value=proposal.timezone;
+  $("timezone").value=zoneSupported?proposal.timezone:"";
   locationProposal=proposal;
   $("settings").dispatchEvent(new Event("input",{bubbles:true}));
   locationNeedsPreview=true;controls();
@@ -192,11 +192,11 @@ for(const name of events) {
   input.type="number";input.id="offset-"+name;input.min=-120;input.max=120;input.step=1;input.required=true;
   label.append(document.createTextNode(title(name)),input);$("offsets").append(label);
 }
-$("settings").addEventListener("input",()=>{dirty=true;if(locationProposal)locationNeedsPreview=true;$("volume-value").value=`${$("volume").value}%`;$("preview-section").hidden=true;controls();});
+$("settings").addEventListener("input",()=>{++settingsVersion;dirty=true;if(locationProposal)locationNeedsPreview=true;$("volume-value").value=`${$("volume").value}%`;$("preview-section").hidden=true;controls();});
 $("settings").addEventListener("submit",(event)=>{event.preventDefault();if(locationNeedsPreview){message("Preview the timetable before saving this location.",true);return;}const body=documentFromForm();if(body)action(snapshot.setup==="active"?"/api/settings":"/api/activate",body);});
 $("preview").addEventListener("click",async()=>{
-  const body=documentFromForm();if(!body || busy)return;busy=true;controls();
-  try {const data=await request("/api/preview",body);times("preview-times",data);$("preview-message").textContent=data.state==="waiting_for_time"?"Waiting for time synchronization. You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings do not produce a valid schedule. Review the location, method and offsets.":(data.conflicts || []).join(" ");$("preview-section").hidden=false;if(locationProposal && data.state!=="invalid_schedule"){locationNeedsPreview=false;controls();}}
+  const body=documentFromForm();if(!body || busy)return;const version=settingsVersion;busy=true;controls();
+  try {const data=await request("/api/preview",body);if(version!==settingsVersion)return;times("preview-times",data);$("preview-message").textContent=data.state==="waiting_for_time"?locationProposal?"Waiting for time synchronization. Preview the timetable after the clock is ready before saving this location.":"Waiting for time synchronization. You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings do not produce a valid schedule. Review the location, method and offsets.":(data.conflicts || []).join(" ");$("preview-section").hidden=false;if(locationProposal && data.state==="ready"){locationNeedsPreview=false;controls();}}
   catch(error){message(error.message,true);}finally{busy=false;controls();}
 });
 $("refresh").addEventListener("click",()=>refresh());

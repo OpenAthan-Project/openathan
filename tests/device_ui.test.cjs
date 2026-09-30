@@ -38,7 +38,12 @@ async function fixture(){
       if(state.lightDrop){state.lightDrop=false;req.socket.destroy();return;}
       send(200,state.device.lights);return;
     }
-    if(req.url==='/api/preview'){send(200,state.device.clock_ready?state.device.schedule:{state:'waiting_for_time'});return;}
+    if(req.url==='/api/preview'){
+      const preview=state.device.clock_ready?structuredClone(state.device.schedule):{state:'waiting_for_time'};
+      state.previewRequested?.();
+      if(state.previewWait)await state.previewWait;
+      send(200,preview);return;
+    }
     if(['/api/settings','/api/activate'].includes(req.url)){
       if(payload.expected_revision!==state.device.revision){send(409,{error:'Settings changed on another client; reload before saving'});return;}
       state.mutations++;state.device.settings=payload.settings;state.device.revision++;
@@ -88,7 +93,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   }finally{await browser.close();await f.close();}
  });
  test(`${browserName}: unsupported timezone and invalid handoff keep manual settings safe`,async()=>{
-  const f=await fixture();
+  const f=await fixture();f.state.device.setup='active';
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
   const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
   try {
@@ -99,6 +104,9 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     assert.equal(await page.locator('#timezone').inputValue(),'');
     assert.match(await page.locator('#location-review').textContent(),/Choose a timezone supported by this device/);
     assert.equal(f.state.mutations,0);
+    await page.goto(f.url+'/#v=1&latitude=0&longitude=0&source=browser');
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    assert.equal(await page.locator('#timezone').inputValue(),'');
     await page.goto(f.url+'/#v=1&latitude=999&longitude=0&source=ip');
     await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('Location link was invalid'));
     assert.equal(await page.locator('#latitude').inputValue(),'0');
@@ -114,6 +122,49 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     await page.waitForFunction(()=>document.querySelector('#latitude').value==='44.4');
     assert.ok(await page.locator('#save').isDisabled());
     assert.equal(f.state.mutations,0);
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: a late preview cannot approve newer coordinates`,async()=>{
+  const f=await fixture();f.state.device.setup='active';
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url+'/#v=1&latitude=44.4&longitude=-79.7&timezone=UTC&source=browser');
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    let releasePreview;f.state.previewWait=new Promise(resolve=>{releasePreview=resolve;});
+    const requested=new Promise(resolve=>{f.state.previewRequested=resolve;});
+    await page.locator('#preview').click();await requested;
+    page.once('dialog',dialog=>dialog.accept());
+    await page.evaluate(()=>{location.hash='#v=1&latitude=43.7&longitude=-79.4&timezone=UTC&source=ip';});
+    await page.waitForFunction(()=>document.querySelector('#latitude').value==='43.7');
+    releasePreview();f.state.previewWait=null;f.state.previewRequested=null;
+    await page.waitForFunction(()=>!document.querySelector('#preview').disabled);
+    assert.equal(await page.locator('#preview-section').isVisible(),false);
+    assert.ok(await page.locator('#save').isDisabled());
+    assert.equal(f.state.mutations,0);
+    await page.locator('#preview').click();
+    await page.waitForFunction(()=>!document.querySelector('#save').disabled);
+    const previews=f.state.posts.filter(post=>post.url==='/api/preview');
+    assert.equal(previews.length,2);
+    assert.equal(previews[0].payload.settings.latitude,44.4);
+    assert.equal(previews[1].payload.settings.latitude,43.7);
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: clock must be ready to review a suggested timetable`,async()=>{
+  const f=await fixture();f.state.device.clock_ready=false;
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url+'/#v=1&latitude=44.4&longitude=-79.7&timezone=UTC&source=browser');
+    await page.waitForFunction(()=>!document.querySelector('#location-review').hidden);
+    await page.locator('#method').selectOption('north_america');
+    await page.locator('#preview').click();
+    await page.waitForFunction(()=>document.querySelector('#preview-message').textContent.includes('after the clock is ready'));
+    assert.ok(await page.locator('#save').isDisabled());
+    assert.equal(f.state.mutations,0);
+    f.state.device.clock_ready=true;
+    await page.locator('#preview').click();
+    await page.waitForFunction(()=>!document.querySelector('#save').disabled);
   }finally{await browser.close();await f.close();}
  });
  test(`${browserName}: light preferences, conflicts and uncertain saves`,async()=>{
