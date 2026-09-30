@@ -22,6 +22,8 @@
       <fieldset id="fields" disabled>
         <legend class="sr-only">Prayer settings</legend>
         <div class="grid"><label>Latitude<input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" required inputmode="decimal" placeholder="e.g. 44.3894"></label><label>Longitude<input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" required inputmode="decimal" placeholder="e.g. −79.6903"></label></div>
+        <p class="location-help"><a id="find-location" href="https://openathan.com/location/" target="_blank" rel="noopener noreferrer">Find my location</a> <span class="hint">Opens an optional helper in a new tab. Your edits stay here.</span></p>
+        <p id="location-review" class="location-review" role="status" hidden></p>
         <label>Timezone<input id="timezone" name="timezone" list="zones" required autocomplete="off" placeholder="Search, e.g. America/Toronto"></label><datalist id="zones"></datalist>
         <label>Calculation method<select id="method" required><option value="">Choose a method</option></select></label>
         <label>Asr calculation<select id="asr"><option value="standard">Standard</option><option value="hanafi">Hanafi</option></select></label>

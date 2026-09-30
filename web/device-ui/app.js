@@ -6,9 +6,66 @@ const methods = {muslim_world_league:"Muslim World League",egyptian:"Egyptian",k
 const faults = {"invalid settings":"Review the location, timezone and calculation settings, then save again","invalid prayer schedule":"These settings cannot produce a valid schedule. Review the location, method and offsets","durable state unavailable":"Saved data could not be read or written. Restart the device; do not erase its storage","audio unavailable":"Audio is unavailable. Check the device power and compatible audio installation","playback request rejected":"Audio could not start. Check the device power and audio installation"};
 let snapshot, editing, dirty = false, busy = false, loading = false, generation = 0;
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
+let locationProposal, locationNeedsPreview=false, settingsVersion=0;
+const supportedZones=new Set();
+let timezonesReady=false, timezonesLoading=false;
 const title = (s) => s[0].toUpperCase()+s.slice(1);
 function message(text, error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
 function lightMessage(text,error=false) { $("lights-message").textContent=text;$("lights-message").classList.toggle("error",error); }
+function incomingLocation() {
+  if(!location.hash.startsWith("#v="))return null;
+  const hash=location.hash;
+  history.replaceState(null,"",location.pathname+location.search);
+  if(hash.length>512)return {error:true};
+  const params=new URLSearchParams(hash.slice(1));
+  const allowed=["v","latitude","longitude","source","timezone","accuracy"];
+  if([...params.keys()].some(key=>!allowed.includes(key)) ||
+     ["v","latitude","longitude","source"].some(key=>params.getAll(key).length!==1) ||
+     ["timezone","accuracy"].some(key=>params.getAll(key).length>1) || params.get("v")!=="1")return {error:true};
+  const latText=params.get("latitude"),lonText=params.get("longitude");
+  const latitude=Number(latText),longitude=Number(lonText),source=params.get("source");
+  if(!latText || !lonText || !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+     latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 ||
+     !["browser","ip"].includes(source))return {error:true};
+  const timezone=params.get("timezone") || "";
+  if(timezone.length>64 || /[\x00-\x1f\x7f]/.test(timezone))return {error:true};
+  const accuracyText=params.get("accuracy"),accuracy=accuracyText===null?undefined:Number(accuracyText);
+  if(accuracyText!==null && (accuracyText==="" || !Number.isFinite(accuracy) || accuracy<0))return {error:true};
+  return {latitude,longitude,timezone,source,accuracy};
+}
+let proposedLocation=incomingLocation();
+const helperUrl=new URL("https://openathan.com/location/");
+helperUrl.hash=new URLSearchParams({v:"1",device:location.origin+"/"}).toString();
+$("find-location").href=helperUrl.href;
+function applyLocationProposal(proposal) {
+  if(!proposal)return;
+  if(proposal.error){message("Location link was invalid. Enter your location manually.",true);return;}
+  if(dirty && !confirm("Replace your unsaved location edits with the suggested location?")){
+    message("Your unsaved edits were kept. You can enter the suggested values manually.");return;
+  }
+  $("latitude").value=String(proposal.latitude);$("longitude").value=String(proposal.longitude);
+  const zoneSupported=!!proposal.timezone && supportedZones.has(proposal.timezone);
+  $("timezone").value=zoneSupported?proposal.timezone:"";
+  locationProposal=proposal;
+  $("settings").dispatchEvent(new Event("input",{bubbles:true}));
+  locationNeedsPreview=true;controls();
+  const source=proposal.source==="ip"?"Approximate IP location":"Browser location";
+  const accuracy=Number.isFinite(proposal.accuracy)
+    ?proposal.source==="ip"?` Estimated radius: ${Math.ceil(proposal.accuracy)} km.`:` Reported accuracy: ${Math.ceil(proposal.accuracy)} metres.`:"";
+  const timezone=zoneSupported?" Check the timezone.":" Choose a timezone supported by this device.";
+  $("location-review").textContent=`${source} suggested.${accuracy}${timezone} Preview the timetable before saving.`;
+  $("location-review").hidden=false;
+  message("Location suggested. Review it and preview the timetable before saving.");
+}
+function applyPendingLocation() {
+  if(!editing || !timezonesReady || !proposedLocation)return;
+  const proposal=proposedLocation;proposedLocation=null;
+  applyLocationProposal(proposal);
+}
+addEventListener("hashchange",()=>{
+  proposedLocation=incomingLocation();
+  applyPendingLocation();
+});
 function fillLights(state) {
   lightEditing=structuredClone(state);lightDirty=false;lightUncertain=false;
   if(state.settings) {
@@ -36,7 +93,8 @@ function controls() {
   $("lights-reload").disabled=busy || loading || !lightSnapshot?.supported;
   const unavailable=busy || !editing || snapshot?.application==="storage_fault" || snapshot?.setup==="storage_fault";
   $("fields").disabled=unavailable;
-  for(const id of ["save","preview"]) $(id).disabled=unavailable;
+  $("save").disabled=unavailable || locationNeedsPreview;
+  $("preview").disabled=unavailable;
   $("reload").disabled=busy || loading || !snapshot;
   $("stop").disabled=busy || !snapshot?.playing;
   $("skip").disabled=busy || snapshot?.setup!=="active" || !snapshot?.next || !!snapshot?.skip;
@@ -82,6 +140,7 @@ function render(state) {
 function fill(state) {
   editing=structuredClone(state);
   const s=state.settings;if(!s){editing=undefined;controls();return;}
+  locationProposal=undefined;locationNeedsPreview=false;$("location-review").hidden=true;
   const fresh=state.setup==="incomplete" && state.revision===1;
   $("latitude").value=fresh?"":s.latitude;$("longitude").value=fresh?"":s.longitude;
   $("timezone").value=fresh?"":s.timezone;$("method").value=fresh?"":s.method;
@@ -110,6 +169,7 @@ async function refresh(replace=false) {
     if(replace || !editing)fill(state);
     else if(state.revision!==editing.revision && !dirty)fill(state);
     else if(state.revision!==editing.revision)message("Settings changed on another client. Your edits are preserved; reload the saved settings before saving.",true);
+    applyPendingLocation();
     return true;
   }catch(error){message(error.message+". Check the device connection.",true);return false;}
   finally{loading=false;controls();}
@@ -139,14 +199,14 @@ for(const name of events) {
   input.type="number";input.id="offset-"+name;input.min=-120;input.max=120;input.step=1;input.required=true;
   label.append(document.createTextNode(title(name)),input);$("offsets").append(label);
 }
-$("settings").addEventListener("input",()=>{dirty=true;$("volume-value").value=`${$("volume").value}%`;$("preview-section").hidden=true;});
-$("settings").addEventListener("submit",(event)=>{event.preventDefault();const body=documentFromForm();if(body)action(snapshot.setup==="active"?"/api/settings":"/api/activate",body);});
+$("settings").addEventListener("input",()=>{++settingsVersion;dirty=true;if(locationProposal)locationNeedsPreview=true;$("volume-value").value=`${$("volume").value}%`;$("preview-section").hidden=true;controls();});
+$("settings").addEventListener("submit",(event)=>{event.preventDefault();if(locationNeedsPreview){message("Preview the timetable before saving this location.",true);return;}const body=documentFromForm();if(body)action(snapshot.setup==="active"?"/api/settings":"/api/activate",body);});
 $("preview").addEventListener("click",async()=>{
-  const body=documentFromForm();if(!body || busy)return;busy=true;controls();
-  try {const data=await request("/api/preview",body);times("preview-times",data);$("preview-message").textContent=data.state==="waiting_for_time"?"Waiting for time synchronization. You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings do not produce a valid schedule. Review the location, method and offsets.":(data.conflicts || []).join(" ");$("preview-section").hidden=false;}
+  const body=documentFromForm();if(!body || busy)return;const version=settingsVersion;busy=true;controls();
+  try {const data=await request("/api/preview",body);if(version!==settingsVersion)return;times("preview-times",data);$("preview-message").textContent=data.state==="waiting_for_time"?locationProposal?"Waiting for time synchronization. Preview the timetable after the clock is ready before saving this location.":"Waiting for time synchronization. You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings do not produce a valid schedule. Review the location, method and offsets.":(data.conflicts || []).join(" ");$("preview-section").hidden=false;if(locationProposal && data.state==="ready"){locationNeedsPreview=false;controls();}}
   catch(error){message(error.message,true);}finally{busy=false;controls();}
 });
-$("refresh").addEventListener("click",()=>refresh());
+$("refresh").addEventListener("click",()=>refreshWithTimezones());
 $("reload").addEventListener("click",async()=>{if(dirty && !confirm("Replace your unsaved edits with the device's saved settings?"))return;if(await refresh(true))message("Saved settings loaded.");});
 $("stop").addEventListener("click",()=>action("/api/stop",{}));
 $("skip").addEventListener("click",()=>action("/api/skip",{expected_revision:snapshot.revision,occurrence:snapshot.next}));
@@ -189,10 +249,25 @@ $("lights-form").addEventListener("submit",async(event)=>{
     } catch {lightUncertain=true;lightMessage("Connection lost. Reload light settings before trying again.",true);}
   } finally {busy=false;controls();}
 });
-async function start() {
+async function loadTimezones() {
+  if(timezonesReady || timezonesLoading)return;
+  timezonesLoading=true;
+  try {
+    const data=await request("/api/timezones");
+    if(!Array.isArray(data.names) || !data.names.length || data.names.some(name=>typeof name!=="string"))throw new Error("Invalid timezone list");
+    for(const name of data.names){supportedZones.add(name);$("zones").append(new Option(name,name));}
+    timezonesReady=true;
+    if(editing)message("Connected to your OpenAthan.");
+    applyPendingLocation();
+  }catch(error){message(proposedLocation && !proposedLocation.error?"Timezone list unavailable. Your location suggestion is waiting. Select Refresh to retry.":"Timezone list unavailable. Select Refresh to retry.",true);}
+  finally{timezonesLoading=false;}
+}
+async function refreshWithTimezones() {
   await refresh();
-  try {const data=await request("/api/timezones");for(const name of data.names)$("zones").append(new Option(name,name));if(editing)message("Connected to your OpenAthan.");}
-  catch(error){message("Timezone list unavailable. Refresh the page to retry.",true);}
-  setInterval(()=>{if(!document.hidden)refresh();},5000);
+  if(!timezonesReady)await loadTimezones();
+}
+async function start() {
+  await refreshWithTimezones();
+  setInterval(()=>{if(!document.hidden)refreshWithTimezones();},5000);
 }
 start();

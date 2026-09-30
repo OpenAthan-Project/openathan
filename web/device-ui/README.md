@@ -6,6 +6,16 @@ It includes first-run manual location/timezone/calculation setup, prayer and
 volume settings, schedule previews, status, stop, skip and cancel-skip controls.
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
+An optional **Find my location** link opens the public HTTPS helper in a new tab.
+It can suggest browser coordinates or an approximate IP location, then returns
+proposed values in a versioned URL fragment. The fragment is checked and removed
+from the address bar; only supported timezones are suggested. The device requires
+a ready timetable preview before a returned location can be saved. If its clock
+has not synchronized, wait and preview again. Manual entry remains available
+without the helper or internet access.
+If status or the timezone list is temporarily unavailable, the proposal waits
+in the open page; **Refresh** retries both reads.
+Deploy the public helper before shipping firmware with this link.
 The isolated acceptance build displays a prominent **Test firmware** banner;
 its authenticated status identifies it with `test_mode: true`.
 
