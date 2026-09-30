@@ -12,8 +12,8 @@ Builds use synthetic, non-playable audio fixtures outside the repository.
 
 | Variant | Baseline OTA bytes | Candidate OTA bytes | Delta | Application budget remaining | Slot free |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Official reference | 1,136,752 | 1,210,528 | +73,776 | 362,336 | 886,624 |
-| Isolated provisioning | 1,138,800 | 1,211,984 | +73,184 | 360,880 | 885,168 |
+| Official reference | 1,136,752 | 1,211,344 | +74,592 | 361,520 | 885,808 |
+| Isolated provisioning | 1,138,800 | 1,213,296 | +74,496 | 359,568 | 883,856 |
 
 Both affected variants passed dependency/partition/capacity checks, exact
 factory/OTA application consistency and absence of fixture audio in applications.
@@ -42,7 +42,7 @@ reviewed rollback-enabled bootloader hash.
   previous-version recovery, corrupt records and unsupported bootloaders.
   Signature success is injected in these runtime tests; the Python tests exercise
   real cryptography. They do not simulate physical flash timing or power loss.
-- Thirty Chromium/WebKit browser cases pass, covering authentication, edits,
+- Thirty-eight Chromium/WebKit browser cases pass, covering authentication, edits,
   uncertain responses, cancellation, reconnect outcomes and phone layout.
 - The pinned public-site validator accepts producer output and rejects mutated
   audio using Node 24.19.0. The fresh-install schema remains unchanged.
@@ -67,6 +67,20 @@ production worker tests assert zero erase/write after an open callback and zero
 writes after a read callback. Task creation failures keep the durable queue intact,
 remain cancellable, and cannot retry before five minutes; browser tests exercise
 the visible Cancel control. All affected local checks pass without hardware I/O.
+
+The subsequent full-diff review baseline was
+`3d69034ed0b7129609ab204373328a8e5f596f7a`. Its handoff and browser-storage fixes
+add 816 reference bytes (1,210,528 → 1,211,344) and 1,312 isolated provisioning
+bytes (1,211,984 → 1,213,296), using the same pinned configuration/toolchain.
+
+Updater probes simulate cuts immediately after the durable handoff commit and
+after boot selection. They verify retained signed intent, resumed queues,
+actual invalid/aborted rollback outcomes, pending selection without more flash
+operations, and the newly running application confirming/clearing the request.
+These adapters model the pinned IDF's inactive-metadata invalidation during OTA
+begin; they do not qualify physical power loss. Chromium and WebKit deny storage
+access, reads, writes and removals while settings, install/cancel, reconnect
+outcomes and subsequent actions continue without script errors.
 
 ## Physical qualification still required
 

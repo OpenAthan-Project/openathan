@@ -81,6 +81,38 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const denied of ['access','getItem','setItem','removeItem']) {
+  test(`${browserName}: denied storage ${denied} preserves settings and firmware actions`,async()=>{
+   const f=await fixture();f.state.device.setup='active';f.state.device.automatic_ready=true;
+   f.state.device.settings.latitude=44.4;
+   f.state.device.firmware={version:'v0.2.0',state:'available',available:{version:'v0.3.0'},result:'',error:''};
+   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+   const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+   const errors=[];page.on('pageerror',error=>errors.push(error.message));
+   await page.addInitScript(operation=>{
+    const denied=()=>{throw new DOMException('Browser storage denied','SecurityError');};
+    if(operation==='access')Object.defineProperty(window,'sessionStorage',{get:denied});
+    else Object.defineProperty(Storage.prototype,operation,{value:denied});
+   },denied);
+   try {
+    await page.goto(f.url);await page.waitForFunction(()=>document.querySelector('#latitude').value==='44.4' && !document.querySelector('#firmware-install').disabled);
+    await page.locator('#latitude').fill('45.2');
+    await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-cancel').disabled);
+    assert.equal(await page.locator('#latitude').inputValue(),'45.2');
+    await page.locator('#firmware-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-install').disabled);
+    await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-cancel').disabled);
+    f.state.device.firmware={version:'v0.3.0',state:'success',result:'success',error:''};
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('updated successfully') && !document.querySelector('#firmware-check').disabled);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/install').length,2);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/cancel').length,1);
+    await page.locator('#save').click();await page.waitForFunction(()=>document.querySelector('#message').textContent==='Device updated.');
+    assert.equal(f.state.device.settings.latitude,45.2);assert.deepEqual(errors,[]);
+   }finally{await browser.close();await f.close();}
+  });
+ }
  test(`${browserName}: a queued task-start failure stays visibly cancellable`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',error:'Not enough memory to start the update; retrying after five minutes'};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

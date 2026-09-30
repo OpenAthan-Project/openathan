@@ -159,14 +159,17 @@ void Upgrade::begin(openathan_component::OpenAthan *athan, bool server_ready) {
       doc.size() != 3 || doc["schema"].as<unsigned>() != 1 ||
       !doc["queue"].is<const char *>() || !doc["expected"].is<const char *>()) { storage_ok_ = false; return; }
   expected_ = doc["expected"].as<std::string>();
+  if (!expected_.empty() && !release_version(expected_)) { storage_ok_ = false; return; }
   const auto queue = doc["queue"].as<std::string>();
   if (!queue.empty()) {
-    if (!descriptor_(queue, queued_) || !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION)) {
+    if (!descriptor_(queue, queued_) ||
+        (!expected_.empty() && queued_.version != expected_) ||
+        (!newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION) &&
+         !(queued_.version == OPENATHAN_FIRMWARE_VERSION && expected_ == queued_.version))) {
       storage_ok_ = false; return;
     }
     state_ = "queued";
   }
-  if (!expected_.empty() && !release_version(expected_)) { storage_ok_ = false; return; }
 }
 void Upgrade::fail_(const char *message) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -332,20 +335,43 @@ void Upgrade::loop(bool connected) {
     }
     if (pending && esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) return;
     confirmed_ = true;
-    if (!expected_.empty()) {
+  }
+  if (!storage_ok_ || active_) return;
+  if (!expected_.empty()) {
+    const auto *candidate = esp_ota_get_next_update_partition(nullptr);
+    esp_app_desc_t description{};
+    esp_ota_img_states_t candidate_state{};
+    const bool identified = candidate && esp_ota_get_partition_description(candidate, &description) == ESP_OK &&
+        expected_ == description.version;
+    const bool rejected = identified && esp_ota_get_state_partition(candidate, &candidate_state) == ESP_OK &&
+        (candidate_state == ESP_OTA_IMG_INVALID || candidate_state == ESP_OTA_IMG_ABORTED);
+    if (expected_ == OPENATHAN_FIRMWARE_VERSION || rejected) {
       result_ = expected_ == OPENATHAN_FIRMWARE_VERSION ? "success" : "rolled_back";
       state_ = result_;
       if (persist_("", "")) { expected_.clear(); queued_ = {}; }
+    } else if (identified && esp_ota_get_boot_partition() == candidate) {
+      // Selection completed, but this application is still running. Do not
+      // erase either slot or rewrite boot metadata while handoff is pending.
+      state_ = "restarting";
+      if (safe_) App.safe_reboot();
+      return;
+    } else {
+      // OTA begin invalidates the inactive slot's previous rollback metadata.
+      // Without a rejected candidate or a selected slot, this is an interrupted
+      // handoff, not evidence that the requested application failed startup.
+      if (persist_(queued_.envelope, "")) expected_.clear();
+      state_ = queued_.envelope.empty() ? "failed" : "queued";
+      if (queued_.envelope.empty()) error_ = "Update handoff interrupted; check for updates again";
     }
   }
-  if (!storage_ok_ || active_) return;
+  if (!storage_ok_) return;
   if (openathan_storage::TEST_MODE) return;
   if (!queued_.envelope.empty() && !bootloader_ok_) {
     error_ = "This speaker needs a maintainer USB bootloader transition before Wi-Fi updates";
     return;
   }
   if (staged_ && safe_) {
-    if (!persist_("", queued_.version)) { error_ = "Update request storage failed; restart the device"; return; }
+    if (!persist_(queued_.envelope, queued_.version)) { error_ = "Update request storage failed; restart the device"; return; }
     expected_ = queued_.version;
     if (esp_ota_set_boot_partition(staged_) != ESP_OK) {
       persist_(queued_.envelope, ""); expected_.clear(); staged_ = nullptr;

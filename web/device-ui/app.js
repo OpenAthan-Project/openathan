@@ -271,19 +271,27 @@ async function start() {
   await refreshWithTimezones();
   setInterval(()=>{if(!document.hidden)refreshWithTimezones();},5000);
 }
-start();
-
 let firmwareBusy=false, firmwareUncertain=false, firmwareGeneration=0, firmwareState;
-let firmwareExpected=sessionStorage.getItem("firmware-expected") || "";
+let firmwareExpected="";
+try {firmwareExpected=sessionStorage.getItem("firmware-expected") || "";}catch {}
+function rememberFirmware(version="") {
+  firmwareExpected=version;
+  // This is only a reconnect hint. Device status remains authoritative when
+  // browser privacy policy or a storage quota prevents saving it.
+  try {
+    if(version)sessionStorage.setItem("firmware-expected",version);
+    else sessionStorage.removeItem("firmware-expected");
+  }catch {}
+}
 const firmwareMessages={idle:"No update has been requested.",checking:"Checking for a stable release…",current:"Your firmware is up to date.",available:"A firmware update is available.",queued:"Update queued. Waiting for a safe time between prayers.",downloading:"Downloading the update…",verifying:"Verifying the downloaded firmware…",restarting:"Restarting with the new firmware. Keep the speaker powered.",success:"Firmware updated successfully.",rolled_back:"The update could not start successfully. The previous firmware has been restored.",failed:"The update could not complete. Check again to retry.",storage_fault:"Update storage is unavailable. Restart the device; saved data has been retained."};
 function renderFirmware(state,confirmed=false) {
   if(confirmed)firmwareUncertain=false;
   firmwareState=state;$("firmware-section").hidden=!state;
   if(!state)return;
   if(firmwareExpected && state.version===firmwareExpected && state.result==="success") {
-    firmwareExpected="";sessionStorage.removeItem("firmware-expected");
+    rememberFirmware();
   } else if(state.result==="rolled_back") {
-    firmwareExpected="";sessionStorage.removeItem("firmware-expected");
+    rememberFirmware();
   }
   $("firmware-version").textContent=`Installed: ${state.version}${state.queued_version?` · Queued: ${state.queued_version}`:state.available?` · Available: ${state.available.version}`:""}`;
   const progress=state.state==="downloading" && state.total?` ${Math.floor(100*state.received/state.total)}%`:"";
@@ -304,10 +312,10 @@ async function firmwareAction(action) {
   ++generation;++firmwareGeneration;
   firmwareBusy=true;renderFirmware(firmwareState);
   const version=firmwareState.available?.version;
-  if(action==="install") {firmwareExpected=version;sessionStorage.setItem("firmware-expected",version);}
   try {
+    if(action==="install")rememberFirmware(version);
     renderFirmware(await request(`/api/firmware/${action}`,action==="install"?{version}:{}),true);
-    if(action==="cancel") {firmwareExpected="";sessionStorage.removeItem("firmware-expected");}
+    if(action==="cancel")rememberFirmware();
   } catch(error) {
     firmwareUncertain=!error.status;
     $("firmware-status").textContent=`${error.message}. Reading update status before retrying.`;
@@ -321,3 +329,4 @@ setInterval(async()=>{
   try {const state=await request("/api/firmware");if(started===firmwareGeneration && !firmwareBusy)renderFirmware(state,true);}
   catch {if(firmwareExpected || ["downloading","verifying","restarting"].includes(firmwareState.state))$("firmware-status").textContent="Waiting for the speaker to reconnect. Keep it powered.";}
 },3000);
+start();

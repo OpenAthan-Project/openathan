@@ -26,6 +26,8 @@ check. If playback starts or scheduling becomes unsafe, staging stops. A verifie
 staged image waits for the final safe-window check before boot selection/restart.
 The page reconnects and reads actual device status instead of assuming success
 from a disconnected HTTP response. Failed startup is reported as restored firmware.
+Browser storage is an optional reconnect hint; denied reads/writes do not block
+settings or update controls, and device status remains authoritative.
 Safety and cancellation are rechecked after blocking network operations and
 immediately before flash erase/write/finalization. If the worker cannot be created,
 the durable request remains queued and cancellable, with a five-minute retry delay.
@@ -90,6 +92,14 @@ Internet connectivity and clock synchronization are not required for confirmatio
 A pending application that fails these checks rolls back after 90 seconds;
 crashes/restarts before confirmation are handled by the rollback-enabled bootloader.
 Confirmation does not establish audible quality or long-term runtime stability.
+
+The signed request remains durable through boot-slot selection and startup.
+A cut before selection retains the queue for a fresh safe-window download.
+A selected candidate waits for restart without erasing or selecting another slot.
+Startup reports rollback only when the requested inactive image is marked invalid
+or aborted by OTA metadata; the running requested version reports success after
+health confirmation. Legacy handoff markers without a descriptor require a new
+owner request if no actual rejection can be established.
 
 The previously compiled public/reference bootloader did **not** enable rollback.
 The device hashes its entire 32 KiB bootloader region against the committed
