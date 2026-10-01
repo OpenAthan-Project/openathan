@@ -138,6 +138,9 @@ class Device:
             require(security["flags"] == 0 and security["flash_crypt_cnt"].bit_count() % 2 == 0,
                     "Unexpected security configuration; no flash writes permitted")
             self.esp = self.esp.run_stub()
+            # esptool otherwise reconnects and reflashes after a USB disconnect,
+            # bypassing our fresh-state guards. Reconcile every uncertain write.
+            self.esp.WRITE_FLASH_ATTEMPTS = 1
             # Match the official CLI: attach SPI flash after loading the stub,
             # before identification or reads. Bare ROM flash_id is not reliable.
             from esptool.cmds import attach_flash

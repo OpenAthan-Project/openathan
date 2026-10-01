@@ -1,4 +1,5 @@
 """USB planning and fresh-state guards; no physical device is accessed."""
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -15,6 +16,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 import upgrade_transition as transition
 from release_artifacts import digest, json_bytes, ISOLATED_STORAGE_MARKERS, QUALIFICATION_MARKERS
 from release_fixtures import esp_image
+from esptool.loader import ESPLoader
+from esptool.util import FatalError
+from serial import SerialException
 
 
 def production_app(extra=b""):
@@ -32,6 +36,110 @@ def metadata(sequence=1, state=2):
 
 
 class TransitionTests(unittest.TestCase):
+    def usb_fixture(self, app):
+        # Run the real adapter and esptool write/verify paths with no serial port.
+        esp = MagicMock()
+        esp.CHIP_NAME = "ESP32-S3"
+        esp.IMAGE_CHIP_ID = 9
+        esp.IS_STUB = True
+        esp.secure_download_mode = False
+        esp.WRITE_FLASH_ATTEMPTS = ESPLoader.WRITE_FLASH_ATTEMPTS
+        esp.FLASH_WRITE_SIZE = 16384
+        esp.FLASH_SECTOR_SIZE = 4096
+        esp.read_mac.return_value = bytes.fromhex("aabbccddeeff")
+        esp.get_security_info.return_value = dict(flags=0, flash_crypt_cnt=0)
+        esp.get_secure_boot_v1_enabled.return_value = False
+        esp.get_secure_boot_enabled.return_value = False
+        esp.get_flash_encryption_enabled.return_value = False
+        esp.get_encrypted_download_disabled.return_value = False
+        esp.get_major_chip_version.return_value = 0
+        esp.flash_id.return_value = 0x1740c8
+        esp.flash_md5sum.return_value = hashlib.md5(app).hexdigest()
+        def stub():
+            esp.IS_STUB = True
+            return esp
+        esp.run_stub.side_effect = stub
+        with patch("esptool.get_default_connected_device", return_value=esp), patch("esptool.cmds.attach_flash"):
+            device = transition.Device("/dev/cu.test", "aa:bb:cc:dd:ee:ff")
+        self.addCleanup(device.close)
+        return device, esp
+
+    def test_real_esptool_disconnect_stops_without_reconnect_or_reflash(self):
+        app = production_app()
+        for address in (0, 0x10000):
+            for method in ("flash_defl_begin", "flash_defl_block"):
+                with self.subTest(address=address, method=method):
+                    device, esp = self.usb_fixture(app)
+                    operation = getattr(esp, method)
+                    def disconnect_once(*args, **kwargs):
+                        if operation.call_count == 1:
+                            raise SerialException("injected USB disconnect")
+                    operation.side_effect = disconnect_once
+                    with patch("esptool.cmds.time.sleep"), patch("esptool.cmds.read_flash", return_value=app) as read:
+                        with self.assertRaisesRegex(SerialException, "injected USB disconnect"):
+                            device.write_verified(address, app)
+                    esp.flash_defl_begin.assert_called_once()
+                    operation.assert_called_once()
+                    esp.connect.assert_not_called()
+                    esp._port.open.assert_not_called()
+                    esp.run_stub.assert_called_once()
+                    esp.flash_defl_finish.assert_not_called()
+                    esp.flash_md5sum.assert_not_called()
+                    read.assert_not_called()
+
+    def test_real_esptool_write_failure_leaves_journal_and_blocks_retry(self):
+        root, snapshot, application, images, report = self.fixture()
+        device, esp = self.usb_fixture(application.read_bytes())
+        device.read = MagicMock(side_effect=lambda address, size: next(
+            data for name, data in images.items() if transition.REGIONS[name] == (address, size)))
+        esp.flash_defl_block.side_effect = SerialException("injected USB disconnect")
+        with patch.object(transition, "ROOT", root), patch.object(transition, "analyze", return_value=report), patch("esptool.cmds.time.sleep"):
+            plan = transition.make_plan(snapshot, application)
+            with self.assertRaises(SerialException):
+                transition.apply(device, plan, root, plan["mac"])
+            self.assertEqual(json.loads((snapshot / "apply-started.json").read_text()), plan)
+            self.assertFalse((snapshot / "apply-verified.json").exists())
+            reads = device.read.call_count
+            with self.assertRaisesRegex(ValueError, "Previous write attempt"):
+                transition.apply(device, plan, root, plan["mac"])
+            self.assertEqual(device.read.call_count, reads)
+        esp.flash_defl_begin.assert_called_once()
+        esp.flash_defl_block.assert_called_once()
+        esp.connect.assert_not_called()
+
+    def test_real_esptool_success_retains_verification_and_readback(self):
+        app = production_app()
+        default_attempts = ESPLoader.WRITE_FLASH_ATTEMPTS
+        device, esp = self.usb_fixture(app)
+        with patch("esptool.cmds.read_flash", return_value=app) as read:
+            device.write_verified(0x10000, app)
+        self.assertEqual(esp.WRITE_FLASH_ATTEMPTS, 1)
+        self.assertEqual(ESPLoader.WRITE_FLASH_ATTEMPTS, default_attempts)
+        esp.flash_defl_begin.assert_called_once()
+        esp.flash_defl_finish.assert_called_once()
+        self.assertEqual(esp.flash_md5sum.call_count, 2)
+        read.assert_called_once_with(esp, 0x10000, len(app), no_progress=True)
+        esp.connect.assert_not_called()
+
+    def test_real_esptool_verification_failures_do_not_rewrite(self):
+        app = production_app()
+        md5 = hashlib.md5(app).hexdigest()
+        for stage in ("write_md5", "verify_md5", "readback"):
+            with self.subTest(stage=stage):
+                device, esp = self.usb_fixture(app)
+                if stage == "write_md5":
+                    esp.flash_md5sum.return_value = "0" * 32
+                elif stage == "verify_md5":
+                    esp.flash_md5sum.side_effect = [md5, "0" * 32]
+                with patch("esptool.cmds.read_flash", return_value=b"changed") as read:
+                    with self.assertRaises(ValueError if stage == "readback" else FatalError):
+                        device.write_verified(0x10000, app)
+                esp.flash_defl_begin.assert_called_once()
+                esp.connect.assert_not_called()
+                esp._port.open.assert_not_called()
+                if stage != "readback":
+                    read.assert_not_called()
+
     def test_usb_connects_only_the_explicit_port_and_leaves_it_stopped(self):
         esp = MagicMock()
         esp.read_mac.return_value = bytes.fromhex("aabbccddeeff")
