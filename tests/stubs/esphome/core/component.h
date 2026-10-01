@@ -1,11 +1,12 @@
 #pragma once
 namespace esphome {
-namespace setup_priority { constexpr float LATE = -100; constexpr float HARDWARE = 800; }
+namespace setup_priority { constexpr float AFTER_WIFI = 200; constexpr float LATE = -100; constexpr float HARDWARE = 800; }
 class Component {
  public:
   virtual ~Component() = default;
   virtual void setup() {}
   virtual void loop() {}
+  virtual void on_shutdown() {}
   virtual float get_setup_priority() const { return 0; }
   void mark_failed() { failed_ = true; }
   bool is_failed() const { return failed_; }
