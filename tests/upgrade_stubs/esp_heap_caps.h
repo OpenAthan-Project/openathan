@@ -19,3 +19,7 @@ inline void *heap_caps_malloc(size_t bytes, uint32_t caps) {
 inline void heap_caps_free(void *buffer) {
   if (buffer) { assert(live_read_buffers); --live_read_buffers; std::free(buffer); }
 }
+#define MALLOC_CAP_SPIRAM (1U << 10)
+inline size_t heap_caps_get_free_size(unsigned){return 65536;}
+inline size_t heap_caps_get_largest_free_block(unsigned){return 32768;}
+inline size_t heap_caps_get_minimum_free_size(unsigned){return 16384;}

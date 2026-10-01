@@ -19,7 +19,11 @@
 
 namespace esphome::openathan_device {
 namespace {
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+constexpr const char *BASE = openathan_upgrade_qualification::RELEASE_BASE;
+#else
 constexpr const char *BASE = "https://github.com/OpenAthan-Project/openathan/releases/";
+#endif
 uint64_t milliseconds() { return esp_timer_get_time() / 1000; }
 bool hex(const std::string &value, uint8_t *output, size_t size) {
   if (value.size() != size * 2) return false;
@@ -32,12 +36,16 @@ bool hex(const std::string &value, uint8_t *output, size_t size) {
   return true;
 }
 bool allowed_url(const std::string &url) {
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  return openathan_upgrade_qualification::allowed_url(url);
+#else
   // Redirects are necessary for GitHub release storage. Never send device
   // credentials, and never follow an insecure or arbitrary-host redirect.
   for (const char *host : {"https://github.com/", "https://release-assets.githubusercontent.com/",
                            "https://objects.githubusercontent.com/"})
     if (url.rfind(host, 0) == 0 && url.size() <= 4096) return true;
   return false;
+#endif
 }
 struct Response {
   esp_http_client_handle_t client{};
@@ -54,7 +62,11 @@ struct Response {
       if (!allowed_url(url)) return false;
       esp_http_client_config_t config{};
       config.url = url.c_str();
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+      openathan_upgrade_qualification::configure_tls(config);
+#else
       config.crt_bundle_attach = esp_crt_bundle_attach;
+#endif
       config.timeout_ms = 4000;
       config.disable_auto_redirect = true;
       config.buffer_size = 4096;
@@ -181,6 +193,9 @@ void Upgrade::snapshot(JsonObject root) {
   std::lock_guard<std::mutex> lock(mutex_);
   root["version"] = OPENATHAN_FIRMWARE_VERSION;
   root["supported"] = bootloader_ok_;
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  qualification_.snapshot(root);
+#endif
   root["commit"] = OPENATHAN_BUILD_COMMIT;
   root["state"] = storage_ok_ ? state_ : "storage_fault";
   root["error"] = error_;
@@ -197,12 +212,23 @@ void Upgrade::snapshot(JsonObject root) {
 }
 int Upgrade::action(const std::string &action, JsonObjectConst input, std::string &error) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!storage_ok_ || !confirmed_) { error = "Firmware upgrade services are not ready"; return 503; }
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  const bool ready = qualification_.services_ready(confirmed_, action);
+#else
+  const bool ready = confirmed_;
+#endif
+  if (!storage_ok_ || !ready) { error = "Firmware upgrade services are not ready"; return 503; }
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  if (action == "qualification") return qualification_.action(*this, input, error);
+#endif
   if (action == "cancel" && input.size() == 0) {
     if (state_ == "restarting") { error = "The update is already restarting"; return 409; }
     if (!persist_("", "")) { error = "Update request could not be saved; restart the device"; return 503; }
     cancel_ = true; queued_ = {}; staged_ = nullptr; expected_.clear();
     state_ = "idle"; error_.clear();
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    qualification_.cancelled();
+#endif
     return 200;
   }
   if (active_ || !queued_.envelope.empty()) { error = "An update is already in progress"; return 409; }
@@ -211,7 +237,9 @@ int Upgrade::action(const std::string &action, JsonObjectConst input, std::strin
     return 200;
   }
   if (action == "install" && input.size() == 1 && input["version"].is<const char *>()) {
+#ifndef OPENATHAN_UPGRADE_QUALIFICATION
     if (openathan_storage::TEST_MODE) { error = "Isolated test firmware cannot install production releases"; return 503; }
+#endif
     if (!bootloader_ok_) { error = "This speaker needs a maintainer USB bootloader transition before Wi-Fi updates"; return 503; }
     if (offered_.version.empty() || input["version"].as<std::string>() != offered_.version) {
       error = "Check for updates and review the available version"; return 409;
@@ -227,6 +255,9 @@ bool Upgrade::start_(bool install) {
   if (active_) return false;
   active_ = true; cancel_ = false; install_job_ = install; received_ = 0;
   state_ = install ? "downloading" : "checking"; error_.clear();
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  qualification_.started(install);
+#endif
   if (xTaskCreate(worker_, "oa_upgrade", 8192, this, 1, nullptr) != pdPASS) {
     active_ = false; state_ = install ? "queued" : "failed";
     error_ = "Not enough memory to start the update; retrying after five minutes";
@@ -238,7 +269,11 @@ bool Upgrade::start_(bool install) {
 }
 void Upgrade::worker_(void *argument) {
   auto *self = static_cast<Upgrade *>(argument);
-  self->run_(); self->active_ = false;
+  self->run_();
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  self->qualification_.worker_finished(uxTaskGetStackHighWaterMark(nullptr));
+#endif
+  self->active_ = false;
   vTaskDelete(nullptr);
 }
 void Upgrade::run_() {
@@ -286,7 +321,13 @@ void Upgrade::run_() {
   // new playback/cancellation state. esp_ota_begin may erase the entire image.
   if (cancel_) return;
   if (!safe_) { fail_("Waiting for a safe time between prayers"); return; }
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  if (!partition || partition->size != 0x200000) { fail_("The inactive application slot is unavailable"); return; }
+  qualification_.erase_attempt();
+  if (esp_ota_begin(partition, release.bytes, &handle) != ESP_OK) {
+#else
   if (!partition || partition->size != 0x200000 || esp_ota_begin(partition, release.bytes, &handle) != ESP_OK) {
+#endif
     // Pinned IDF allocates the handle before erasing. An erase failure leaves
     // it live, whereas failures before allocation leave our zero sentinel.
     if (handle) esp_ota_abort(handle);
@@ -303,7 +344,13 @@ void Upgrade::run_() {
     if (count <= 0 || mbedtls_sha256_update(&hash, buffer.get(), count) != 0) { ok = false; break; }
     // Never use the safety sample from before a blocking read to authorize a
     // flash write. Cancellation also stops a successfully received chunk.
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    if (cancel_ || !safe_) { ok = false; break; }
+    qualification_.write_attempt();
+    if (esp_ota_write(handle, buffer.get(), count) != ESP_OK) { ok = false; break; }
+#else
     if (cancel_ || !safe_ || esp_ota_write(handle, buffer.get(), count) != ESP_OK) { ok = false; break; }
+#endif
     total += count; received_ = total;
     vTaskDelay(1);
   }
@@ -314,6 +361,9 @@ void Upgrade::run_() {
   if (!ok || cancel_ || !safe_) { esp_ota_abort(handle); if (!cancel_) fail_("Download paused; waiting for a safe time or a retry"); return; }
   { std::lock_guard<std::mutex> lock(mutex_); if (!cancel_) state_ = "verifying"; }
   if (cancel_ || !safe_) { esp_ota_abort(handle); if (!cancel_) fail_("Waiting for a safe time between prayers"); return; }
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  qualification_.finalize_attempt();
+#endif
   if (esp_ota_end(handle) != ESP_OK) { fail_("The firmware image failed validation"); return; }
   esp_app_desc_t description{};
   if (esp_ota_get_partition_description(partition, &description) != ESP_OK || release.version != description.version) {
@@ -327,9 +377,14 @@ void Upgrade::loop(bool connected) {
   const auto status = athan_->status();
   const auto clock = athan_->read();
   const auto *settings = athan_->settings_service();
-  const bool health = server_ready_ && !athan_->is_failed() && settings && settings->healthy() &&
+  const bool services_healthy = server_ready_ && !athan_->is_failed() && settings && settings->healthy() &&
       std::string(athan_->setup_state()) != "storage_fault" && athan_->upgrade_health() &&
       boot_scheduler_healthy(status.fault);
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  const bool health = qualification_.startup_health(services_healthy);
+#else
+  const bool health = services_healthy;
+#endif
   safe_ = upgrade_window(status.playing, clock.valid, athan_->activated(),
       health && status.automatic_ready, clock.utc, status.next ? std::optional<int64_t>(status.next->utc) : std::nullopt);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -341,10 +396,16 @@ void Upgrade::loop(bool connected) {
       if (pending && now - boot_ms_ >= 90000) esp_ota_mark_app_invalid_rollback_and_reboot();
       return;
     }
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    if (!qualification_.prepare_baseline(*this)) return;
+#endif
     if (pending && esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) return;
     confirmed_ = true;
   }
   if (!storage_ok_ || active_) return;
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  if (qualification_.selected_loop(safe_)) return;
+#endif
   if (!queued_.envelope.empty() && !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION)) {
     // A preserving USB update can fulfill or supersede a queued Wi-Fi request
     // without setting our handoff marker. A valid old request is not corruption.
@@ -354,7 +415,11 @@ void Upgrade::loop(bool connected) {
     if (persist_("", "")) { expected_.clear(); queued_ = {}; }
   }
   if (!storage_ok_) return;
-  if (!expected_.empty()) {
+  if (!expected_.empty()
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+      && qualification_.should_reconcile(*this)
+#endif
+      ) {
     const auto *candidate = esp_ota_get_next_update_partition(nullptr);
     esp_app_desc_t description{};
     esp_ota_img_states_t candidate_state{};
@@ -382,19 +447,31 @@ void Upgrade::loop(bool connected) {
     }
   }
   if (!storage_ok_) return;
+#ifndef OPENATHAN_UPGRADE_QUALIFICATION
   if (openathan_storage::TEST_MODE) return;
+#endif
   if (!queued_.envelope.empty() && !bootloader_ok_) {
     error_ = "This speaker needs a maintainer USB bootloader transition before Wi-Fi updates";
     return;
   }
   if (staged_ && safe_) {
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    if (!qualification_.persist_handoff(*this)) { error_ = "Update request storage failed; restart the device"; return; }
+#else
     if (!persist_(queued_.envelope, queued_.version)) { error_ = "Update request storage failed; restart the device"; return; }
+#endif
     expected_ = queued_.version;
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    if (qualification_.before_selection()) return;
+#endif
     if (esp_ota_set_boot_partition(staged_) != ESP_OK) {
       persist_(queued_.envelope, ""); expected_.clear(); staged_ = nullptr;
       state_ = "queued"; error_ = "Could not select the new application"; retry_ms_ = now + 300000; return;
     }
     state_ = "restarting";
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+    if (qualification_.after_selection()) return;
+#endif
     // Boot selection and restart happen together after the final window check.
     App.safe_reboot();
     return;

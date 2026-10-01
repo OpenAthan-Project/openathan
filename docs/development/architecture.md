@@ -122,6 +122,24 @@ for serial ownership, authentication, persistence, and hardware acceptance limit
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 
+### Upgrade qualification boundary
+
+The production updater remains the single update engine. The separately selected
+`openathan_upgrade_qualification` component owns private-feed trust, test
+identity, diagnostic health exceptions, holds, counters, baseline initialization
+and forced startup failure. Its C++ code refuses compilation without both
+qualification and isolated-storage flags. Small conditional hooks connect it to
+the engine; production builds have no qualification member, controls or component
+dependency. Adjustments needed for repeated test holds are confined to that
+component, preserving production reconciliation and persistence behavior.
+
+Capacity checks inspect generated definitions, copied/compiled sources and actual
+application payloads. Release validation rejects qualification and isolated
+provisioning images; its defaults never enable the capacity check's test-image
+exceptions. A discovered product defect requires a focused production fix and
+regression coverage. Passing qualification-tool CI does not establish physical
+acceptance or release readiness.
+
 ## Standalone operation
 
 Core Athan scheduling must not require Home Assistant or a cloud service. Internet may be used for initial/periodic time sync, Quran streaming, firmware downloads, or optional services.

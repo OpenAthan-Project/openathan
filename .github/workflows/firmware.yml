@@ -49,7 +49,7 @@ jobs:
       - name: Validate developer configurations
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
-          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation; do
+          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation upgrades/qualification; do
             python -m esphome config "firmware/esphome/$config.yaml" > "$RUNNER_TEMP/config.log" 2>&1 || { cat "$RUNNER_TEMP/config.log"; exit 1; }
           done
 
@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [device, validation, reference, provisioning-validation]
+        configuration: [device, validation, reference, provisioning-validation, upgrade-qualification, upgrade-startup-failure]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,17 +78,24 @@ jobs:
           ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
+          options=()
           if [ "$CONFIGURATION" = reference ]; then
             config=firmware/esphome/openathan.yaml
             image=openathan
           elif [ "$CONFIGURATION" = provisioning-validation ]; then
             config=firmware/esphome/provisioning/validation.yaml
             image=openathan-test
+          elif [ "$CONFIGURATION" = upgrade-qualification ] || [ "$CONFIGURATION" = upgrade-startup-failure ]; then
+            config=firmware/esphome/upgrades/qualification.yaml
+            image=openathan-test
+            if [ "$CONFIGURATION" = upgrade-startup-failure ]; then
+              options=(-s qualification_version v0.0.3 -s qualification_startup_failure true)
+            fi
           else
             config="firmware/esphome/scheduler/$CONFIGURATION.yaml"
             image=openathan-feasibility
           fi
-          python -m esphome compile "$config" > "$RUNNER_TEMP/compile.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/compile.log"; exit 1; }
+          python -m esphome "${options[@]}" compile "$config" > "$RUNNER_TEMP/compile.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/compile.log"; exit 1; }
           python tools/check_feasibility.py \
             --build-dir "$ESPHOME_BUILD_PATH/$image" \
             --log "$RUNNER_TEMP/compile.log" \

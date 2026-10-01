@@ -14,6 +14,25 @@ import yaml
 from audio_image import ROOT, validate_partitions
 
 
+def inspect_build_profile(build_dir, app):
+    from release_artifacts import reject_test_material
+    defines = (build_dir / "src/esphome/core/defines.h").read_text()
+    qualification = "#define OPENATHAN_UPGRADE_QUALIFICATION\n" in defines
+    isolated = "#define OPENATHAN_PROVISIONING_TEST_STORAGE\n" in defines
+    component = build_dir / "src/esphome/components/openathan_upgrade_qualification"
+    compiled = "/openathan_upgrade_qualification/qualification.cpp" in (build_dir / "build/compile_commands.json").read_text()
+    if qualification:
+        if not isolated:
+            raise ValueError("Qualification capacity checks require isolated storage")
+        if not component.is_dir() or not compiled:
+            raise ValueError("Qualification build must compile its separate component")
+    elif (component.exists() or compiled or
+          re.search(r"^#define (?:OPENATHAN_UPGRADE_QUALIFICATION|OPENATHAN_QUALIFICATION_\w+|USE_OPENATHAN_UPGRADE_QUALIFICATION)\b", defines, re.M)):
+        raise ValueError("Production/ordinary builds must exclude the qualification component and definitions")
+    reject_test_material(app, allow_qualification=qualification, allow_isolated=isolated)
+    return qualification, isolated
+
+
 def inspect_firmware(build_dir, log, root=ROOT):
     partitions = root / "firmware/esphome/feasibility/partitions.csv"
     validate_partitions(partitions)
@@ -56,7 +75,8 @@ def inspect_firmware(build_dir, log, root=ROOT):
     if factory[0x10000:0x10000 + len(app)] != app:
         raise ValueError("Factory and OTA application payloads differ")
     from release_artifacts import validate_firmware_images
-    validate_firmware_images(factory, app)
+    qualification, isolated = inspect_build_profile(build_dir, app)
+    validate_firmware_images(factory, app, allow_qualification=qualification, allow_isolated=isolated)
     log_text = log.read_text().replace("\r", "\n")
     ram = re.search(r"RAM:.*used (\d+) bytes from (\d+) bytes", log_text)
     flash = re.search(r"Flash:.*used (\d+) bytes from (\d+) bytes", log_text)

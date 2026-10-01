@@ -1,4 +1,5 @@
 #pragma once
+#include "esphome/core/defines.h"
 #include "upgrade_api.h"
 #include "upgrade_policy.h"
 #include <atomic>
@@ -6,6 +7,9 @@
 #include <nvs.h>
 #include <esp_partition.h>
 #include "esphome/components/openathan/openathan.h"
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+#include "esphome/components/openathan_upgrade_qualification/qualification.h"
+#endif
 
 namespace esphome::openathan_device {
 struct UpgradeRelease {
@@ -37,5 +41,9 @@ class Upgrade : public UpgradeApi {
   std::atomic<uint32_t> received_{0};
   uint64_t boot_ms_{}, next_check_ms_{}, retry_ms_{};
   int64_t last_check_{};
+#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+  friend class openathan_upgrade_qualification::Qualification;
+  openathan_upgrade_qualification::Qualification qualification_;
+#endif
 };
 }  // namespace esphome::openathan_device

@@ -5,14 +5,16 @@
 using esp_err_t=int;
 constexpr int HTTP_EVENT_ON_HEADER=1;
 struct esp_http_client_event_t{int event_id;char *header_key,*header_value;void *user_data;};
-struct esp_http_client_config_t{const char *url;int(*crt_bundle_attach)(void *);int timeout_ms;bool disable_auto_redirect;int buffer_size,buffer_size_tx;int(*event_handler)(esp_http_client_event_t *);void *user_data;};
+struct esp_http_client_config_t{const char *url;const char *cert_pem;int(*crt_bundle_attach)(void *);int timeout_ms;bool disable_auto_redirect;int buffer_size,buffer_size_tx;int(*event_handler)(esp_http_client_event_t *);void *user_data;};
 struct Http{std::string data;size_t offset{};};
 using esp_http_client_handle_t=Http *;
 inline std::string descriptor_response,application_response;
 inline bool transfer_fail=false;
 inline void (*on_read)()=nullptr;
 inline void (*on_open)()=nullptr;
-inline Http *esp_http_client_init(const esp_http_client_config_t *c){return new Http{std::string(c->url).ends_with("upgrade.json")?descriptor_response:application_response};}
+inline std::string last_url,last_ca;
+inline bool last_bundle{};
+inline Http *esp_http_client_init(const esp_http_client_config_t *c){last_url=c->url;last_ca=c->cert_pem?c->cert_pem:"";last_bundle=c->crt_bundle_attach!=nullptr;return new Http{std::string(c->url).ends_with("upgrade.json")?descriptor_response:application_response};}
 inline int esp_http_client_cleanup(Http *h){delete h;return 0;}
 inline int esp_http_client_open(Http *,int){if(on_open){auto callback=on_open;on_open=nullptr;callback();}return 0;}
 inline int esp_http_client_fetch_headers(Http *h){return h->data.size();}

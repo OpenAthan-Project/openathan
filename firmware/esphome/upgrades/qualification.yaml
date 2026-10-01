@@ -1,0 +1,20 @@
+# Maintainer-only firmware. Trust paths refer to private, off-repository files.
+substitutions:
+  qualification_version: v0.0.1
+  qualification_startup_failure: "false"
+packages:
+  isolated: !include ../provisioning/validation.yaml
+esphome:
+  project:
+    version: ${qualification_version}
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_upgrade_qualification]
+openathan_upgrade_qualification:
+  origin: !secret qualification_origin
+  ca_file: !secret qualification_ca_file
+  public_key_file: !secret qualification_public_key_file
+  version: ${qualification_version}
+  startup_failure: ${qualification_startup_failure}

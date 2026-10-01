@@ -39,6 +39,8 @@ def firmware():
 
 
 def compiled(directory, pins, partitions):
+    (directory / "src/esphome/core").mkdir(parents=True)
+    (directory / "src/esphome/core/defines.h").write_text("")
     import yaml
     factory, app = firmware()
     (directory / "build").mkdir(parents=True)

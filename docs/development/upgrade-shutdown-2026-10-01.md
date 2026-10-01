@@ -49,9 +49,18 @@ source-proven hazard consistent with the reset, rather than a confirmed physical
 callsite. Fresh paired scoped reads preserved protected production records,
 complete shared audio, the bootloader and the retained VALID v2 application.
 
-The device is stopped for diagnosis. The corrected programmatic handoff under
-HTTP polling, rollback retest and 60-minute audio/network soak remain pending.
-No release readiness is implied. Use the
-[attended qualification runbook](https://github.com/OpenAthan-Project/openathan/blob/codex/upgrade-qualification/firmware/esphome/upgrades/VALIDATION.md)
-after integrating the fix into the isolated qualification build; the runbook is
-provided by the qualification branch until that change is merged.
+The corrected isolated integration
+`6eb5572db7035ea59e767cc3a19e847eb5d9a12d` subsequently passed v2/v4
+PENDING-to-VALID software handoffs under HTTP polling and automatic failed-v3
+rollback, with reset reason 3 and preserved settings/history. Both retained
+recordings received attended listening acceptance during a 3,601.579-second run
+with 720 status samples and 48 completed firmware checks. The original observer's
+extra-third-play assertion was reconciled separately; its original stopped result
+remains preserved. Fresh paired USB reads confirmed protected production records,
+full shared audio, the reviewed bootloader and exact VALID v4 / retained v2.
+
+See the [source-bound qualification results and runtime measurements](upgrade-qualification-2026-10-01.md#corrected-shutdown-handoffs-and-retained-recording-soak).
+The earlier ten interrupted attempts and physical cuts remain evidence for their
+original source. Production restoration, long-duration/network coverage and
+public-release acceptance remain deferred. No blanket release readiness is
+implied.
