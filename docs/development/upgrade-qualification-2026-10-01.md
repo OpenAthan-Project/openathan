@@ -199,8 +199,8 @@ write had followed the reset.
 [PR #13](https://github.com/OpenAthan-Project/openathan/pull/13) owns a separate
 product fix for a source-proven blocking HTTP shutdown wait consistent with this
 reset. The physical timeout backtrace was not captured. Qualification depends
-on that fix as well as PR #12; neither product PR is merged. At that checkpoint,
-new exact-head CI, source-bound builds and corrected physical handoffs were
+on that fix as well as PR #12; neither product PR was merged at that checkpoint.
+New exact-head CI, source-bound builds and corrected physical handoffs were
 required before continuing, and the audio/network soak had not started. The
 corrected evidence below supersedes those pending tests. Production restoration
 and a real production Athan remain deferred.
@@ -307,3 +307,29 @@ final preservation have passed with the limits above. Public GitHub delivery and
 redirects, broader network/browser coverage and overnight operation remain
 untested. Release-media rights and public release selection remain separate
 release gates.
+
+## Production restoration guard review follow-up
+
+The production fixes in PRs #12 and #13 have merged; qualification is now based
+on `main` at `17871919dbcb5ac787fb68efafc67302771f21a6`.
+
+The restoration planner previously checked only the qualification identity.
+Ordinary isolated firmware embeds the production version without that identity,
+so it could be selected for production restoration. Planning and apply-time
+revalidation now use the shared release-packaging test-material filter, rejecting
+all qualification and isolated-storage markers. Correctly hashed plans from an
+older helper are also rejected before scoped flash reads, writes or write-journal
+creation. The explicit healthy qualification bootloader transition is unchanged.
+
+The regression fails before the fix and passes afterward for each independent
+test marker. All 84 Python tests passed without skips, all eleven UBSan CTest
+suites passed, and all six updater profiles plus negative compile cases passed.
+Host-only checks against retained compiled production, ordinary isolated and
+qualification images accepted production and rejected both test variants;
+production and ordinary isolated images both embed `v0.2.0`. These checks use a
+simulated stopped snapshot and mock flash I/O.
+
+This review fix changes host tooling, its regression and documentation. Firmware
+sources, configuration and embedded UI are unchanged. Earlier build sizes and
+physical results remain bound to their recorded source revisions. The speaker
+was not accessed or restored during this follow-up.
