@@ -5,6 +5,8 @@ application-only updates from its authenticated device page. Prayer calculation,
 scheduling and recordings continue to work independently of the release service.
 This implementation requires physical qualification before release. See the
 [dated build report](upgrade-validation-2026-09-30.md).
+The [maintainer qualification runbook](../../firmware/esphome/upgrades/VALIDATION.md)
+uses isolated records and a private HTTPS feed to exercise interruption and rollback.
 
 ## Owner flow
 
@@ -126,6 +128,9 @@ Do not use the fresh installer, erase NVS, rewrite audio, restore historical pra
 history, or promise startup rollback with the old bootloader.
 Isolated diagnostic firmware cannot install production releases and does not
 automatically contact the release service.
+The separate upgrade qualification configuration replaces production trust with
+a private test CA/key and permits only its fixed LAN origin. It cannot be packaged
+as a public release.
 
 Use the existing [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
 for fresh preflight and scoped preservation evidence. Qualification must test

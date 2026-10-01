@@ -56,9 +56,19 @@ static RAM and the smaller frame do not establish runtime headroom.
 
 ## Physical limitations
 
-The captured overflow establishes the original failure. The fixed worker still
-requires descriptor/TLS diagnostics with serial capture and runtime memory
-measurements before the interrupted installation matrix resumes. Healthy OTA,
-pending interruption, forced rollback, ten interrupted attempts and the bounded
-audio/network soak are separate pending physical results. Public GitHub delivery
-and release readiness are not established by the private qualification origin.
+The captured overflow establishes the original failure. Fixed isolated source
+`98470e448059d391c5c4ef9d86a8de8634be9a4e` passed six descriptor/TLS checks,
+ten interrupted attempts, physical pre/post-selection cuts, v2 confirmation and
+both pending/startup rollback cases. A later handoff watchdog stopped that run.
+
+Corrected integration
+`6eb5572db7035ea59e767cc3a19e847eb5d9a12d`, including the separate nonblocking
+shutdown fix, passed corrected v2/v4 software handoffs, automatic failed-v3
+rollback, both retained recordings and the reconciled bounded 60-minute soak.
+Minimum observed unused worker stack was 3,964 bytes during the final soak. Fresh
+paired readback preserved protected production records, complete shared audio and
+reviewed bootloader. See the
+[dated qualification evidence and runtime measurements](upgrade-qualification-2026-10-01.md#corrected-shutdown-handoffs-and-retained-recording-soak),
+including the extra-play observer correction and the paused-download limitation.
+Production restoration, public GitHub delivery, broader/overnight coverage and
+release readiness remain separate gates.

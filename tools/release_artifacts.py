@@ -76,7 +76,19 @@ def esp_image(data, exact=False):
         raise ValueError("Truncated ESP image") from error
 
 
-def validate_firmware_images(factory, app=None):
+QUALIFICATION_MARKERS = (b"OPENATHAN_QUALIFICATION_V1", b"before_boot_selection\0",
+                         b"after_boot_selection\0", b"Qualification baseline", b"worker_stack_min_free\0")
+ISOLATED_STORAGE_MARKERS = (b"oa_test\0", b"oa_setup_test\0", b"oa_network_test\0", b"oa_upgrade_test\0")
+
+
+def reject_test_material(app, *, allow_qualification=False, allow_isolated=False):
+    require(allow_qualification or not any(marker in app for marker in QUALIFICATION_MARKERS),
+            "Qualification firmware cannot enter production release bundles")
+    require(allow_isolated or not any(marker in app for marker in ISOLATED_STORAGE_MARKERS),
+            "Isolated test firmware cannot enter production release bundles")
+
+
+def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False):
     require(0x10020 <= len(factory) < PARTITION_OFFSET, "Invalid factory image size")
     esp_image(factory[:0x8000])
     table = factory[0x8000:0x9000]
@@ -92,6 +104,7 @@ def validate_firmware_images(factory, app=None):
     app_length = esp_image(factory[0x10000:])
     require(app_length <= 0x180000, "Application exceeds the 1.5 MiB growth-budget target")
     actual = factory[0x10000:0x10000 + app_length]
+    reject_test_material(actual, allow_qualification=allow_qualification, allow_isolated=allow_isolated)
     if app is not None:
         require(actual == app, "Factory and OTA application payloads differ")
         esp_image(app, exact=True)

@@ -15,6 +15,7 @@ using namespace esphome::openathan_device;
 int64_t now_us{};
 int64_t esp_timer_get_time(){return now_us;}
 std::string saved_record, staged_record;
+unsigned nvs_commits{};
 bool commit_ok=true;
 bool cut_after_commit=false;
 struct PowerCut {};
@@ -25,7 +26,7 @@ int nvs_get_blob(nvs_handle_t,const char *,void *out,size_t *size){
   *size=saved_record.size();return 0;
 }
 int nvs_set_blob(nvs_handle_t,const char *,const void *data,size_t size){staged_record.assign(static_cast<const char *>(data),size);return 0;}
-int nvs_commit(nvs_handle_t){if(!commit_ok)return -1;saved_record=staged_record;if(cut_after_commit)throw PowerCut{};return 0;}
+int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok)return -1;saved_record=staged_record;if(cut_after_commit)throw PowerCut{};return 0;}
 void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
@@ -52,6 +53,12 @@ void expect_result(Upgrade &update,const char *result) {
   JsonDocument doc;update.snapshot(doc.to<JsonObject>());assert(doc["result"].as<std::string>()==result);
 }
 int main(){
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    JsonDocument doc;u.snapshot(doc.to<JsonObject>());assert(doc["qualification"].isUnbound());
+    assert(action(u,"qualification")==400&&erases==0&&writes==0&&boot_selections==0);}
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;a.health=false;
+    begin(u,a);assert(action(u,"check")==503&&task_attempts==0);
+    assert(erases==0&&writes==0&&boot_selections==0&&saved_record.empty());}
   if(std::string(OPENATHAN_FIRMWARE_VERSION)=="v0.3.0") {
     reset();JsonDocument doc;doc["schema"]=1;doc["queue"]=descriptor_response;doc["expected"]="v0.3.0";
     serializeJson(doc,saved_record);running_state=ESP_OTA_IMG_PENDING_VERIFY;
@@ -188,4 +195,5 @@ int main(){
   }
   assert(live_read_buffers==0);
   std::cout<<"Production updater interruption, persistence and rollback checks passed\n";
+  return 0;
 }

@@ -44,6 +44,8 @@ class CapacityChecksTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.build = self.root / "firmware"
         (self.build / "build").mkdir(parents=True)
+        (self.build / "src/esphome/core").mkdir(parents=True)
+        (self.build / "src/esphome/core/defines.h").write_text("")
         self.pins = json.loads((ROOT / "firmware/esphome/feasibility/dependencies.json").read_text())
         self.lock = {name: {**entry, "source": {"type": "service"}}
                      for name, entry in self.pins["managed_components"].items()}

@@ -4,11 +4,14 @@
 repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation
 for the six developer configurations, the provisioning reference configuration,
-and the isolated provisioning-validation configuration.
+the isolated provisioning-validation configuration, and the isolated upgrade
+qualification configuration.
 Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
 `openathan.yaml` and `provisioning/validation.yaml`, then enforce dependency pins, partition layout,
-the 1.5 MiB application budget and factory/OTA payload consistency. The device
-build also tests the production settings JSON bridge with the exact resolved
+the 1.5 MiB application budget and factory/OTA payload consistency. Two additional
+jobs build healthy upgrade qualification and forced startup-failure variants.
+Their generated test CA and signing key are ephemeral and never enter releases.
+The device build also tests the production settings JSON bridge with the exact resolved
 ArduinoJson library. The host suite exercises interrupted settings writes and
 the bridge against pinned ESPHome timezone conversion code. Additional host tests
 cover the production local API, USB protocol, activation/credential storage, Digest
@@ -24,6 +27,16 @@ Production and isolated host builds exercise the same storage implementations.
 Tests prove cleanup rejects production namespaces, preserves unrelated records,
 and remains safe across interrupted writes/commits. Both settings/API builds
 verify `test_mode`; browser tests verify the isolated build's warning banner.
+Updater host tests cover production behavior, ordinary isolated installation
+denial, both qualification holds, erased/corrupt baseline metadata and forced
+startup rollback. Python tests cover real local TLS, feed faults, release
+exclusion and stale-state/write-failure guards for scoped USB transitions.
+
+Qualification C++ is a separate component compiled only into the two maintainer
+variants. Host checks reject its inclusion in production or incomplete test
+profiles. Capacity checks require generated definitions and verify component
+exclusion in production/ordinary isolated builds; release tests reject both
+qualification instrumentation and isolated storage markers in publishable images.
 
 CI uses Python 3.13 on Ubuntu 24.04 and the pinned ESPHome requirements. The
 macOS-specific constraints file must not be installed on Linux. Builds use
@@ -59,6 +72,17 @@ Use unused temporary paths. Fixture preparation refuses existing secret files
 or symlinks, and refuses audio output inside the repository. Never install these
 placeholder builds or attempt to play the synthetic payloads. Repeat compilation
 with `scheduler/validation.yaml` and a separate build/log path for the test harness.
+For upgrade qualification, compile `upgrades/qualification.yaml` in its own build
+directory; the image name is `openathan-test`. To build the startup-failure variant:
+
+```sh
+ESPHOME_BUILD_PATH=/tmp/openathan-ci-upgrade-failure python -m esphome \
+  -s qualification_version v0.0.3 -s qualification_startup_failure true \
+  compile firmware/esphome/upgrades/qualification.yaml
+```
+
+Use the [upgrade runbook](../../firmware/esphome/upgrades/VALIDATION.md) for actual
+recordings, private trust setup, source-bound artifacts and attended hardware work.
 
 CI establishes source/build behavior, not audible playback or hardware recovery.
 See the [dated device results](../../docs/development/feasibility-report.md).

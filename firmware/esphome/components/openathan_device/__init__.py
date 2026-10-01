@@ -57,11 +57,16 @@ def timezone_entries():
 async def to_code(config):
     root = Path(__file__).resolve().parents[4]
     release = json.loads((root / "release/firmware.json").read_text())
-    if CORE.config["esphome"].get("project", {}).get("version") != release["version"]:
+    version = release["version"]
+    public_key = (root / "release/upgrade-public-key.pem").read_text()
+    if qualification := CORE.config.get("openathan_upgrade_qualification"):
+        from esphome.components.openathan_upgrade_qualification import firmware_identity
+        version, public_key = firmware_identity(qualification)
+    if CORE.config["esphome"].get("project", {}).get("version") != version:
         raise cv.Invalid("Official project version must match release/firmware.json")
-    cg.add_define("OPENATHAN_FIRMWARE_VERSION", release["version"])
+    cg.add_define("OPENATHAN_FIRMWARE_VERSION", version)
     cg.add_define("OPENATHAN_BUILD_COMMIT", os.environ.get("OPENATHAN_BUILD_COMMIT", "development"))
-    cg.add_define("OPENATHAN_UPGRADE_PUBLIC_KEY", (root / "release/upgrade-public-key.pem").read_text())
+    cg.add_define("OPENATHAN_UPGRADE_PUBLIC_KEY", public_key)
     bootloaders = json.loads((root / "release/rollback-bootloaders.json").read_text())
     if bootloaders["regionBytes"] != 32768 or not 1 <= len(bootloaders["sha256"]) <= 8 or any(
             not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in bootloaders["sha256"]):
@@ -70,7 +75,7 @@ async def to_code(config):
     # Own confirmation after required OpenAthan services have initialized.
     cg.add_define("USE_OTA_ROLLBACK")
     esp32.add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER_FROM_CONFIG", True)
-    esp32.add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER", release["version"])
+    esp32.add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER", version)
     esp32.add_idf_sdkconfig_option("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE", True)
     esp32.add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE", True)
     esp32.add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL", True)

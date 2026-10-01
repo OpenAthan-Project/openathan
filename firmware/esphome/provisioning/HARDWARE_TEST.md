@@ -5,8 +5,11 @@ first-run and USB recovery sessions are recorded in the
 [validation report](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
 This runbook is
 for the existing AtomS3R C126 + Voice Pyramid A167. Execute hardware steps only in
-a separately coordinated session. The reference and test images have no product
-OTA endpoint: this procedure uses a verified, application-only USB update.
+a separately coordinated session. This procedure uses a verified, application-only
+USB update. The reference now includes the authenticated firmware upgrade API;
+ordinary provisioning test firmware cannot install production releases. Use the
+[upgrade qualification runbook](../upgrades/VALIDATION.md) for the separate
+rollback-bootloader transition and attended Wi-Fi upgrade checks.
 The public website, publishing, media licensing and release qualification are
 outside this procedure.
 
