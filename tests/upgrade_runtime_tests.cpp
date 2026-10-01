@@ -3,6 +3,7 @@
 #include "upgrade.h"
 #include "esphome/core/application.h"
 #include <esp_http_client.h>
+#include <esp_heap_caps.h>
 #include <esp_ota_ops.h>
 #include <esp_flash.h>
 #include <freertos/task.h>
@@ -29,7 +30,7 @@ void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
 int action(Upgrade &update,const char *name,const char *version=nullptr){JsonDocument doc;auto root=doc.to<JsonObject>();if(version)root["version"]=version;std::string error;return update.action(name,root,error);}
-void reset(){now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
+void reset(){assert(live_read_buffers==0);read_buffer_allocation_fails=false;read_buffer_allocation_attempts=0;now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
   application_response=std::string(512,'a');uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
   std::string hash;for(auto b:bytes){hash+="0123456789abcdef"[b>>4];hash+="0123456789abcdef"[b&15];}
   JsonDocument payload;payload["schema"]=1;payload["version"]="v0.3.0";payload["commit"]=std::string(40,'a');payload["hardware"]="atoms3r-c126-pyramid-a167";payload["layout"]="dual-2m-audio-3_5m-v1";payload["storageFormat"]=1;payload["audioFormat"]=1;payload["rollback"]=true;payload["bytes"]=512;payload["sha256"]=hash;
@@ -82,6 +83,25 @@ int main(){
     Upgrade failed_clear;begin(failed_clear,a);assert(state(failed_clear)=="storage_fault");expect_record(descriptor_response,"");
     commit_ok=true;now_us=0;Upgrade retry_clear;begin(retry_clear,a);expect_record("","");assert(action(retry_clear,"cancel")==200);
     std::cout<<"Fulfilled/superseded requests reconcile after preserving USB updates\n";return 0;
+  }
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    read_buffer_allocation_fails=true;assert(action(u,"check")==200);run_worker();
+    assert(state(u)=="failed" && live_read_buffers==0 && erases==0 && writes==0 && boot_selections==0);
+    read_buffer_allocation_fails=false;offer(u);
+    assert(live_read_buffers==0 && last_read_buffer_bytes==1024);
+    assert(last_read_buffer_caps==(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+  }
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);
+    const auto request=saved_record;read_buffer_allocation_fails=true;u.loop(true);run_worker();
+    assert(state(u)=="queued" && saved_record==request && live_read_buffers==0);
+    assert(erases==0 && writes==0 && live_ota_handles==0 && boot_selections==0);
+    const auto attempts=read_buffer_allocation_attempts;
+    for(unsigned i=0;i<20;++i)u.loop(true);
+    now_us+=299999000;u.loop(true);assert(read_buffer_allocation_attempts==attempts && !pending_worker);
+    read_buffer_allocation_fails=false;now_us+=1000;u.loop(true);run_worker();
+    assert(flashed==application_response && live_read_buffers==0 && last_read_buffer_bytes==4096);
+    assert(last_read_buffer_caps==(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+    assert(saved_record==request && boot_selections==0);
   }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);assert(action(u,"install","v0.3.0")==409);a.sample.next->utc=1800;u.loop(true);assert(!pending_worker);a.sample.next->utc=9000;u.loop(true);run_worker();assert(flashed==application_response);assert(boot_selections==0);u.loop(true);assert(boot_selections==1 && esphome::App.reboots==1);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);Upgrade restored;begin(restored,a);assert(state(restored)=="queued");assert(action(restored,"cancel")==200);assert(state(restored)=="idle");}
@@ -166,5 +186,6 @@ int main(){
     serializeJson(doc,saved_record);Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
     assert(state(u)=="storage_fault" && boot_selections==0);
   }
+  assert(live_read_buffers==0);
   std::cout<<"Production updater interruption, persistence and rollback checks passed\n";
 }

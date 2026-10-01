@@ -4,6 +4,7 @@
 #include "esphome/core/hal.h"
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
+#include <esp_heap_caps.h>
 #include <esp_ota_ops.h>
 #include <esp_flash.h>
 #include <esp_random.h>
@@ -14,6 +15,7 @@
 #include <freertos/task.h>
 #include <array>
 #include <ctime>
+#include <memory>
 
 namespace esphome::openathan_device {
 namespace {
@@ -240,17 +242,24 @@ void Upgrade::worker_(void *argument) {
   vTaskDelete(nullptr);
 }
 void Upgrade::run_() {
+  // TLS/signature verification shares this worker's 8 KiB stack. Keep both
+  // read buffers off that stack, including the descriptor-only path. Internal
+  // memory remains accessible while OTA writes disable the flash/PSRAM cache.
+  const size_t buffer_size = install_job_ ? 4096 : 1024;
+  std::unique_ptr<uint8_t, decltype(&heap_caps_free)> buffer(
+      static_cast<uint8_t *>(heap_caps_malloc(buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+      &heap_caps_free);
+  if (!buffer) { fail_("Not enough memory to check or download firmware; try again later"); return; }
   if (!install_job_) {
     Response response;
     if (!response.open(std::string(BASE) + "latest/download/upgrade.json")) { fail_("Could not check for updates; try again later"); return; }
     std::string envelope;
-    char buffer[1024];
     const auto deadline = milliseconds() + 30000;
     while (!cancel_ && milliseconds() < deadline) {
-      const int count = esp_http_client_read(response.client, buffer, sizeof(buffer));
+      const int count = esp_http_client_read(response.client, reinterpret_cast<char *>(buffer.get()), buffer_size);
       if (count < 0 || envelope.size() + count > 8192) { fail_("Invalid update response"); return; }
       if (count == 0) break;
-      envelope.append(buffer, count);
+      envelope.append(reinterpret_cast<char *>(buffer.get()), count);
     }
     if (cancel_) return;
     UpgradeRelease release;
@@ -285,17 +294,16 @@ void Upgrade::run_() {
   }
   mbedtls_sha256_context hash;
   mbedtls_sha256_init(&hash); mbedtls_sha256_starts(&hash, 0);
-  std::array<uint8_t, 4096> buffer{};
   uint32_t total = 0;
   bool ok = true;
   const auto deadline = milliseconds() + 180000;
   while (total < release.bytes && ok && !cancel_ && safe_ && milliseconds() < deadline) {
-    const int count = esp_http_client_read(response.client, reinterpret_cast<char *>(buffer.data()),
-        std::min<size_t>(buffer.size(), release.bytes - total));
-    if (count <= 0 || mbedtls_sha256_update(&hash, buffer.data(), count) != 0) { ok = false; break; }
+    const int count = esp_http_client_read(response.client, reinterpret_cast<char *>(buffer.get()),
+        std::min<size_t>(buffer_size, release.bytes - total));
+    if (count <= 0 || mbedtls_sha256_update(&hash, buffer.get(), count) != 0) { ok = false; break; }
     // Never use the safety sample from before a blocking read to authorize a
     // flash write. Cancellation also stops a successfully received chunk.
-    if (cancel_ || !safe_ || esp_ota_write(handle, buffer.data(), count) != ESP_OK) { ok = false; break; }
+    if (cancel_ || !safe_ || esp_ota_write(handle, buffer.get(), count) != ESP_OK) { ok = false; break; }
     total += count; received_ = total;
     vTaskDelay(1);
   }
