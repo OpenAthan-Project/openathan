@@ -13,15 +13,15 @@ import zlib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import upgrade_transition as transition
-from release_artifacts import digest, json_bytes
+from release_artifacts import digest, json_bytes, ISOLATED_STORAGE_MARKERS, QUALIFICATION_MARKERS
 from release_fixtures import esp_image
 
 
-def production_app():
+def production_app(extra=b""):
     payload = bytearray(256)
     struct.pack_into("<I", payload, 0, 0xabcd5432)
     payload[16:22] = b"v0.2.0"
-    return esp_image(bytes(payload))
+    return esp_image(bytes(payload) + extra)
 
 
 def metadata(sequence=1, state=2):
@@ -129,6 +129,28 @@ class TransitionTests(unittest.TestCase):
                 with self.assertRaises(ValueError): transition.apply(device, plan, root, plan["mac"])
             self.assertEqual(device.writes, 0)
             self.assertFalse((snapshot / "apply-started.json").exists())
+
+    def test_production_restoration_rejects_test_images_before_flash_io(self):
+        root, snapshot, application, images, report = self.fixture()
+        device = MagicMock()
+        with patch.object(transition, "ROOT", root):
+            production_plan = transition.make_plan(snapshot, application)
+            self.assertEqual(production_plan["offset"], 0x10000)
+            for marker in ISOLATED_STORAGE_MARKERS + QUALIFICATION_MARKERS:
+                with self.subTest(marker=marker):
+                    app = production_app(marker)
+                    application.write_bytes(app)
+                    with self.assertRaises(ValueError):
+                        transition.make_plan(snapshot, application)
+                    # A correctly hashed plan from an older helper must also be
+                    # refused before scoped flash reads, writes or the write journal.
+                    legacy_plan = {**production_plan, "application_sha256": digest(app),
+                                   "application_bytes": len(app)}
+                    with self.assertRaises(ValueError):
+                        transition.apply(device, legacy_plan, root, report["mac"])
+                    device.read.assert_not_called()
+                    device.write_verified.assert_not_called()
+                    self.assertFalse((snapshot / "apply-started.json").exists())
 
     def test_write_failure_is_journaled_and_not_retried(self):
         root, snapshot, application, images, report = self.fixture()

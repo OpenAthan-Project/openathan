@@ -216,6 +216,12 @@ python tools/upgrade_transition.py apply --plan "$RESTORATION_PLAN" \
   --port "$DEVICE_PORT" --expect-mac "$DEVICE_MAC" --idf "$IDF_PATH"
 ```
 
+Production restoration rejects both qualification and ordinary isolated test
+images, even when their embedded version matches production. The planner and
+apply-time revalidation use the same test-material filter as release packaging;
+an older plan cannot bypass it before scoped flash reads, writes or a write
+journal starts.
+
 The restoration writes only the freshly selected application slot and retains
 the reviewed rollback bootloader. Verify production hostname/version/source,
 `test_mode: false`, normal settings revision and light preferences, valid clock,

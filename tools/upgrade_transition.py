@@ -16,7 +16,7 @@ import sys
 import zlib
 
 from audio_image import ROOT
-from release_artifacts import digest, esp_image, json_bytes, read_file, read_json, require
+from release_artifacts import digest, esp_image, json_bytes, read_file, read_json, reject_test_material, require
 from upgrade_qualification import MARKER, private_directory, write_private
 from upgrade_artifacts import image_version
 
@@ -191,7 +191,7 @@ def make_plan(snapshot, application, bootloader=None):
         require(len(boot) == 0x8000 and digest(boot) in allowlist["sha256"], "Bootloader is not in the reviewed allowlist")
         esp_image(boot)
     else:
-        require(MARKER not in app, "Production restoration requires a production application")
+        reject_test_material(app)
         require(image_version(app) == read_json((ROOT / "release/firmware.json").read_bytes())["version"],
                 "Production restoration requires the current committed firmware version")
         require(report["regions"]["bootloader"] in read_json((ROOT / "release/rollback-bootloaders.json").read_bytes())["sha256"],
