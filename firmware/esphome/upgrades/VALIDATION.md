@@ -119,6 +119,9 @@ It writes the selected application first, then the reviewed 32 KiB bootloader;
 it verifies both by independent readback. Partition table, NVS, OTA selection,
 inactive application and shared audio must remain byte-identical during this
 transition. It never uses erase-all or automatically retries an uncertain write.
+The connected esptool stub is limited to one flash attempt, so a USB disconnect
+propagates without an internal reconnect or reflash. The write journal remains
+present after a failed attempt and blocks another apply using that snapshot.
 If anything fails, keep the device stopped, inspect the journal and reconcile
 the actual state before planning another operation.
 

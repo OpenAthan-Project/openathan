@@ -333,3 +333,24 @@ This review fix changes host tooling, its regression and documentation. Firmware
 sources, configuration and embedded UI are unchanged. Earlier build sizes and
 physical results remain bound to their recorded source revisions. The speaker
 was not accessed or restored during this follow-up.
+
+## USB write retry review follow-up
+
+The scoped write journal prevented a second helper invocation but did not prevent
+esptool's internal retry. In esptool 5.3.1, an interrupted write could reconnect
+and reflash without repeating the helper's identity, security or snapshot guards.
+The connected stub now uses one flash attempt; esptool's global default is
+unchanged. A failed write leaves its journal in place for reconciliation.
+
+Regressions exercise the real esptool write and verification paths with mocked
+USB transport. Disconnects during initialization and data transfer, at both
+application and bootloader addresses, fail before the fix and pass afterward:
+one write attempt, no reconnect/reflash and no subsequent verification. A failed
+apply retains its journal and blocks another invocation. Successful writes retain
+both hash verification steps and independent readback; failures at each
+verification stage never trigger another write.
+
+All 88 Python tests passed without skips, including twelve scoped USB tests;
+all eleven UBSan CTest suites also passed. This is host-only validation. No
+speaker access or production restoration occurred; firmware sources and
+configuration are unchanged, and previous physical evidence remains source-bound.
