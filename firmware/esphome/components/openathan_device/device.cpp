@@ -103,13 +103,6 @@ void Device::setup() {
   upgrade_.begin(athan_, server_ != nullptr && wifi_record_ != ::openathan::LoadResult::ERROR &&
       password_record_ != ::openathan::LoadResult::ERROR);
 }
-void Device::on_shutdown() {
-  upgrade_.shutdown();
-  if (server_) {
-    httpd_stop(server_);
-    server_ = nullptr;
-  }
-}
 void Device::restore_wifi_() {
   auto* wifi = wifi::global_wifi_component;
   wifi->disable();
