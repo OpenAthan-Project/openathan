@@ -1,5 +1,6 @@
 #pragma once
 #include "../openathan/openathan.h"
+#include "upgrade_api.h"
 
 namespace esphome::openathan_device {
 struct ZoneEntry {
@@ -22,6 +23,7 @@ class LocalApi {
     wifi_connected_ = connected;
   }
   void handle(ApiExchange& request);
+  void set_upgrade(UpgradeApi *upgrade) { upgrade_ = upgrade; }
 
  private:
   void lights_(JsonObject root);
@@ -33,5 +35,6 @@ class LocalApi {
   size_t zone_count_;
   std::string hostname_;
   bool wifi_connected_{};
+  UpgradeApi *upgrade_{};
 };
 }  // namespace esphome::openathan_device

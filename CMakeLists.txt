@@ -3,6 +3,9 @@ project(openathan_tests LANGUAGES CXX)
 enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(upgrade_policy_tests tests/upgrade_policy_tests.cpp)
+target_include_directories(upgrade_policy_tests PRIVATE firmware/esphome/components/openathan_device lib/openathan-core/include)
+add_test(NAME upgrade_safe_window COMMAND upgrade_policy_tests)
 file(GLOB ADHAN_SOURCES CONFIGURE_DEPENDS third_party/adhan-cpp/src/*.cpp)
 add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp

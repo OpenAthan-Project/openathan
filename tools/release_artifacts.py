@@ -154,15 +154,22 @@ def checksums(files):
 
 def validate_bundle(directory):
     require(directory.is_dir() and not directory.is_symlink(), "Bundle must be a regular directory")
-    require({p.name for p in directory.iterdir()} == set(ASSETS), "Bundle must contain exactly the five release assets")
+    from upgrade_artifacts import UPGRADE_ASSETS
+    names = {p.name for p in directory.iterdir()}
+    require(names in (set(ASSETS), set(ASSETS) | set(UPGRADE_ASSETS)), "Bundle contains unexpected release assets")
     limits = (16384, PARTITION_OFFSET - 1, PARTITION_SIZE, 1024, 65536)
     files = {name: read_file(directory / name, limit) for name, limit in zip(ASSETS, limits)}
+    if set(UPGRADE_ASSETS) <= names:
+        files.update({"firmware.ota.bin": read_file(directory / "firmware.ota.bin", 1572864),
+                      "upgrade.json": read_file(directory / "upgrade.json", 8192)})
     manifest = read_json(files["manifest.json"])
     require(isinstance(manifest, dict), "Invalid release manifest")
     expected = make_manifest(manifest.get("commit"), manifest.get("tag"), files[ASSETS[1]], files[ASSETS[2]])
     require(json_bytes(manifest) == json_bytes(expected),
             "Release manifest does not match the supported contract and files")
     app = validate_firmware_images(files[ASSETS[1]])
+    if "firmware.ota.bin" in files:
+        require(files["firmware.ota.bin"] == app, "Upgrade application differs from factory image")
     payloads = audio_payloads(files[ASSETS[2]])
     require(all(payload[:4096] not in app for payload in payloads), "Recording data found in application")
     require(files["SHA256SUMS"] == checksums(files), "Bundle checksums differ")

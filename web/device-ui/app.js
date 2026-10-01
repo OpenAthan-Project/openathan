@@ -120,6 +120,7 @@ function render(state) {
   $("test-banner").hidden=state.test_mode!==true;
   snapshot=state;
   renderLights(state.lights);
+  renderFirmware(state.firmware);
   $("setup-state").textContent=state.setup==="active"?"Setup complete":state.setup==="incomplete"?"Setup incomplete":"Storage fault";
   $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${state.next.local}`:"No upcoming announcement available";
   const status=[];
@@ -270,4 +271,62 @@ async function start() {
   await refreshWithTimezones();
   setInterval(()=>{if(!document.hidden)refreshWithTimezones();},5000);
 }
+let firmwareBusy=false, firmwareUncertain=false, firmwareGeneration=0, firmwareState;
+let firmwareExpected="";
+try {firmwareExpected=sessionStorage.getItem("firmware-expected") || "";}catch {}
+function rememberFirmware(version="") {
+  firmwareExpected=version;
+  // This is only a reconnect hint. Device status remains authoritative when
+  // browser privacy policy or a storage quota prevents saving it.
+  try {
+    if(version)sessionStorage.setItem("firmware-expected",version);
+    else sessionStorage.removeItem("firmware-expected");
+  }catch {}
+}
+const firmwareMessages={idle:"No update has been requested.",checking:"Checking for a stable release…",current:"Your firmware is up to date.",available:"A firmware update is available.",queued:"Update queued. Waiting for a safe time between prayers.",downloading:"Downloading the update…",verifying:"Verifying the downloaded firmware…",restarting:"Restarting with the new firmware. Keep the speaker powered.",success:"Firmware updated successfully.",rolled_back:"The update could not start successfully. The previous firmware has been restored.",failed:"The update could not complete. Check again to retry.",storage_fault:"Update storage is unavailable. Restart the device; saved data has been retained."};
+function renderFirmware(state,confirmed=false) {
+  if(confirmed)firmwareUncertain=false;
+  firmwareState=state;$("firmware-section").hidden=!state;
+  if(!state)return;
+  if(firmwareExpected && state.version===firmwareExpected && state.result==="success") {
+    rememberFirmware();
+  } else if(["rolled_back","superseded"].includes(state.result)) {
+    rememberFirmware();
+  }
+  $("firmware-version").textContent=`Installed: ${state.version}${state.queued_version?` · Queued: ${state.queued_version}`:state.available?` · Available: ${state.available.version}`:""}`;
+  const progress=state.state==="downloading" && state.total?` ${Math.floor(100*state.received/state.total)}%`:"";
+  $("firmware-status").textContent=(state.supported===false?"This speaker needs a maintainer USB update before Wi-Fi installation. ":"")+(firmwareMessages[state.state] || "Reading update status…")+progress+(state.error?` ${state.error}`:"");
+  if(firmwareUncertain)$("firmware-status").textContent="The response was lost. Waiting to read update status before allowing another action. Keep the speaker powered.";
+  $("firmware-last-check").textContent=state.last_check?`Last checked: ${new Date(state.last_check*1000).toLocaleString()}`:"No successful update check yet.";
+  const working=["checking","queued","downloading","verifying","restarting"].includes(state.state);
+  $("firmware-check").disabled=firmwareBusy || firmwareUncertain || working || state.state==="storage_fault";
+  $("firmware-install").hidden=!state.available || working;
+  $("firmware-install").disabled=firmwareBusy || firmwareUncertain || state.state==="storage_fault" || state.supported===false;
+  $("firmware-cancel").hidden=!["queued","downloading","verifying"].includes(state.state);
+  $("firmware-cancel").disabled=firmwareBusy || firmwareUncertain;
+  $("firmware-notes").hidden=!state.available;
+  if(state.available)$("firmware-notes").href=`https://github.com/OpenAthan-Project/openathan/releases/tag/${encodeURIComponent(state.available.version)}`;
+}
+async function firmwareAction(action) {
+  if(firmwareBusy || firmwareUncertain || !firmwareState)return;
+  ++generation;++firmwareGeneration;
+  firmwareBusy=true;renderFirmware(firmwareState);
+  const version=firmwareState.available?.version;
+  try {
+    if(action==="install")rememberFirmware(version);
+    renderFirmware(await request(`/api/firmware/${action}`,action==="install"?{version}:{}),true);
+    if(action==="cancel")rememberFirmware();
+  } catch(error) {
+    firmwareUncertain=!error.status;
+    $("firmware-status").textContent=`${error.message}. Reading update status before retrying.`;
+    try {renderFirmware(await request("/api/firmware"),true);}catch {$("firmware-status").textContent="The speaker is unavailable. Keep it powered; status will reconnect automatically.";}
+  } finally {firmwareBusy=false;if(firmwareState)renderFirmware(firmwareState);}
+}
+for(const action of ["check","install","cancel"])$("firmware-"+action).addEventListener("click",()=>firmwareAction(action));
+setInterval(async()=>{
+  if(firmwareBusy || !firmwareState)return;
+  const started=firmwareGeneration;
+  try {const state=await request("/api/firmware");if(started===firmwareGeneration && !firmwareBusy)renderFirmware(state,true);}
+  catch {if(firmwareExpected || ["downloading","verifying","restarting"].includes(firmwareState.state))$("firmware-status").textContent="Waiting for the speaker to reconnect. Keep it powered.";}
+},3000);
 start();

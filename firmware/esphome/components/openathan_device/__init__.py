@@ -1,10 +1,13 @@
 """Official-device networking and embedded UI; optional to the reusable core."""
 import gzip
 import json
+import os
+import re
 from pathlib import Path
 from importlib.resources import files
 
 from esphome import codegen as cg, config_validation as cv, final_validate as fv
+from esphome.core import CORE
 from esphome.components import esp32, openathan, time, wifi
 from esphome.const import CONF_ID
 from aioesphomeapi.posix_tz import parse_posix_tz
@@ -52,6 +55,26 @@ def timezone_entries():
 
 
 async def to_code(config):
+    root = Path(__file__).resolve().parents[4]
+    release = json.loads((root / "release/firmware.json").read_text())
+    if CORE.config["esphome"].get("project", {}).get("version") != release["version"]:
+        raise cv.Invalid("Official project version must match release/firmware.json")
+    cg.add_define("OPENATHAN_FIRMWARE_VERSION", release["version"])
+    cg.add_define("OPENATHAN_BUILD_COMMIT", os.environ.get("OPENATHAN_BUILD_COMMIT", "development"))
+    cg.add_define("OPENATHAN_UPGRADE_PUBLIC_KEY", (root / "release/upgrade-public-key.pem").read_text())
+    bootloaders = json.loads((root / "release/rollback-bootloaders.json").read_text())
+    if bootloaders["regionBytes"] != 32768 or not 1 <= len(bootloaders["sha256"]) <= 8 or any(
+            not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in bootloaders["sha256"]):
+        raise cv.Invalid("Unexpected rollback bootloader region")
+    cg.add_define("OPENATHAN_ROLLBACK_BOOTLOADERS", ",".join(bootloaders["sha256"]))
+    # Own confirmation after required OpenAthan services have initialized.
+    cg.add_define("USE_OTA_ROLLBACK")
+    esp32.add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER_FROM_CONFIG", True)
+    esp32.add_idf_sdkconfig_option("CONFIG_APP_PROJECT_VER", release["version"])
+    esp32.add_idf_sdkconfig_option("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE", True)
+    esp32.add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE", True)
+    esp32.add_idf_sdkconfig_option("CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL", True)
+    esp32.include_builtin_idf_component("esp_http_client")
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_openathan(await cg.get_variable(config["openathan_id"])))
@@ -67,7 +90,7 @@ async def to_code(config):
     table = ",\n".join("{"+json.dumps(name)+","+json.dumps(rules)+"}" for name, rules in entries)
     cg.add_global(cg.RawStatement("static const esphome::openathan_device::ZoneEntry OA_ZONES[] = {\n"+table+"\n};"))
     cg.add(var.set_zones(cg.RawExpression("OA_ZONES"), len(entries)))
-    root = Path(__file__).resolve().parents[4] / "web/device-ui"
+    root = root / "web/device-ui"
     for index, (name, mime) in enumerate((("index.html", "text/html; charset=utf-8"),
                                          ("app.js", "text/javascript; charset=utf-8"),
                                          ("style.css", "text/css; charset=utf-8"))):

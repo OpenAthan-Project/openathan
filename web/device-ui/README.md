@@ -48,5 +48,6 @@ set `OPENATHAN_DIGEST_TEST_BRIDGE` to the adapter's absolute path.
 See the [light contract](../../docs/development/lights.md) for countdown/status
 colors, separate persistence, and LED hardware acceptance.
 
-Quran/adhkar, product OTA, and the public browser installer remain
-separate work.
+The [firmware upgrade flow](../../docs/development/firmware-upgrades.md) checks
+for stable releases and queues owner-requested application updates between prayers.
+Quran/adhkar and public browser upgrade UI remain separate work.

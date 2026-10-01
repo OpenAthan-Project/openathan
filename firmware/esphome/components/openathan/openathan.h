@@ -30,6 +30,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void require_setup() { setup_gate_ = std::make_unique<SetupStore>(); }
   const char *setup_state() const;
   bool activated() const { return !maintenance_ && (!setup_gate_ || setup_gate_->active()); }
+  bool upgrade_health() const { return playback_ && playback_->ready() && volume_applied_; }
   // Internal test-maintenance boundary; no product HTTP endpoint calls this.
   void quiesce_for_maintenance();
   bool finish_setup(uint32_t revision);

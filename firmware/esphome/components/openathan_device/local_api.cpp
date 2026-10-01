@@ -65,6 +65,7 @@ void LocalApi::lights_(JsonObject root) {
   }
 }
 void LocalApi::snapshot_(JsonObject root) {
+  if (upgrade_) upgrade_->snapshot(root["firmware"].to<JsonObject>());
   lights_(root["lights"].to<JsonObject>());
   root["test_mode"] = openathan_storage::TEST_MODE;
   athan_->write_settings_json(root);
@@ -105,6 +106,8 @@ void LocalApi::handle(ApiExchange& request) {
   auto root = output.to<JsonObject>();
   if (request.method == "GET" && request.uri == "/api/status")
     snapshot_(root);
+  else if (request.method == "GET" && request.uri == "/api/firmware" && upgrade_)
+    upgrade_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/lights")
     lights_(root);
   else if (request.method == "GET" && request.uri == "/api/timezones") {
@@ -120,7 +123,12 @@ void LocalApi::handle(ApiExchange& request) {
     auto payload = input.as<JsonObject>();
     const bool settings_action =
         request.uri == "/api/settings" || request.uri == "/api/preview" || request.uri == "/api/activate";
-    if (request.uri == "/api/lights") {
+    if (request.uri.rfind("/api/firmware/", 0) == 0 && upgrade_) {
+      std::string message;
+      const int code = upgrade_->action(request.uri.substr(14), payload, message);
+      if (code != 200) { error(request, code, message.c_str()); return; }
+      upgrade_->snapshot(root);
+    } else if (request.uri == "/api/lights") {
       if (!athan_->has_lights()) { error(request, 404, "Lights are not supported on this device"); return; }
       const auto settings = payload["settings"];
       if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||

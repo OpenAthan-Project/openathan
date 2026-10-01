@@ -27,6 +27,7 @@ async function fixture(){
       res.writeHead(200,{'Content-Type':files[req.url][1],'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"});res.end(await readFile(join(__dirname,'../web/device-ui',files[req.url][0])));return;
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+    if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
     if(req.method==='GET'){
       if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}
@@ -40,6 +41,14 @@ async function fixture(){
     let body='';for await(const data of req)body+=data;
     const payload=JSON.parse(body);state.posts.push({url:req.url,payload,origin:req.headers.origin});
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
+    if(req.url.startsWith('/api/firmware/')){
+      const firmware=state.device.firmware;
+      if(req.url.endsWith('/check'))firmware.state='available';
+      else if(req.url.endsWith('/install')){firmware.state='queued';firmware.queued_version=payload.version;}
+      else if(req.url.endsWith('/cancel')){firmware.state='idle';firmware.queued_version='';}
+      if(state.firmwareDrop){state.firmwareDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
+      send(200,firmware);return;
+    }
     if(req.url==='/api/lights'){
       if(payload.expected_revision!==state.device.lights.revision){send(409,{error:'Reload light settings'});return;}
       state.lightMutations++;state.device.lights.settings=payload.settings;state.device.lights.revision++;
@@ -72,6 +81,121 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: a superseded queue clears its reconnect hint and permits checks`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.4.0',state:'current',result:'superseded',error:''};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  await page.addInitScript(()=>sessionStorage.setItem('firmware-expected','v0.3.0'));
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-section').hidden);
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('firmware-expected')),null);
+    assert.ok(await page.locator('#firmware-check').isEnabled());
+    await page.locator('#firmware-check').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('available'));
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/check').length,1);
+  }finally{await browser.close();await f.close();}
+ });
+ for(const denied of ['access','getItem','setItem','removeItem']) {
+  test(`${browserName}: denied storage ${denied} preserves settings and firmware actions`,async()=>{
+   const f=await fixture();f.state.device.setup='active';f.state.device.automatic_ready=true;
+   f.state.device.settings.latitude=44.4;
+   f.state.device.firmware={version:'v0.2.0',state:'available',available:{version:'v0.3.0'},result:'',error:''};
+   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+   const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+   const errors=[];page.on('pageerror',error=>errors.push(error.message));
+   await page.addInitScript(operation=>{
+    const denied=()=>{throw new DOMException('Browser storage denied','SecurityError');};
+    if(operation==='access')Object.defineProperty(window,'sessionStorage',{get:denied});
+    else Object.defineProperty(Storage.prototype,operation,{value:denied});
+   },denied);
+   try {
+    await page.goto(f.url);await page.waitForFunction(()=>document.querySelector('#latitude').value==='44.4' && !document.querySelector('#firmware-install').disabled);
+    await page.locator('#latitude').fill('45.2');
+    await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-cancel').disabled);
+    assert.equal(await page.locator('#latitude').inputValue(),'45.2');
+    await page.locator('#firmware-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-install').disabled);
+    await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-cancel').disabled);
+    f.state.device.firmware={version:'v0.3.0',state:'success',result:'success',error:''};
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('updated successfully') && !document.querySelector('#firmware-check').disabled);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/install').length,2);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/cancel').length,1);
+    await page.locator('#save').click();await page.waitForFunction(()=>document.querySelector('#message').textContent==='Device updated.');
+    assert.equal(f.state.device.settings.latitude,45.2);assert.deepEqual(errors,[]);
+   }finally{await browser.close();await f.close();}
+  });
+ }
+ test(`${browserName}: a queued task-start failure stays visibly cancellable`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',error:'Not enough memory to start the update; retrying after five minutes'};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden);
+    assert.match(await page.locator('#firmware-status').textContent(),/retrying after five minutes/);
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isEnabled());
+    await page.locator('#firmware-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-cancel').hidden);
+    assert.equal(f.state.device.firmware.queued_version,'');
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/cancel').length,1);
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: uncertain install blocks another action until status returns`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'available',available:{version:'v0.3.0'},result:'',error:''};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-install').hidden);
+    f.state.firmwareDrop=true;f.state.failRead=true;
+    await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('Waiting to read update status'));
+    assert.ok(await page.locator('#firmware-install').isDisabled());
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/install').length,1);
+    f.state.failRead=false;
+    await page.waitForFunction(()=>!document.querySelector('#firmware-cancel').hidden && !document.querySelector('#firmware-cancel').disabled);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/install').length,1);
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: firmware queue and uncertain response preserve edits`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'available',received:0,last_check:1700000000,available:{version:'v0.3.0',bytes:1000},result:'',error:''};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({viewport:{width:390,height:844},httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#firmware-install').hidden);
+    await page.locator('#latitude').fill('44.4');
+    f.state.firmwareDrop=true;await page.locator('#firmware-install').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('queued'));
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/install').length,1);
+    assert.deepEqual(f.state.posts.find(p=>p.url==='/api/firmware/install').payload,{version:'v0.3.0'});
+    assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    await page.screenshot({path:join(process.env.OPENATHAN_TEST_OUTPUT_DIR || require('node:os').tmpdir(),`openathan-upgrade-mobile-${browserName}.png`),fullPage:true});
+    await page.locator('#firmware-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('No update'));
+    assert.equal(f.state.device.firmware.queued_version,'');assert.equal(f.state.mutations,0);
+    f.state.device.firmware.supported=false;
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('maintainer USB'));
+    assert.ok(await page.locator('#firmware-install').isDisabled());
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: firmware reconnect reports rollback and success`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',result:'',error:''};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('queued'));
+    f.state.device.firmware.state='rolled_back';f.state.device.firmware.result='rolled_back';
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('previous firmware'));
+    f.state.device.firmware.version='v0.3.0';f.state.device.firmware.state='success';f.state.device.firmware.result='success';
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('updated successfully'));
+    await page.screenshot({path:join(process.env.OPENATHAN_TEST_OUTPUT_DIR || require('node:os').tmpdir(),`openathan-upgrade-desktop-${browserName}.png`),fullPage:true});
+    assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/firmware/')).length,0);
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: pending handoff survives a transient timezone-list failure`,async()=>{
   const f=await fixture();f.state.failTimezones=true;f.state.device.setup='active';
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true}).catch(async error=>{await f.close();throw error;});

@@ -51,6 +51,15 @@
       <div class="actions"><button id="lights-save" type="submit" disabled>Save light settings</button><button id="lights-reload" type="button" class="quiet" disabled>Reload light settings</button></div>
     </form>
   </section>
+  <section id="firmware-section" hidden aria-labelledby="firmware-title">
+    <h2 id="firmware-title">Firmware</h2>
+    <p id="firmware-version"></p>
+    <p id="firmware-status" role="status" aria-live="polite"></p>
+    <p id="firmware-last-check"></p>
+    <a id="firmware-notes" hidden target="_blank" rel="noopener noreferrer">Read release notes</a>
+    <p>Updates keep your settings and recordings. Installation waits until playback ends and the next Athan is at least 15 minutes away.</p>
+    <div class="actions"><button id="firmware-check" type="button">Check for updates</button><button id="firmware-install" type="button" hidden>Install update</button><button id="firmware-cancel" type="button" class="quiet" hidden>Cancel queued update</button></div>
+  </section>
   <footer><span id="address"></span><p>Wi‑Fi or password changed? Connect by USB to recover access. Keep your phone on the same network as the device.</p></footer>
 </main>
 </body>
