@@ -61,7 +61,8 @@ checks the PR merge identity and complete changed-path list before installing
 build dependencies. For documentation-only changes, it reports an intentional
 omission in its job summary and skips dependency installation, compilation,
 capacity checks and the regressions requiring resolved firmware libraries.
-Host tests and browser tests still run normally.
+Host tests and browser tests still run normally. Published firmware artifacts
+are unaffected by this optimization.
 
 The policy in `tools/ci_build_policy.py` allows Markdown under `docs/` and an
 explicit list of existing prose-only Markdown paths elsewhere. It excludes
