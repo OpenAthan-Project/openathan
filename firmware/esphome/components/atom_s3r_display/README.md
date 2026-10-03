@@ -17,6 +17,9 @@ general-purpose light entities or network dependency. The original helper's
 uninitialized configuration variable is not retained.
 
 Pin ownership and screen revisions follow [M5Stack's C126 documentation](https://docs.m5stack.com/en/core/AtomS3R).
-The accompanying profile targets GC9107, matching earlier source-bound physical
-display evidence. The new integrated dim display has not received physical
-acceptance. Newer ST7735 revisions are not qualified by this profile.
+The accompanying profile targets GC9107. The integrated dim display passed
+[attended isolated hardware acceptance](../../../../docs/development/display-validation-2026-10-03.md#attended-isolated-hardware-acceptance)
+on 2026-10-03, including upright text, readability and comfortable dimness at
+the 10% default. This bounded, instrumented maintainer test does not establish
+release readiness or long-soak behavior. Newer ST7735 revisions are not qualified
+by this profile.
