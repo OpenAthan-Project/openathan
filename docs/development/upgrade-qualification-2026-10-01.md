@@ -1,5 +1,9 @@
 # Firmware upgrade qualification checkpoint — 2026-10-01
 
+The results and deferred restoration/publication statements below belong to their
+dated checkpoints. Later production installation, listening and v0.2.1/public
+installer status are recorded in the [2026-10-03 release summary](release-validation-2026-10-03.md).
+
 This checkpoint covers the maintainer qualification implementation on top of
 merged upgrade-flow commit `ef913beac1c1e453704e667f301925435af87efe`.
 The earlier attended run stopped after a v4 task-watchdog reset. Corrected

@@ -1,8 +1,10 @@
 # Provisioning hardware acceptance runbook
 
-**Preparation is implemented; the full physical matrix remains pending.** Bounded
-first-run and USB recovery sessions are recorded in the
-[validation report](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
+This is a procedure, not a statement that every case is pending or passed.
+Source-bound first-run, USB recovery and later controls/preservation results are
+recorded in the [dated validation report](../../../docs/development/feasibility-report.md).
+See the [current release evidence and limits](../../../docs/development/release-validation-2026-10-03.md)
+before selecting new acceptance work; do not repeat unrelated completed checks.
 This runbook is
 for the existing AtomS3R C126 + Voice Pyramid A167. Execute hardware steps only in
 a separately coordinated session. This procedure uses a verified, application-only

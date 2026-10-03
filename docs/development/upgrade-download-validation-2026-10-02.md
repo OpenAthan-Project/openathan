@@ -1,5 +1,9 @@
 # Update download validation — 2026-10-02
 
+This report retains the pre-release correction's measurements and then-pending
+acceptance. The later exact v0.2.1 installation, public check and publication are
+recorded in the [current release summary](release-validation-2026-10-03.md).
+
 The v0.2.1 candidate sizes the HTTP transmit buffer from each validated URL:
 URL length plus 512 bytes, with a maximum of 4,608 bytes. The earlier 512-byte
 buffer could not hold GitHub's signed asset request line. These automated results

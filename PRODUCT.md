@@ -12,7 +12,8 @@ The primary users are Muslim households who want a standalone Athan speaker
 they can set up and control from a phone without coding or Home Assistant.
 The intended reference experience uses pre-assembled modules and precompiled
 firmware, without requiring soldering, PCB design, YAML, or embedded-development
-experience. The public installation path is still being developed.
+experience. The public USB installer distributes precompiled reference releases
+for AtomS3R C126 + Pyramid A167.
 
 ESPHome makers are a secondary audience. They should be able to reuse OpenAthan
 with compatible hardware while retaining control of their board configuration,
@@ -63,7 +64,7 @@ alone cannot establish the current time after a cold boot.
 
 ## Capabilities and Constraints
 
-- Developer firmware implements prayer calculations, calculation and Asr methods,
+- Reference firmware implements prayer calculations, calculation and Asr methods,
   high-latitude handling, prayer offsets, enabled prayers, normal/Fajr playback,
   persistent settings, volume, and durable skip/replay protection.
 - The reference UI implements local setup, schedule preview, status, settings,
@@ -85,11 +86,13 @@ alone cannot establish the current time after a cold boot.
 - Settings, prayer-consumption history, shared audio, and recovery capability
   must survive compatible updates and recovery. Historical full-flash images
   are not routine settings or credential recovery mechanisms.
-- Current functionality is developer firmware, not a qualified end-user release.
-  The public installer, product update experience, broader hardware acceptance,
-  and release recording qualification remain separate work. Quran, adhkar,
-  expanded storage, and Home Assistant integration remain future scope; consult
-  the [roadmap](docs/development/roadmap.md) for milestone details.
+- Pre-1.0 reference releases include the public installer, approved normal/Fajr
+  recordings, optional prayer lights and owner-requested signed application
+  updates. Website release adoption does not update speakers automatically.
+  Reuse physical evidence only within its recorded source and scope; see the
+  [current release evidence](docs/development/release-validation-2026-10-03.md).
+  Quran, adhkar, touch/display adapters, expanded storage and Home Assistant
+  integration remain future scope in the [roadmap](docs/development/roadmap.md).
 - Software, documentation, and original hardware designs retain their respective
   [Apache-2.0](LICENSE), [CC BY 4.0](docs/LICENSE.md), and
   [CERN-OHL-P-2.0](hardware/LICENSE.md) licensing boundaries. Third-party recordings
