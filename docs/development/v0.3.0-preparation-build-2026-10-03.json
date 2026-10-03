@@ -1,0 +1,55 @@
+{
+  "baseline_source": "ecad806ecc79393b09fd6ddb1e4197b6e53c1ac4",
+  "version_before": "v0.2.1",
+  "version_after": "v0.3.0",
+  "baseline_firmware_inputs_sha256": "94d4325cac453babddab44816c492c5e2524b57168a8dab9b51cbea838ce0f50",
+  "candidate_firmware_inputs_sha256": "43090cceeee17e20bcfc7e5d5ed2a722adb731b575ee9c87fce13c899e2e0f42",
+  "source_digest_algorithm": "SHA256 of sorted tracked repository-relative path + NUL + file bytes + NUL for all non-Markdown files under firmware/, lib/, web/ and release/",
+  "toolchain": {
+    "python": "3.13.0",
+    "esphome": "2026.9.0",
+    "esp_idf": "5.5.5",
+    "compiler": "esp-14.2.0_20260121",
+    "tzdata": "2026.4"
+  },
+  "fixture_inputs_matched": true,
+  "build_commit_identity": "compile-only default; exact merged production build remains pending",
+  "variants": {
+    "reference": {
+      "before": {
+        "application_bytes": 1249408,
+        "application_sha256": "5762724ff74a6e324ab76bd172e7fee0aa7c227c2bd6b90ef481117a4a95b5f9",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 323456,
+        "slot_free_bytes": 847744
+      },
+      "after": {
+        "application_bytes": 1249408,
+        "application_sha256": "15cdc2ed843fc7309f49d7f21ee277b91fc857e4730fef7c52d42625ccfba79f",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 323456,
+        "slot_free_bytes": 847744
+      },
+      "application_delta_bytes": 0,
+      "static_ram_delta_bytes": 0
+    },
+    "isolated": {
+      "before": {
+        "application_bytes": 1251184,
+        "application_sha256": "0602e1fcb6c5689138b06a2528cb5ac070865753cbd831e872695925c780fe87",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 321680,
+        "slot_free_bytes": 845968
+      },
+      "after": {
+        "application_bytes": 1251184,
+        "application_sha256": "0b4cabcc300eeb59428e1706e422a7864e968db6d35c8bc67e8a2b0defd1f48a",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 321680,
+        "slot_free_bytes": 845968
+      },
+      "application_delta_bytes": 0,
+      "static_ram_delta_bytes": 0
+    }
+  }
+}
