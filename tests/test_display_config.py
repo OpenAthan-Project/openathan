@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(importlib.util.find_spec("esphome"), "Run with the pinned ESPHome environment")
 class DisplayConfigTests(unittest.TestCase):
-    def test_reference_writer_and_brightness_bounds(self):
+    def test_reference_writer_rotation_and_brightness_bounds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config = root / "display.yaml"
@@ -25,6 +25,9 @@ class DisplayConfigTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             source = (build / "openathan/src/main.cpp").read_text()
             self.assertIn("MipiSpiBuffer<uint8_t", source)
+            # Pinned ESPHome omits the setter for its default 0-degree rotation.
+            # Any nonzero rotation emits a setter, including the old 180 value.
+            self.assertNotIn("atom_status_lcd->set_rotation(", source)
             self.assertIn("athan_status_screen->draw(it)", source)
             self.assertNotIn("atom_status_lcd->show_test_card()", source)
             self.assertIn("->set_brightness(10)", source)

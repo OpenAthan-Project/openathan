@@ -7,10 +7,14 @@ bundle. The dated report records isolated hardware acceptance; successor
 release qualification remains separate.
 
 The board profile keeps the screen on at a build-time default of 10% backlight
-brightness (`display_brightness_percent`) and rotation 180. Isolated hardware
-acceptance confirmed dimness, readability and orientation on the verified GC9107
-unit; see the dated report for source and measurement limits. This screen has
-its own small-device layout; the device-local web UI retains its existing design.
+brightness (`display_brightness_percent`) and rotation 0. The intended viewing
+side is opposite the Pyramid's power/expansion ports, with the cord at the back.
+The earlier isolated run used rotation 180 and confirmed dimness and readability
+from the operator's viewing side; it did not establish this front/back convention.
+Physical confirmation of the corrected orientation is pending the next attended
+candidate installation; see the dated report for source and measurement limits.
+This screen has its own small-device layout; the device-local web UI retains
+its existing design.
 
 The presenter is plain C++ without ESPHome dependencies. Its firmware adapter
 reads the existing scheduler, activation, settings and Wi-Fi state; it does not
