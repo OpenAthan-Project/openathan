@@ -1,6 +1,6 @@
 # Firmware feasibility build
 
-This compile-only milestone integrates reusable prayer calculations, offline
+This development configuration integrates reusable prayer calculations, offline
 MP3 partition playback and C126 + A167 audio hardware. It is not release
 firmware. No scheduler, provisioning wizard, device UI or Home Assistant is
 required or included. See the [capacity report](../../../docs/development/feasibility-report.md).

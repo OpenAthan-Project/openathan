@@ -7,7 +7,7 @@ Legacy five-asset releases remain supported, and the fresh-install manifest stay
 schema 1.
 
 The firmware repository builds and packages releases. The website consumes a
-reviewed release; it never compiles firmware. The [installer contract](https://github.com/OpenAthan-Project/website/blob/ba356c80f00ff07046b7433c03e0fdc9802f64b0/installer/README.md)
+reviewed release; it never compiles firmware. The [installer contract](https://github.com/OpenAthan-Project/website/blob/main/installer/README.md)
 remains schema v1, for AtomS3R C126 + Voice Pyramid A167, ESP32-S3 with 8 MiB flash
 and the dual-2 MiB application / 3.5 MiB shared-audio layout.
 
@@ -15,7 +15,9 @@ The selected normal and Fajr recordings have a documented
 [media approval](../../AUDIO-LICENSES.md). Packaging and uploading require a source
 revision containing that approval and the exact approved MP3 files. Other private
 test recordings, CI audio fixtures and historical recovery images are not release
-inputs. This tooling never flashes, publishes, or selects a website release.
+inputs. This tooling never flashes or publishes. Once a qualified release is
+explicitly published as stable latest, the website's automatic policy can adopt
+it after validation. See the [current release evidence](release-validation-2026-10-03.md).
 
 ## Prerequisites
 
@@ -63,30 +65,37 @@ and `approved: true`. Approval records human review; tooling cannot establish ri
 
 ```sh
 python tools/release.py package --build-dir /tmp/openathan-build \
-  --tag v0.2.0 --normal /path/to/normal.mp3 --fajr /path/to/fajr.mp3 \
+  --tag "$RELEASE_TAG" --normal /path/to/normal.mp3 --fajr /path/to/fajr.mp3 \
   --signing-key /private/path/release-signing-key.pem \
   --output-dir /tmp/openathan-bundle
 ```
 
-The version is an explicit `vX.Y.Z` target, not a selection of the first public
-release. Packaging preserves MP3 bytes, checks their approved hashes, builds the
+Before running this example, set `RELEASE_TAG` to a new, unused `vX.Y.Z` version
+matching `release/firmware.json` and the official YAML project version in the
+selected source. Do not reuse or move an existing release tag. Packaging
+preserves MP3 bytes, checks their approved hashes, builds the
 shared partition, and executes the production C++ audio-format validator from the
 source commit. Format/hash validation does not decode MP3 or replace listening tests.
 
-The completed bundle contains exactly:
+Current upgrade-capable releases contain exactly seven assets:
 
 | Asset | Purpose |
 | --- | --- |
 | `manifest.json` | Installer schema v1, source commit, layout, sizes, hashes and license link |
 | `firmware.factory.bin` | Fresh-install firmware, starting at offset zero |
 | `athan-audio.bin` | Exactly 3.5 MiB at `0x410000`, outside the application |
-| `SHA256SUMS` | SHA-256 of the other four files |
+| `firmware.ota.bin` | Application-only update, matching the factory application's bytes |
+| `upgrade.json` | Signed version/source/compatibility and application-size/hash descriptor |
+| `SHA256SUMS` | SHA-256 of the other six files |
 | `build-report.json` | Public source/toolchain identity and capacity measurements |
 
-Only factory and audio appear in the manifest's two parts. OTA binaries remain
-local evidence; this milestone does not add a product OTA mechanism. The report
-excludes raw logs, credentials and personal paths. Existing outputs and symlink
-files are rejected; regenerate a changed bundle into a fresh directory.
+Only factory and audio appear in the fresh-install manifest's two parts. The
+device updater consumes the separate signed descriptor and OTA application;
+the website importer consumes only the manifest, factory and audio. Legacy
+releases without upgrade identity retain the five-asset contract and four-file
+checksum list. The report excludes raw logs, credentials and personal paths.
+Existing outputs and symlink files are rejected; regenerate a changed bundle
+into a fresh directory.
 
 ## Upload a draft
 
@@ -96,8 +105,8 @@ main-push Firmware CI run must have passed. Deliberately create and push the
 version tag at that exact commit before uploading, after checking it is unused:
 
 ```sh
-git tag -a v0.2.0 <full-40-character-commit-sha> -m 'OpenAthan v0.2.0'
-git push origin refs/tags/v0.2.0
+git tag -a "$RELEASE_TAG" <full-40-character-commit-sha> -m "OpenAthan $RELEASE_TAG"
+git push origin "refs/tags/$RELEASE_TAG"
 python tools/release.py upload-draft --bundle /tmp/openathan-bundle
 ```
 
@@ -114,11 +123,21 @@ never uses `--clobber` or modifies a published release. Do not publish or edit t
 draft concurrently with upload; the command rechecks state but remote changes are
 not an atomic transaction.
 
-Success reports the draft URL and manifest SHA-256. Complete physical installation,
-interruption/recovery and scheduled-playback qualification against these exact
-artifacts. Record public evidence and limitations, explicitly publish the reviewed
-release, then propose a separate website catalog PR using the exact tag and
-manifest hash. Set the website's review flags only after those reviews are complete.
+Success reports the draft URL and manifest SHA-256. Review applicable physical
+installation, interruption/recovery and scheduled-playback evidence against the
+candidate. Reuse accepted evidence within its source limits and identify untested
+changes; do not infer physical acceptance from CI. Record public evidence and
+limitations, then explicitly approve publication and stable latest selection.
+Draft upload does neither automatically.
+
+Both device discovery and the website's automatic mode follow stable latest.
+Publishing it authorizes website adoption after artifact/source/hash and website
+checks pass; no per-release catalog PR is needed. The generated review flags
+record that human publication policy rather than proving physical qualification.
+A reviewed catalog PR is still used for a persistent manual pin/rollback or
+disabling fresh installation. See the [website deployment policy](https://github.com/OpenAthan-Project/website/blob/main/deployment/README.md).
+Website adoption does not queue an update on existing speakers; owners choose
+**Install update** on the authenticated device page.
 
 ## Validation
 

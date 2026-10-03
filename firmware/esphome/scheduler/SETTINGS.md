@@ -3,7 +3,9 @@
 Runtime settings can change without rebuilding firmware or requiring Home
 Assistant. `device.yaml` and `validation.yaml` expose encrypted `get_settings`
 and `set_settings` actions. `development.yaml` has the same settings service
-without a network interface. The phone UI remains separate work.
+without a network interface. Reference firmware exposes the same settings service
+through its authenticated [phone-friendly local UI](../provisioning/README.md).
+The developer actions below are optional and are not the ordinary-user setup path.
 
 ## Read, edit, save
 
@@ -91,11 +93,13 @@ readback gates new playback; dropped requests are retried without stopping audio
 ## Phone setup integration
 
 The developer actions use ESPHome's encrypted native API; they are not an HTTP
-interface for a browser. The planned phone setup must add its own transport and
-access controls while using this settings service. Provisioning, Wi-Fi recovery
-and password recovery must preserve prayer settings and consumed-prayer history.
-First-run confirmation is separate product work: current developer firmware uses
-configured/restored settings and gates scheduling on valid time, storage and audio.
+interface for a browser. The reference local HTTP API adds Digest authentication,
+same-origin controls and revision-checked access to this settings service.
+Provisioning, Wi-Fi recovery and password recovery preserve prayer settings and
+consumed-prayer history. Reference first-run activation explicitly gates playback
+and consumption until setup is confirmed. Generic developer firmware retains its
+configured/restored initialization behavior and valid-time/storage/audio gates.
+See the [provisioning and activation contract](../provisioning/README.md).
 
 ## Verification
 

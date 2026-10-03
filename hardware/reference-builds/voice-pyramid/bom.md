@@ -6,21 +6,23 @@
 |---|---|---|
 | M5Stack AtomS3R | **C126** | ESP32-S3 controller; 8 MB flash, 8 MB PSRAM, display |
 | M5Stack Voice Pyramid | **A167** | Speaker/audio hardware, microphone, RGB LEDs, touch controls, enclosure |
-| USB power source and cable | Generic, suitable for the documented power input | Power |
+| USB-C data cable and computer | Desktop Chrome or Edge for browser setup | USB installation and credential recovery |
+| USB power source | Suitable for the Pyramid's documented bottom USB-C power input | Normal operation; the data cable may be reused for power |
 
-The reference build is intentionally based on pre-assembled modules and should require no soldering.
+The reference build uses pre-assembled modules and requires no soldering. See the
+[assembly and single-cable power instructions](assembly.md).
 
-> **Product naming:** M5Stack's current documentation calls SKU A167 **Echo Pyramid**. OpenAthan uses **Voice Pyramid** as its project-facing name for that same product. Verify the SKU when purchasing.
+> **Product naming:** A167 is Voice Pyramid and has also been called Echo Pyramid. Verify the SKU when purchasing.
 
 Official references:
 
 - [M5Stack AtomS3R C126 documentation](https://docs.m5stack.com/en/core/AtomS3R)
-- [M5Stack A167 documentation](https://docs.m5stack.com/en/atom/Echo_Pyramid)
+- [M5Stack A167 documentation](https://docs.m5stack.com/en/atom/Voice_Pyramid)
 - [M5Stack A167 reference source](https://github.com/m5stack/M5Echo-Pyramid)
 
 ## Optional expansions
 
-Not required for the first release:
+Not required by the current reference build:
 
 - battery-backed RTC;
 - microSD or USB storage;

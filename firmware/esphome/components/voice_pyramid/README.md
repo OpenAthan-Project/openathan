@@ -16,7 +16,7 @@ code. Optional LEDs use the STM32 controller through checked I2C writes; see the
 [light contract](../../../../docs/development/lights.md). Touch, microphone and
 display are not implemented here.
 
-M5Stack's current official documentation calls SKU A167 Echo Pyramid. OpenAthan retains Voice Pyramid as its project-facing name for the same product.
+M5Stack documents SKU A167 as [Voice Pyramid](https://docs.m5stack.com/en/atom/Voice_Pyramid); it has also been called Echo Pyramid. Verify the SKU rather than relying only on a product name.
 
 Responsibilities are limited to verified A167-specific audio hardware, microphone, RGB LEDs, capacitive-touch controls, power, and initialization behavior as required. AtomS3R C126 platform and display configuration belong in the reference board layer, not this component.
 

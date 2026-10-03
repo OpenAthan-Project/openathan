@@ -1,5 +1,10 @@
 # Firmware capacity report — 2026-09-24
 
+This report preserves the dated development measurements and device observations
+below. They are not current release sizes or a statement of today's pending work.
+For v0.2.1 production, media and public-installer status, see the
+[2026-10-03 release summary](release-validation-2026-10-03.md).
+
 **The compile-time capacity target passed.** ESPHome, released Adhan C++, and
 the shared audio adapter fit comfortably in each 2 MiB OTA slot. Both supplied
 MP3 recordings fit unchanged in the 3.5 MiB data partition. The initial builds
@@ -577,7 +582,8 @@ qualified as a new public release.
 
 The maintainer selected the 1,221,602-byte `Adhan-Mishary_compressed.mp3` and
 confirmed the existing AlAdhan source/permission basis. Its exact SHA-256 is
-recorded in [the media approval](../../AUDIO-LICENSES.md) and release registry.
+recorded in the [media approval at that revision](https://github.com/OpenAthan-Project/openathan/blob/5badc10c266dc78ebf67129fe6688a1d2b2d3605/AUDIO-LICENSES.md).
+The current registry has a later replacement; this paragraph retains the earlier selection.
 The 257.15-second MP3 is retained without further conversion; Fajr remains
 byte-identical. Both canonical image extraction and the production C++ audio
 validator passed, along with a full FFmpeg decode and all 21 release-tooling tests.

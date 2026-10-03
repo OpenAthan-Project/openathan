@@ -110,7 +110,7 @@ before any retry.
 
 ### Device UI
 
-The reference candidate embeds a responsive UI at a unique
+The reference firmware embeds a responsive UI at a unique
 `openathan-<suffix>.local` hostname, with an IPv4 fallback. The product layer
 provides USB Wi-Fi/password provisioning, protected local access, and an explicit
 setup gate. New devices persist an incomplete marker before settings seeding;
@@ -144,13 +144,13 @@ acceptance or release readiness.
 
 Core Athan scheduling must not require Home Assistant or a cloud service. Internet may be used for initial/periodic time sync, Quran streaming, firmware downloads, or optional services.
 
-The generic ESPHome package does not configure Wi-Fi. The reference candidate provides USB provisioning, while ESPHome integrators keep their existing network configuration.
+The generic ESPHome package does not configure Wi-Fi. Reference firmware provides USB provisioning, while ESPHome integrators keep their existing network configuration. The current reference build needs internet time synchronization after a cold boot; saved settings cannot establish the current time. With a valid clock, prayer calculation and stored-recording playback remain local.
 
 ## Public website boundary
 
 The public website and browser installer live in the separate [`OpenAthan-Project/website`](https://github.com/OpenAthan-Project/website) repository. Firmware builds and release artifacts originate in this repository; the website consumes published artifacts and does not compile firmware.
 
-The device UI remains in this repository and must function without the public website or cloud infrastructure.
+The device UI remains in this repository and must function without the public website or cloud infrastructure. The deployed website can suggest a location and adopt approved stable releases after verification; neither is required for local controls or daily operation. Automatic website adoption does not request a speaker update: owners queue signed application updates through the device's Firmware section.
 
 ## Future migration
 

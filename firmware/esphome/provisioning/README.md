@@ -1,12 +1,13 @@
 # USB provisioning and local settings
 
-`../openathan.yaml` is the buildable reference **development candidate** for the
-AtomS3R C126 + Voice Pyramid A167. It includes USB provisioning, a device-hosted
-setup/settings page, and first-run activation. The public website and browser
-installer are separate work. Bounded first-run and USB recovery hardware checks
-passed; see the [validation results](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25)
-for the tested revision and unresolved serial-associated Wi-Fi loss. Remaining
-physical acceptance and release recording qualification are still pending.
+[`openathan.yaml`](../openathan.yaml) is the reference release entry point for
+AtomS3R C126 + Voice Pyramid A167. It includes USB provisioning, local
+setup/settings, first-run activation, optional lights and signed firmware updates.
+The public [browser installer](https://openathan.com/install/) consumes published
+artifacts from this repository. See the [current release evidence and limits](../../../docs/development/release-validation-2026-10-03.md)
+and [earlier provisioning results](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
+Serial close/reopen has caused temporary Wi-Fi loss on the tested unit; that
+observation remains relevant to recovery guidance.
 
 For existing-device acceptance, use the [isolated test build and hardware runbook](HARDWARE_TEST.md).
 It keeps test prayer, activation and credential records separate and includes a
@@ -56,8 +57,9 @@ establish the current time from saved settings alone.
 
 ## Installer integration contract
 
-Firmware builds artifacts; a future website task consumes them. No website or
-`/install` implementation is included here.
+This repository builds release artifacts; the separate
+[website repository](https://github.com/OpenAthan-Project/website) verifies and
+consumes them. The public installer owns browser-side transport and USB flashing.
 
 - The device implements Improv Serial version 1 over USB Serial/JTAG, 115200 baud.
   Standard commands are Wi-Fi settings (1), current state (2), device info (3),
@@ -74,7 +76,7 @@ Firmware builds artifacts; a future website task consumes them. No website or
   image**. It handles standard Improv frames and the password extension below.
   Do not instantiate a second reader. The serial logger is silent; consumers
   should nevertheless ignore boot noise and validate framing/checksums.
-- A future browser installer must release its serial reader before its password
+- The browser installer must release its serial reader before its password
   client acquires the port. Wi-Fi and password recovery send commands only.
   Failure to recognize firmware must not automatically start an installation.
 
@@ -111,7 +113,7 @@ its generated-audio fixture for CI, or approved media for a separately authorize
 hardware test.
 
 A compatible ordinary update replaces only an application slot and preserves
-NVS and shared audio. The reference candidate now exposes an authenticated
+NVS and shared audio. The reference firmware exposes an authenticated
 [application-only upgrade flow](../../../docs/development/firmware-upgrades.md).
 It has no arbitrary upload endpoint. A merged factory image can overwrite NVS
 even without a full-chip erase. Existing developer devices therefore require a
@@ -240,11 +242,14 @@ npx playwright install chromium webkit
 OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
 ```
 
-Bounded physical first-run and USB/password recovery results are recorded in the
-validation report above. Remaining acceptance includes hidden networks, phone
-playback controls, Android Chrome, deliberate setup/save interruptions, audio
-during Wi-Fi loss/recovery, production migration and qualified release media.
-The later coordinate-precision integration is automated-tested only.
+The [dated device report](../../../docs/development/feasibility-report.md) records
+first-run, USB recovery, phone controls and interruption results by tested source.
+The [current release summary](../../../docs/development/release-validation-2026-10-03.md)
+adds production migration, approved media, listening and public-delivery evidence.
+Host/browser simulations do not establish hidden-network radio behavior, broader
+phone/browser coverage or physical acceptance of every later revision. Retain
+those boundaries rather than treating this runbook as a blanket pass or an
+undated list of unfinished tests.
 
 ## Optional lights
 

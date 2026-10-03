@@ -194,8 +194,10 @@ and does not validate later firmware revisions on hardware. A separate deliberat
 startup-failure test on 2026-09-25 verified automatic rollback to the unchanged
 working image, with retained audio, scheduler state and 70% volume. This covers
 failure before successful-boot confirmation, not faults after confirmation.
-Provisioning UI, scheduler settings UI and automatic audio updates remain outside
-this milestone.
+These scheduler development configurations omit the reference product's USB
+provisioning and local UI. Those are implemented in the separate
+[reference entry point](../provisioning/README.md). Automatic audio replacement
+remains unimplemented; compatible firmware updates preserve shared recordings.
 
 For device checks, see [the validation procedure](VALIDATION.md). Its separate
 synthetic timetable uses isolated NVS and the real clock; `device.yaml` returns

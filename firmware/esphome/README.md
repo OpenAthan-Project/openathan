@@ -2,10 +2,10 @@
 
 ESPHome is the preferred initial embedded framework for OpenAthan.
 
-> **Status:** the [scheduler development build](scheduler/README.md) integrates scheduling, saved runtime settings, durable consumption/skip state and shared offline audio, with host and reference-device validation. The generic package loads the hardware-independent component; the official entry point now builds a provisioning/local-UI development candidate, with physical acceptance pending. There is no end-user firmware release yet. The [manual feasibility build](feasibility/README.md) remains available separately.
+> **Status:** precompiled reference releases provide USB setup/recovery, local settings, scheduled offline Athan, optional prayer lights and signed application updates. See the [current release evidence and limits](../../docs/development/release-validation-2026-10-03.md). The [scheduler development build](scheduler/README.md) and [manual feasibility build](feasibility/README.md) remain separate development configurations.
 
 Runtime configuration uses the optional encrypted [settings console](scheduler/SETTINGS.md)
-or the reference candidate’s [device-hosted settings interface](provisioning/README.md).
+or the reference firmware's [device-hosted settings interface](provisioning/README.md).
 The latter adds USB Wi-Fi/password setup and recovery, local access protection,
 and explicit activation while retaining the settings service and prayer history.
 
@@ -13,13 +13,13 @@ and explicit activation while retaining the settings service and prayer history.
 
 ### Precompiled reference firmware
 
-Ordinary users will install official releases from [openathan.com/install](https://openathan.com/install). They will not need YAML or ESPHome knowledge. [`openathan.yaml`](openathan.yaml) is the release entry point and composes the reusable OpenAthan package with the C126 + A167 reference-hardware package. Official-only provisioning, networking, OTA, and release settings belong at that entry-point layer, not in the generic package.
+Ordinary users install official releases from [openathan.com/install](https://openathan.com/install) without YAML or ESPHome knowledge. [`openathan.yaml`](openathan.yaml) is the release entry point and composes the reusable OpenAthan package with the C126 + A167 reference-hardware package. Official-only provisioning, networking, OTA, and release settings belong at that entry-point layer, not in the generic package. Fresh installation erases saved data; existing speakers use the [preserving upgrade path](../../docs/development/firmware-upgrades.md).
 
 ### Reusable ESPHome integration
 
-ESPHome users will be able to import [`packages/openathan.yaml`](packages/openathan.yaml) into an existing configuration and bind OpenAthan to components they already own. The generic package must not select a board, define GPIOs, configure Wi-Fi credentials, require the native API, or assume Home Assistant.
+ESPHome contributors can compose [`packages/openathan.yaml`](packages/openathan.yaml) from a local checkout and bind OpenAthan to compatible components. The generic package must not select a board, define GPIOs, configure Wi-Fi credentials, require the native API, or assume Home Assistant.
 
-Once a compatible release exists, package consumption is intended to look like:
+Remote package consumption remains unvalidated. Its intended configuration shape is:
 
 ```yaml
 packages:
@@ -65,4 +65,4 @@ The scheduler and hardware-independent OpenAthan component may request playback 
 - [`packages/hardware/voice-pyramid.yaml`](packages/hardware/voice-pyramid.yaml) — convenience mapping for the official C126 + A167 combination.
 - [`boards/`](boards/) — verified low-level reference-board configuration only.
 - [`examples/custom-hardware.yaml`](examples/custom-hardware.yaml) — documented integration shape for user-owned ESPHome hardware.
-- [`openathan.yaml`](openathan.yaml) — unfinished official precompiled-firmware entry point.
+- [`openathan.yaml`](openathan.yaml) — official reference release entry point.

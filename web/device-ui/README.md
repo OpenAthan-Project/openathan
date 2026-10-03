@@ -15,7 +15,8 @@ has not synchronized, wait and preview again. Manual entry remains available
 without the helper or internet access.
 If status or the timezone list is temporarily unavailable, the proposal waits
 in the open page; **Refresh** retries both reads.
-Deploy the public helper before shipping firmware with this link.
+The published reference firmware uses the deployed `https://openathan.com/location/`
+helper. Forks changing that URL must deploy a compatible helper before shipping.
 The isolated acceptance build displays a prominent **Test firmware** banner;
 its authenticated status identifies it with `test_mode: true`.
 
@@ -25,8 +26,9 @@ consume prayer history. The interface preserves unsaved edits during status
 refreshes and reads back uncertain saves without repeating them.
 
 See [provisioning and the local API](../../firmware/esphome/provisioning/README.md)
-for build instructions, the USB console, recovery, API contracts, tests and
-remaining hardware acceptance. `index.html`, `app.js`, and `style.css` are
+for build instructions, the USB console, recovery, API contracts and tests.
+The [current release summary](../../docs/development/release-validation-2026-10-03.md)
+records physical evidence and its limits. `index.html`, `app.js`, and `style.css` are
 compressed into firmware during code generation; no public website build is
 involved. The npm dependency is for browser testing only.
 
@@ -50,4 +52,7 @@ colors, separate persistence, and LED hardware acceptance.
 
 The [firmware upgrade flow](../../docs/development/firmware-upgrades.md) checks
 for stable releases and queues owner-requested application updates between prayers.
-Quran/adhkar and public browser upgrade UI remain separate work.
+The authenticated **Firmware** section provides check, install, cancel and
+reconnect/status controls. The public USB installer remains a fresh-install and
+credential-recovery tool. Quran/adhkar and owner-facing audio replacement remain
+future work.

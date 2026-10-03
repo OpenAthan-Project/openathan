@@ -3,8 +3,9 @@
 Official reference firmware can check for published stable releases and install
 application-only updates from its authenticated device page. Prayer calculation,
 scheduling and recordings continue to work independently of the release service.
-This implementation requires physical qualification before release. See the
-[dated build report](upgrade-validation-2026-09-30.md).
+The flow is included in published pre-1.0 reference releases. See the
+[current production/public evidence and limits](release-validation-2026-10-03.md)
+and [source-bound qualification results](upgrade-qualification-2026-10-01.md).
 The [maintainer qualification runbook](../../firmware/esphome/upgrades/VALIDATION.md)
 uses isolated records and a private HTTPS feed to exercise interruption and rollback.
 
@@ -61,8 +62,10 @@ must be reconciled with a GET, never automatically repeated.
 Keep the existing five fresh-install assets and schema-1 installer manifest.
 Upgrade-capable releases add `firmware.ota.bin` and `upgrade.json` to the bundle
 and checksum list. The OTA application must equal the factory application's bytes.
-The website's pinned importer selects its known assets; extra upgrade assets do
-not alter the fresh-install manifest.
+The website importer verifies its selected manifest, factory and audio assets;
+extra upgrade assets do not alter the fresh-install manifest. Its automatic
+policy adopts published stable latest after validation, with a manual pin or
+disable policy available. This does not install updates on existing speakers.
 
 `upgrade.json` contains `payload` (the exact signed JSON string) and `signature`
 (lowercase hexadecimal DER ECDSA signature). SHA-256/P-256 verification uses the
@@ -95,7 +98,7 @@ privately; changing the embedded trust key requires a separately planned rotatio
 
 ## Startup recovery and existing devices
 
-New official builds enable bootloader application rollback and suppress
+Upgrade-capable official builds enable bootloader application rollback and suppress
 ESPHome's immediate application confirmation. After 30 seconds, OpenAthan
 confirms only a fault-free scheduler, healthy settings/setup storage, update
 storage, required audio and volume initialization, and local
@@ -117,7 +120,7 @@ older version is fulfilled or superseded after startup health confirmation. Its
 bookkeeping is cleared without installing older firmware. Invalid signatures or
 failed bookkeeping commits still fail closed; they are not silently discarded.
 
-The previously compiled public/reference bootloader did **not** enable rollback.
+Older reference bootloaders built without rollback are incompatible with Wi-Fi updates.
 The device hashes its entire 32 KiB bootloader region against the committed
 rollback-enabled bootloader allowlist and refuses Wi-Fi installation when it does
 not match. Keep older compatible hashes when releasing newer firmware; packaging
@@ -129,6 +132,13 @@ The updater follows GitHub's published stable `latest` release. Draft preparatio
 keeps `--latest=false`; after physical qualification and explicit publication
 approval, select the intended stable release as latest. Publishing assets without
 that selection does not make them available through the periodic update check.
+On v0.2.0, GitHub asset redirects can make checks fail with **Could not check
+for updates**. A preserving USB application update to v0.2.1 or a compatible
+successor is required to receive the fix; repeatedly checking the affected
+firmware cannot deliver it. The [download regression report](upgrade-download-validation-2026-10-02.md)
+documents the request-buffer correction. Do not use the destructive fresh
+installer as an update workaround.
+
 An application-only USB transition cannot change that bootloader. Before installing
 this feature on an existing speaker, inspect its current bootloader and use a
 separately reviewed preservation procedure if a bootloader transition is required.

@@ -1,6 +1,6 @@
 # Audio Strategy
 
-## Developer implementation
+## Released Athan playback
 
 The current scheduler plays normal and Fajr recordings from a separately
 provisioned shared audio partition. Saved volume is applied through the portable
@@ -10,18 +10,26 @@ before a scheduled recording starts. A crash after consumption can omit playback
 but must not replay that prayer. See the [settings guide](../../firmware/esphome/scheduler/SETTINGS.md)
 and dated [device validation](feasibility-report.md).
 
-These developer results do not settle release recording selection, content
-approval or redistribution rights.
+The normal and Fajr recordings are selected and approved in the
+[recording registry](../../release/recordings.json), with their exact bytes,
+permission basis and attribution in [AUDIO-LICENSES.md](../../AUDIO-LICENSES.md).
+The [current release summary](release-validation-2026-10-03.md) distinguishes
+production listening from format checks and earlier source-bound qualification.
 
-## Initial release
+## Reference release
 
-The base device should support:
+The reference firmware supports:
 
 - one normal Athan;
 - one Fajr Athan;
 - local playback without a cloud service;
 - independent Athan volume;
 - clean interruption/dismiss behavior.
+
+Application-only firmware updates retain installed recordings. A newer recording
+in a fresh-install bundle does not replace audio on an existing speaker. There
+is no owner-facing audio update flow; replacing shared audio requires a separately
+reviewed preserving procedure. Keep recordings outside application slots.
 
 ## Quran
 
