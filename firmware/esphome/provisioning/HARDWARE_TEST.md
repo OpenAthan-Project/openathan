@@ -1,12 +1,11 @@
 # Provisioning hardware acceptance runbook
 
-This is a procedure, not a statement that every case is pending or passed.
+Select acceptance work using the dated validation records.
 Source-bound first-run, USB recovery and later controls/preservation results are
 recorded in the [dated validation report](../../../docs/development/feasibility-report.md).
 See the [current release evidence and limits](../../../docs/development/release-validation-2026-10-03.md)
 before selecting new acceptance work; do not repeat unrelated completed checks.
-This runbook is
-for the existing AtomS3R C126 + Voice Pyramid A167. Execute hardware steps only in
+This runbook covers AtomS3R C126 + Voice Pyramid A167. Execute hardware steps only in
 a separately coordinated session. This procedure uses a verified, application-only
 USB update. The reference now includes the authenticated firmware upgrade API;
 ordinary provisioning test firmware cannot install production releases. Use the

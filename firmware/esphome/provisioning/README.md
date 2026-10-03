@@ -247,9 +247,8 @@ first-run, USB recovery, phone controls and interruption results by tested sourc
 The [current release summary](../../../docs/development/release-validation-2026-10-03.md)
 adds production migration, approved media, listening and public-delivery evidence.
 Host/browser simulations do not establish hidden-network radio behavior, broader
-phone/browser coverage or physical acceptance of every later revision. Retain
-those boundaries rather than treating this runbook as a blanket pass or an
-undated list of unfinished tests.
+phone/browser coverage or physical acceptance of every later revision. Preserve
+those source and coverage limits when selecting new acceptance work.
 
 ## Optional lights
 
