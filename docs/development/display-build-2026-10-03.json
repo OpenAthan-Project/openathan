@@ -1,0 +1,83 @@
+{
+  "baseline_source": "bf3b200e549dbfc9b216a27df0e04ae982855481",
+  "candidate_runtime_source_sha256": "28c9a67455361b4deb4726fe5e1925592e9e716e07303b0b21b1cebac5eb45dc",
+  "source_digest_algorithm": "SHA256 of sorted repository-relative path + NUL + file bytes + NUL for the two configuration files and both new components .py/.h/.cpp files",
+  "toolchain": {
+    "python": "3.13.0",
+    "esphome": "2026.9.0",
+    "esp_idf": "5.5.5",
+    "compiler": "esp-14.2.0_20260121",
+    "tzdata": "2026.4"
+  },
+  "variants": {
+    "reference": {
+      "baseline": {
+        "application_bytes": 1211680,
+        "application_sha256": "007d73ec7d733da81fc05931fc109f98f30b423e3c23e45f3c3394296665ea0d",
+        "static_ram_bytes": 113351,
+        "application_budget_remaining_bytes": 361184,
+        "slot_free_bytes": 885472
+      },
+      "candidate": {
+        "application_bytes": 1249456,
+        "application_sha256": "b84bb1b28607bc92fd27492c070cf2e5a200f40e8ecdd07a35655a64e8e2fb0c",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 323408,
+        "slot_free_bytes": 847696
+      },
+      "application_delta_bytes": 37776
+    },
+    "isolated": {
+      "baseline": {
+        "application_bytes": 1213504,
+        "application_sha256": "68b45f7e2fdb017fabc582497ca60fde7d03be07e686cab5156b61298c555e1c",
+        "static_ram_bytes": 113351,
+        "application_budget_remaining_bytes": 359360,
+        "slot_free_bytes": 883648
+      },
+      "candidate": {
+        "application_bytes": 1251248,
+        "application_sha256": "8a662feccc569662304adb018164681f5e554144b084dddcd6f5ca967a11aa36",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 321616,
+        "slot_free_bytes": 845904
+      },
+      "application_delta_bytes": 37744
+    },
+    "qualification": {
+      "baseline": {
+        "application_bytes": 1218992,
+        "application_sha256": "d9d5c690f0dda4a53377a1c3447df695183cd73a4487b52b8c640b4703ae1097",
+        "static_ram_bytes": 113431,
+        "application_budget_remaining_bytes": 353872,
+        "slot_free_bytes": 878160
+      },
+      "candidate": {
+        "application_bytes": 1256672,
+        "application_sha256": "903adcd5c8ce2391c1dc9583aa2f714a34034db6398884185259d2edb1947d77",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316192,
+        "slot_free_bytes": 840480
+      },
+      "application_delta_bytes": 37680
+    },
+    "rollback": {
+      "baseline": {
+        "application_bytes": 1218992,
+        "application_sha256": "019efe0ba0086c8e5b2b89ce04127d2235d3faa4850f54b7a1cda0f9c2bac48a",
+        "static_ram_bytes": 113431,
+        "application_budget_remaining_bytes": 353872,
+        "slot_free_bytes": 878160
+      },
+      "candidate": {
+        "application_bytes": 1256672,
+        "application_sha256": "615536f7f857243c2108b4ebc096428d53bbefb4fe6f5901d74882c12f697520",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316192,
+        "slot_free_bytes": 840480
+      },
+      "application_delta_bytes": 37680
+    }
+  },
+  "fixture_inputs_matched": true
+}

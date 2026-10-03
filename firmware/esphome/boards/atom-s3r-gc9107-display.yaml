@@ -1,0 +1,44 @@
+# Optional screen for the physically verified GC9107 AtomS3R revision.
+# Newer ST7735 units require their own validated profile.
+substitutions:
+  display_brightness_percent: "10"
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [atom_s3r_display, openathan_display]
+
+i2c:
+  - id: atom_internal_bus
+    sda: GPIO45
+    scl: GPIO0
+    scan: false
+
+spi:
+  - id: atom_display_spi
+    clk_pin: GPIO15
+    mosi_pin: GPIO21
+
+atom_s3r_display:
+  i2c_id: atom_internal_bus
+  address: 0x30
+  brightness_percent: ${display_brightness_percent}
+
+display:
+  - platform: mipi_spi
+    id: atom_status_lcd
+    spi_id: atom_display_spi
+    model: M5STACK-ATOMS3R-GC9107
+    rotation: 180
+    color_depth: 8
+    update_interval: never
+    auto_clear_enabled: false
+    show_test_card: false
+    lambda: |-
+      id(athan_status_screen).draw(it);
+
+openathan_display:
+  id: athan_status_screen
+  openathan_id: athan_scheduler
+  display_id: atom_status_lcd

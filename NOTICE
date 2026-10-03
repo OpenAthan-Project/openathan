@@ -6,3 +6,11 @@ This product may include or interoperate with third-party software, hardware, an
 Athan and Quran audio recordings are not covered by the OpenAthan software license unless a specific recording is explicitly distributed with compatible rights and attribution.
 
 This repository includes Adhan C++ v1.0.2, copyright Ishraq Hasan, under the MIT license. It is derived from Adhan, copyright 2016 Batoul Apps, also under the MIT license. Both notices are retained in third_party/adhan-cpp/.
+
+The AtomS3R backlight adapter adapts LP5562 initialization from m5stack/esphome-yaml,
+copyright 2025 m5stack, under the MIT license retained in
+firmware/esphome/components/atom_s3r_display/LICENSE.
+
+The display uses Daniel Hepper's public-domain font8x8 basic Latin bitmap font,
+based on Marcel Sondaar's public-domain IBM VGA font work. Attribution and source
+are retained in firmware/esphome/components/openathan_display/README.md and font.h.

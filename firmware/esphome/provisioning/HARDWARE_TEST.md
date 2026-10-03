@@ -278,3 +278,35 @@ The existing `OATHAN` v1 framing is unchanged. Production rejects both commands:
 
 The only public HTTP addition is the informational `test_mode` boolean on status
 snapshots. Cleanup has no HTTP endpoint and does not erase any flash partition.
+
+## Optional GC9107 status display acceptance
+
+The post-v0.2.1 candidate adds an always-on screen for the verified GC9107
+AtomS3R revision. Newer ST7735 units need a separately validated profile.
+These checks are pending; earlier diagnostic display operation does not
+qualify this integrated image or its 10% dimness.
+
+Use this runbook's existing attended preflight and application-only preservation
+procedure. Recheck the actual device, active slot, settings, consumption history,
+shared audio and recovery path before any installation. Do not use a fresh
+installer, historical NVS restore, or synthetic CI audio fixture for this task.
+
+- Confirm orientation and readable next prayer/time at the normal viewing
+  distance, with comfortable dimness in a dark room. Verify cold-start clock
+  waiting, then the saved timezone/time after synchronization.
+- Observe next prayer, existing skip/cancel controls and normal/Fajr playback
+  transitions. Confirm front-button timing/behavior and phone controls are
+  unchanged. Do not alter production prayer history to manufacture a screen.
+- After clock synchronization, disconnect network access in an isolated test:
+  Offline must remain a footer while valid-clock scheduling continues. Exercise
+  incomplete setup, disabled prayers and fault screens using isolated records
+  or host previews, not destructive production changes.
+- Observe audio, local UI/network activity and screen redraws concurrently;
+  record internal heap/minimum/largest free block, fragmentation, PSRAM and
+  relevant stack headroom in an isolated maintainer image. Confirm no audio
+  glitches, resets or missed deadlines. Production excludes that instrumentation.
+- Record exact source/image identity and before/after preserved records. Report
+  physical observations separately from host fixtures and static RAM figures.
+
+See the [display contract](../components/openathan_display/README.md) and
+[dated build report](../../../docs/development/display-validation-2026-10-03.md).
