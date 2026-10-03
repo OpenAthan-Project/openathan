@@ -1,0 +1,74 @@
+{
+  "source_commit": "679217f926e9e865a09150173c58e1146243dd62",
+  "samples": 313,
+  "observation_seconds": 1840.018,
+  "unchanged_boot_id": true,
+  "display_failures": 0,
+  "redraws": 54,
+  "memory": {
+    "free_internal": {
+      "min": 215704,
+      "max": 242740,
+      "initial": 242740,
+      "final": 239036
+    },
+    "min_internal": {
+      "min": 167900,
+      "max": 236796,
+      "initial": 236796,
+      "final": 167900
+    },
+    "largest_internal": {
+      "min": 172032,
+      "max": 196608,
+      "initial": 196608,
+      "final": 192512
+    },
+    "free_psram": {
+      "min": 7214860,
+      "max": 8355820,
+      "initial": 8355820,
+      "final": 8354128
+    },
+    "largest_psram": {
+      "min": 7077888,
+      "max": 8257536,
+      "initial": 8257536,
+      "final": 7208960
+    }
+  },
+  "stack_minimum_free_bytes": {
+    "loopTask": 3054,
+    "httpd": 5644,
+    "ann_read": 4148,
+    "ann_decode": 1728,
+    "speaker_task": 2976
+  },
+  "fajr_observed_seconds": 270.001,
+  "normal_expected_seconds": 233.547755,
+  "normal_first_idle_seconds_after_deadline": 237.00839495658875,
+  "normal_started_offline": "attended user observation; network telemetry unavailable during outage",
+  "offline_seconds": 90.042,
+  "asr_consumed_once": true,
+  "browser_controls": [
+    "skip/cancel acknowledged",
+    "stop acknowledged and eventual idle readback"
+  ],
+  "limits": [
+    "Private encrypted API, trace enumeration and redraw counters affect runtime allocations",
+    "Largest PSRAM block did not fully recover, despite near-baseline free PSRAM",
+    "Bounded run does not establish long-soak fragmentation, maximum-load production readiness, or ST7735 support",
+    "Setup/error cases remain framebuffer previews; no destructive physical fault injection"
+  ],
+  "ordinary_runtime_source_sha256": "f64bfd7ced1330a8ade28f79b3b54df5b87bab03acb3d685b641db306dbc3f71",
+  "maintainer_application_bytes": 1316960,
+  "maintainer_application_budget_remaining_bytes": 255904,
+  "instrumentation": [
+    "Isolated provisioning storage",
+    "Encrypted native API",
+    "FreeRTOS trace stack enumeration every five seconds",
+    "RAM framebuffer redraw counter"
+  ],
+  "protected_production_records_audio_preserved": true,
+  "application_only_restoration": "exact captured published v0.2.1, independently verified"
+}
