@@ -64,15 +64,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
+      - name: Determine whether firmware compilation is required
+        id: build_policy
+        continue-on-error: true
+        run: python tools/ci_build_policy.py
       - name: Install build dependencies
+        if: steps.build_policy.outcome != 'success' || steps.build_policy.outputs.build_required != 'false'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build libffi-dev libssl-dev
           python -m pip install -r firmware/esphome/requirements.txt
       - name: Compile and inspect firmware
+        if: steps.build_policy.outcome != 'success' || steps.build_policy.outputs.build_required != 'false'
         env:
           CONFIGURATION: ${{ matrix.configuration }}
           ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
@@ -101,7 +108,7 @@ jobs:
             --log "$RUNNER_TEMP/compile.log" \
             --audio-image "$RUNNER_TEMP/audio-fixture/athan-audio.bin"
       - name: Test settings JSON with the resolved firmware library
-        if: matrix.configuration == 'device'
+        if: matrix.configuration == 'device' && (steps.build_policy.outcome != 'success' || steps.build_policy.outputs.build_required != 'false')
         env:
           OPENATHAN_ARDUINOJSON_INCLUDE: ${{ runner.temp }}/firmware/openathan-feasibility/managed_components/bblanchon__arduinojson/src
         run: |
@@ -110,7 +117,7 @@ jobs:
           python -m unittest discover -s tests -p test_settings_adapter.py -v
           python tools/check_upgrade_runtime.py --arduinojson "$OPENATHAN_ARDUINOJSON_INCLUDE"
       - name: Test update request formatting with the resolved SDK
-        if: matrix.configuration == 'reference'
+        if: matrix.configuration == 'reference' && (steps.build_policy.outcome != 'success' || steps.build_policy.outputs.build_required != 'false')
         env:
           ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
         run: python tools/check_upgrade_http.py --build-dir "$ESPHOME_BUILD_PATH/openathan"

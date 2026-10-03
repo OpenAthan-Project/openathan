@@ -54,6 +54,23 @@ uses Node 24.19.0 and the pinned website validator to check installer compatibil
 See [release preparation](../../docs/development/releases.md) for the explicit
 build, package and draft-upload commands.
 
+## Documentation-only pull requests
+
+All eight check names remain present on every pull request. Each firmware job
+checks the PR merge identity and complete changed-path list before installing
+build dependencies. For documentation-only changes, it reports an intentional
+omission in its job summary and skips dependency installation, compilation,
+capacity checks and the regressions requiring resolved firmware libraries.
+Host tests and browser tests still run normally.
+
+The policy in `tools/ci_build_policy.py` allows Markdown under `docs/` and an
+explicit list of existing prose-only Markdown paths elsewhere. It excludes
+`AUDIO-LICENSES.md`, which release tooling consumes, and third-party metadata.
+Unknown paths, mixed changes, renames involving non-documentation paths, empty
+diffs and detection failures run the complete builds. Every push to `main` also
+runs the complete suite. The workflow uses step conditions rather than skipping
+the workflow or removing matrix entries, preserving all existing check names.
+
 ## Reproduce from a clean checkout
 
 Use a fresh disposable checkout and a Python 3.13 virtual environment. Install
