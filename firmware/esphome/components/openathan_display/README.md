@@ -3,11 +3,13 @@
 The reference candidate includes a dim, always-on 128×128 status screen through
 [the GC9107 board profile](../../boards/atom-s3r-gc9107-display.yaml).
 This is development work after v0.2.1, not a capability in the published v0.2.1
-bundle. Hardware acceptance and a successor release remain separate.
+bundle. The dated report records isolated hardware acceptance; successor
+release qualification remains separate.
 
 The board profile keeps the screen on at a build-time default of 10% backlight
-brightness (`display_brightness_percent`) and rotation 180. Physical dimness and
-orientation still require acceptance on the integrated device. This screen has
+brightness (`display_brightness_percent`) and rotation 180. Isolated hardware
+acceptance confirmed dimness, readability and orientation on the verified GC9107
+unit; see the dated report for source and measurement limits. This screen has
 its own small-device layout; the device-local web UI retains its existing design.
 
 The presenter is plain C++ without ESPHome dependencies. Its firmware adapter
@@ -20,8 +22,9 @@ must not gate the scheduler, local controls or application-update health.
 The adapter polls once a second and sends a framebuffer only when visible
 content changes. The clock displays minutes, not seconds. The driver uses an
 8-bit framebuffer (16 KiB); allocator placement, SPI transfer cost, runtime heap
-and PSRAM headroom must be observed on the integrated image during hardware
-acceptance. Static RAM and a successful build are not those measurements.
+and PSRAM headroom are measured separately during hardware acceptance. The
+dated report records a bounded isolated run and its fragmentation limits;
+static RAM and a successful build do not establish runtime headroom.
 
 ## Layout and states
 

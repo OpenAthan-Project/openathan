@@ -49,7 +49,7 @@ playback. Earlier accepted evidence is retained with these limits.
 - [x] Optional LED countdown/status adapter with independent on/off and brightness.
 - [ ] Optional touch playback/volume/dismiss adapter.
 - [x] Optional GC9107 AtomS3R display-status adapter (development candidate;
-      [integrated hardware acceptance pending](display-validation-2026-10-03.md)).
+      [bounded isolated hardware acceptance recorded](display-validation-2026-10-03.md)).
 
 Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 

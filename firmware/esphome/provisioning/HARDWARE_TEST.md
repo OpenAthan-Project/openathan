@@ -283,8 +283,9 @@ snapshots. Cleanup has no HTTP endpoint and does not erase any flash partition.
 
 The post-v0.2.1 candidate adds an always-on screen for the verified GC9107
 AtomS3R revision. Newer ST7735 units need a separately validated profile.
-These checks are pending; earlier diagnostic display operation does not
-qualify this integrated image or its 10% dimness.
+Use the dated display report to select checks for the exact candidate source.
+The recorded bounded isolated run does not qualify other integrated images,
+brightness settings, long-soak behavior or maximum-load production headroom.
 
 Use this runbook's existing attended preflight and application-only preservation
 procedure. Recheck the actual device, active slot, settings, consumption history,

@@ -92,7 +92,9 @@ alone cannot establish the current time after a cold boot.
   Reuse physical evidence only within its recorded source and scope; see the
   [current release evidence](docs/development/release-validation-2026-10-03.md).
   The optional GC9107 status display is a post-v0.2.1 development candidate;
-  integrated hardware acceptance remains pending. Quran, adhkar, touch adapters,
+  [bounded isolated hardware acceptance](docs/development/display-validation-2026-10-03.md)
+  is recorded; successor release qualification remains separate. Quran, adhkar,
+  touch adapters,
   expanded storage and Home Assistant integration remain future scope in the
   [roadmap](docs/development/roadmap.md).
 - Software, documentation, and original hardware designs retain their respective

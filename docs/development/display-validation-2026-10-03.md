@@ -63,22 +63,77 @@ excluding documentation. Later source changes require new measurements.
   framebuffer, prevents an implicit test card, and rejects brightness outside
   1–100. Brightness defaults to 10% at build time.
 
-The existing browser interface and HTTP contracts are unchanged; local browser
-tests were not repeated for this framebuffer-only change. Existing scheduler-only
-firmware variants do not include the optional display profile.
+The existing browser interface and HTTP contracts are unchanged. Browser
+regressions passed in CI; live-device browser checks are recorded below.
+Existing scheduler-only firmware variants do not include the optional display
+profile.
 
-## Hardware limits and next acceptance
+## Attended isolated hardware acceptance
 
-No device was accessed, installed, restarted, played or modified for this work.
-Earlier source-bound evidence established that this unit's GC9107 screen and
-LP5562 helper could display diagnostic rows. It does not establish this new
-integrated adapter's dimness, orientation, stability or audio concurrency.
-Newer ST7735 AtomS3R revisions are outside this profile's qualification.
+The 2026-10-03 session tested an isolated maintainer image based on display
+source `679217f926e9e865a09150173c58e1146243dd62` on the previously verified
+GC9107 AtomS3R + Voice Pyramid, using bottom-only power. The private image adds
+an encrypted native telemetry API, FreeRTOS task-stack enumeration and RAM
+redraw counters. Production excludes this instrumentation. Its actual OTA is
+1,316,960 bytes, with 255,904 bytes of application budget remaining.
 
-The driver allocates a 16 KiB 8-bit framebuffer. Static RAM figures do not prove
-runtime heap, largest free block/fragmentation, PSRAM or stack headroom during
-audio, networking and redraws. Those observations remain pending in a separately
-coordinated isolated-maintainer session. Follow the [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md#optional-gc9107-status-display-acceptance),
-preserve actual current settings/history/audio/recovery and use an application-only
-transition. Do not install synthetic CI fixtures or restore historical prayer
-history. Firmware publication and website adoption remain separate release work.
+Observed results, separate from the host fixtures above:
+
+- The operator confirmed upright text, normal-distance readability and
+  comfortable dimness at the 10% default. Cold power-on showed clock waiting,
+  followed by the synchronized saved Toronto time and disabled-prayer screen.
+- The next-prayer screen, three-second front-button skip, seven-second cancel,
+  playback screen and brief-tap stop passed on the device and in status reads.
+- Both retained, approved recordings completed clearly with normal display
+  transitions. Fajr telemetry spanned 270.001 seconds for its 268.069-second
+  recording. The normal recording is 233.548 seconds; the first idle read was
+  237.008 seconds after its isolated scheduled deadline.
+- During a 90.042-second device-only Wi-Fi outage, the operator observed the
+  Offline footer, advancing clock and scheduled normal playback before Wi-Fi
+  returned. Reconnection retained clock/readiness, one boot identity, no fault
+  and exactly one Asr consumption watermark advancement. No clock or history
+  was rewound; the scheduled test used isolated location/offset settings.
+- The actual device page loaded at a 390-pixel browser width during audio.
+  Browser skip/cancel returned HTTP 200; Stop returned HTTP 200 and reached
+  idle on readback. Stop acknowledgment can precede the asynchronous audio
+  adapter's idle transition; the browser check waits for both.
+- Across 1,840.018 seconds and 313 distinct telemetry samples, the image had
+  54 redraws, no observed reset, no display/backlight failure and no reported
+  audio glitch. The operator confirmed both complete recordings and returns.
+
+| Runtime measure, bytes | Initial | Minimum | Final quiet |
+| --- | ---: | ---: | ---: |
+| Sampled free internal heap | 242,740 | 215,704 | 239,036 |
+| Cumulative minimum internal heap | 236,796 | 167,900 | 167,900 |
+| Largest internal block | 196,608 | 172,032 | 192,512 |
+| Free PSRAM | 8,355,820 | 7,214,860 | 8,354,128 |
+| Largest PSRAM block | 8,257,536 | 7,077,888 | 7,208,960 |
+
+Minimum unused stack headroom, in pinned ESP-IDF bytes: loop 3,054; HTTP 5,644;
+audio reader 4,148; decoder 1,728; speaker 2,976. These are observed task-specific
+high-water marks, not a guarantee for every possible load.
+
+Free PSRAM returned close to baseline, but its largest block remained exactly
+1 MiB below the initial value. Retain that fragmentation result; this bounded
+run does not establish long-soak behavior or maximum-load production headroom.
+The encrypted API/trace instrumentation changes allocations, so these numbers
+qualify this isolated image rather than the ordinary production binary. No
+physical fault injection or destructive setup/history change was used; those
+screens remain covered by host previews. Newer ST7735 units remain outside the
+profile's qualification.
+
+Fresh paired USB reads before installation and after testing verified exact
+image identity and preserved production record payloads, shared audio,
+bootloader, OTA selection and inactive application. Test settings were returned
+to their original all-prayers-off values with monotonic test history retained.
+The captured exact published v0.2.1 application was restored through a guarded
+application-only write and independent readback. No factory image, synthetic
+recording, bootloader, partition, credential or historical NVS restore was used.
+
+[Machine-readable hardware results](display-hardware-2026-10-03.json) retain the
+source binding, runtime measurements and limits. Private evidence retains raw
+traces, compatible recovery, readbacks, listener reports and corrected harness
+oracles; no private credentials or recovery images are committed.
+Firmware publication and website adoption remain separate release work. Use
+this source-bound result with the [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md#optional-gc9107-status-display-acceptance)
+when selecting future acceptance checks.
