@@ -1,5 +1,9 @@
 # Firmware release preparation
 
+The next reference candidate is v0.3.0. Its [candidate notes](../releases/v0.3.0.md)
+and [preparation evidence](v0.3.0-preparation-2026-10-03.md) distinguish version
+preparation from the remaining exact-source build and hardware acceptance.
+
 Upgrade-capable firmware also publishes signed application-only assets. Pass
 `--signing-key PATH` (a private P-256 key outside Git) to the packaging command;
 see the [upgrade contract and recovery requirements](firmware-upgrades.md).
