@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
               if "-DOPENATHAN_UPGRADE_QUALIFICATION" in extra else []),
             *([] if os.uname().sysname == "Darwin" else ["-lcrypto"]), "-o", str(output)], check=True)
         subprocess.run([output], check=True)
-    for version in ("v0.2.0", "v0.3.0", "v0.4.0"):
+    for version in ("v0.2.0", "v0.2.1", "v0.3.0", "v0.4.0"):
         run("upgrade_runtime_tests.cpp", version)
     run("upgrade_isolated_tests.cpp", "v0.2.0", ["-DOPENATHAN_PROVISIONING_TEST_STORAGE"])
     for failure in ("false", "true"):

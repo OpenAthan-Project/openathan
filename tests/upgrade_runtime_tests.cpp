@@ -31,7 +31,7 @@ void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
 int action(Upgrade &update,const char *name,const char *version=nullptr){JsonDocument doc;auto root=doc.to<JsonObject>();if(version)root["version"]=version;std::string error;return update.action(name,root,error);}
-void reset(){assert(live_read_buffers==0);read_buffer_allocation_fails=false;read_buffer_allocation_attempts=0;now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
+void reset(){reset_http();assert(live_read_buffers==0);read_buffer_allocation_fails=false;read_buffer_allocation_attempts=0;now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
   application_response=std::string(512,'a');uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
   std::string hash;for(auto b:bytes){hash+="0123456789abcdef"[b>>4];hash+="0123456789abcdef"[b&15];}
   JsonDocument payload;payload["schema"]=1;payload["version"]="v0.3.0";payload["commit"]=std::string(40,'a');payload["hardware"]="atoms3r-c126-pyramid-a167";payload["layout"]="dual-2m-audio-3_5m-v1";payload["storageFormat"]=1;payload["audioFormat"]=1;payload["rollback"]=true;payload["bytes"]=512;payload["sha256"]=hash;
@@ -52,7 +52,100 @@ void expect_record(const std::string &queue,const char *expected) {
 void expect_result(Upgrade &update,const char *result) {
   JsonDocument doc;update.snapshot(doc.to<JsonObject>());assert(doc["result"].as<std::string>()==result);
 }
+const std::string latest_url="https://github.com/OpenAthan-Project/openathan/releases/latest/download/upgrade.json";
+const std::string tagged_url="https://github.com/OpenAthan-Project/openathan/releases/download/v0.3.0/upgrade.json";
+std::string asset_url(size_t bytes) {
+  // Synthetic query with the shape/length of a GitHub signed asset URL. No
+  // live token or private release response is retained in the test fixture.
+  const auto prefix="https://release-assets.githubusercontent.com/"+std::string(79,'p')+"?sig=";
+  assert(bytes>=prefix.size());return prefix+std::string(bytes-prefix.size(),'q');
+}
+void expect_http_cleanup() {assert(live_http_clients==0 && live_http_tx_bytes==0 && live_read_buffers==0);}
+void expect_http_config() {
+  for(const auto &request:http_requests) {
+    assert(request.tx==static_cast<int>(request.url.size()+512) && request.tx<=4608);
+    assert(request.rx==4096 && request.timeout==4000 && request.auto_redirect_disabled);
+  }
+  assert(last_bundle && last_ca.empty());expect_http_cleanup();
+}
+void check_redirects() {
+  for(const auto bytes:{size_t{150},size_t{905},size_t{4096}}) {
+    reset();const auto asset=asset_url(bytes);
+    http_replies[latest_url]={302,tagged_url,""};http_replies[tagged_url]={302,asset,""};
+    http_replies[asset]={200,"",descriptor_response};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();
+    assert(state(u)==(newer_release("v0.3.0",OPENATHAN_FIRMWARE_VERSION)?"available":"current"));
+    assert(http_requests.size()==3 && http_requests[2].url==asset && http_cleanups==3);
+    assert(peak_http_tx_bytes==bytes+512);expect_http_config();
+    assert(saved_record.empty() && erases==0 && writes==0 && boot_selections==0);
+  }
+  // A long GitHub path leaves less header space than the longer asset hostname.
+  {reset();std::string url="https://github.com/?q=";url+=std::string(4096-url.size(),'q');
+    http_replies[latest_url]={302,url,""};http_replies[url]={200,"",descriptor_response};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)!="failed");expect_http_config();}
+  for(const auto &unsafe:{"http://github.com/a", "https://example.com/a", "https://github.com.evil.test/a",
+                          "https://github.com@evil.test/a", "/relative"}) {
+    reset();http_replies[latest_url]={302,unsafe,""};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)=="failed" && http_requests.size()==1);
+    expect_http_cleanup();assert(saved_record.empty() && erases==0 && boot_selections==0);
+  }
+  for(const auto status:{301,302,303,307,308}) {
+    reset();const auto asset=asset_url(905);
+    http_replies[latest_url]={status,asset,""};http_replies[asset]={200,"",descriptor_response};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)!="failed");expect_http_config();
+  }
+  for(const auto status:{302,404}) {
+    reset();http_replies[latest_url]={status,"",""};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)=="failed" && http_requests.size()==1);expect_http_cleanup();
+  }
+  {reset();http_replies[latest_url]={302,asset_url(4097),""};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)=="failed" && http_requests.size()==1);expect_http_cleanup();}
+  for(const auto redirects:{4u,5u}) {
+    reset();std::string url=latest_url;
+    for(unsigned i=0;i<redirects;++i) {
+      const auto next="https://github.com/redirect/"+std::to_string(i);
+      http_replies[url]={302,next,""};url=next;
+    }
+    http_replies[url]={200,"",descriptor_response};
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert((state(u)=="failed")== (redirects==5));
+    assert(http_requests.size()==5 && http_cleanups==5);expect_http_config();
+  }
+  for(const auto failure:{HttpFailure::INIT,HttpFailure::OPEN,HttpFailure::HEADERS}) {
+    for(const bool redirected:{false,true}) {
+      reset();const auto asset=asset_url(905);
+      if(redirected)http_replies[latest_url]={302,asset,""};
+      http_failure=failure;http_failure_url=redirected?asset:latest_url;
+      Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+      assert(action(u,"check")==200);run_worker();assert(state(u)=="failed");expect_http_cleanup();
+      assert(saved_record.empty() && erases==0 && writes==0 && boot_selections==0);
+      reset_http();assert(action(u,"check")==200);run_worker();assert(state(u)!="failed");expect_http_config();
+    }
+  }
+  {reset();const auto asset=asset_url(905);http_replies[latest_url]={302,asset,""};
+    http_replies[asset]={200,"",descriptor_response};transfer_fail=true;
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)=="failed");expect_http_cleanup();
+    assert(saved_record.empty() && erases==0 && writes==0 && boot_selections==0);
+  }
+  {reset();JsonDocument envelope,payload;assert(!deserializeJson(envelope,descriptor_response));
+    assert(!deserializeJson(payload,envelope["payload"].as<std::string>()));payload["version"]="v0.2.0";
+    std::string text;serializeJson(payload,text);envelope["payload"]=text;
+    descriptor_response.clear();serializeJson(envelope,descriptor_response);
+    Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    assert(action(u,"check")==200);run_worker();assert(state(u)=="current");
+    assert(action(u,"install","v0.2.0")==409 && saved_record.empty());
+    assert(erases==0 && writes==0 && boot_selections==0);expect_http_config();
+  }
+}
 int main(){
+  check_redirects();
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
     JsonDocument doc;u.snapshot(doc.to<JsonObject>());assert(doc["qualification"].isUnbound());
     assert(action(u,"qualification")==400&&erases==0&&writes==0&&boot_selections==0);}
@@ -70,7 +163,7 @@ int main(){
     assert(confirmations==0 && rollbacks==1);expect_record(descriptor_response,"v0.3.0");
     std::cout<<"Updated application confirms the retained handoff request\n";
   }
-  if(std::string(OPENATHAN_FIRMWARE_VERSION)!="v0.2.0") {
+  if(!newer_release("v0.3.0",OPENATHAN_FIRMWARE_VERSION)) {
     for(const char *expected:{"","v0.3.0"}) {
       reset();JsonDocument doc;doc["schema"]=1;doc["queue"]=descriptor_response;doc["expected"]=expected;
       serializeJson(doc,saved_record);inactive_state=ESP_OTA_IMG_ABORTED;
@@ -111,6 +204,24 @@ int main(){
     assert(saved_record==request && boot_selections==0);
   }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);assert(action(u,"install","v0.3.0")==409);a.sample.next->utc=1800;u.loop(true);assert(!pending_worker);a.sample.next->utc=9000;u.loop(true);run_worker();assert(flashed==application_response);assert(boot_selections==0);u.loop(true);assert(boot_selections==1 && esphome::App.reboots==1);}
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);reset_http();
+    const std::string application_url="https://github.com/OpenAthan-Project/openathan/releases/download/v0.3.0/firmware.ota.bin";
+    const auto asset=asset_url(4096);http_replies[application_url]={307,asset,""};
+    http_replies[asset]={200,"",application_response};u.loop(true);run_worker();
+    assert(flashed==application_response && state(u)=="queued" && http_requests.size()==2);
+    assert(boot_selections==0);expect_http_config();u.loop(true);assert(boot_selections==1);
+  }
+  for(const auto failure:{HttpFailure::INIT,HttpFailure::OPEN,HttpFailure::HEADERS}) {
+    reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);reset_http();
+    const auto request=saved_record;
+    const std::string application_url="https://github.com/OpenAthan-Project/openathan/releases/download/v0.3.0/firmware.ota.bin";
+    const auto asset=asset_url(905);http_replies[application_url]={302,asset,""};
+    http_replies[asset]={200,"",application_response};http_failure=failure;http_failure_url=asset;
+    u.loop(true);run_worker();assert(state(u)=="queued" && saved_record==request);
+    assert(erases==0 && writes==0 && boot_selections==0);expect_http_cleanup();
+    http_failure=HttpFailure::NONE;now_us+=300000000;u.loop(true);run_worker();
+    assert(flashed==application_response && boot_selections==0);expect_http_config();
+  }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);Upgrade restored;begin(restored,a);assert(state(restored)=="queued");assert(action(restored,"cancel")==200);assert(state(restored)=="idle");}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);u.loop(true);callback_update=&u;on_read=cancel_download;run_worker();assert(boot_selections==0 && aborts==1 && erases==1 && writes==0);assert(state(u)=="idle");}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);u.loop(true);callback_update=&u;callback_athan=&a;on_read=prayer_starts;run_worker();assert(boot_selections==0 && aborts==1 && erases==1 && writes==0);assert(state(u)=="queued");}

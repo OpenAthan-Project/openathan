@@ -71,6 +71,14 @@ commit, hardware/layout, settings/audio format compatibility, rollback requireme
 application byte count and SHA-256. The firmware derives release asset URLs from
 the verified tag; callers cannot supply URLs. TLS certificate verification is
 mandatory, and redirects are restricted to GitHub release-storage HTTPS hosts.
+Each validated URL (at most 4,096 bytes) gets an HTTP transmit buffer of its
+length plus 512 bytes, capped at 4,608 bytes. ESP-IDF formats the request line
+and the first headers together; the extra space accommodates GitHub's long
+signed asset queries and the default headers. The previous redirect client is
+released before allocating the next one. The four-redirect limit and four-second
+HTTP timeout still apply. Allocation or transport failure retains the running
+application; a queued installation remains subject to the existing retry policy.
+See the [download regression and capacity results](upgrade-download-validation-2026-10-02.md).
 
 `release/firmware.json` owns the candidate version and format identifiers. Keep
 the official YAML project version aligned. `tools/release.py build` embeds its
