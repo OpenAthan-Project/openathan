@@ -31,6 +31,12 @@ Updater host tests cover production behavior, ordinary isolated installation
 denial, both qualification holds, erased/corrupt baseline metadata and forced
 startup rollback. Python tests cover real local TLS, feed faults, release
 exclusion and stale-state/write-failure guards for scoped USB transitions.
+Updater transport regressions cover long GitHub asset queries, maximum-length
+URLs, per-redirect buffer sizing, cleanup and failed allocation/transport retries.
+The reference build also compiles its resolved ESP-IDF request formatter and
+header sender with the SDK header implementation against a host transport. It
+checks that complete requests are transmitted, including the header-space
+boundary; it does not establish device TLS or runtime memory headroom.
 
 Qualification C++ is a separate component compiled only into the two maintainer
 variants. Host checks reject its inclusion in production or incomplete test

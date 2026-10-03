@@ -70,7 +70,10 @@ struct Response {
       config.timeout_ms = 4000;
       config.disable_auto_redirect = true;
       config.buffer_size = 4096;
-      config.buffer_size_tx = 512;
+      // IDF formats the request line and the first headers in this buffer.
+      // GitHub asset redirects carry long queries; validated URLs cap this at
+      // 4608 bytes while short requests allocate only what they need.
+      config.buffer_size_tx = static_cast<int>(url.size() + 512);
       config.event_handler = event;
       config.user_data = this;
       location.clear();

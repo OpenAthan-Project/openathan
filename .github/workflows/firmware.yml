@@ -109,6 +109,11 @@ jobs:
           cmake --build build --target openathan_core --parallel 2
           python -m unittest discover -s tests -p test_settings_adapter.py -v
           python tools/check_upgrade_runtime.py --arduinojson "$OPENATHAN_ARDUINOJSON_INCLUDE"
+      - name: Test update request formatting with the resolved SDK
+        if: matrix.configuration == 'reference'
+        env:
+          ESPHOME_BUILD_PATH: ${{ runner.temp }}/firmware
+        run: python tools/check_upgrade_http.py --build-dir "$ESPHOME_BUILD_PATH/openathan"
 
   device-ui:
     runs-on: ubuntu-24.04
