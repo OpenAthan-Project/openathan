@@ -48,9 +48,10 @@ There are no animation, scrolling, remote fonts or graphical UI framework.
 
 Faults take precedence over setup, then playback, clock readiness, disabled
 prayers and next-event status. Playback remains visible if time becomes invalid;
-the clock then displays `--:--`. Wi-Fi loss alone only changes the footer to
-Offline: valid-clock standalone scheduling continues. An unrelated/stale skip
-does not label a different event. Front-button stop/skip/cancel behavior is
+the clock then displays `--:--`. The connected footer stays blank: successful
+Wi-Fi connection needs no label during normal operation. Wi-Fi loss alone changes
+the footer to Offline: valid-clock standalone scheduling continues. An
+unrelated/stale skip does not label a different event. Front-button stop/skip/cancel behavior is
 unchanged, and the display introduces no additional controls.
 
 ## Font attribution

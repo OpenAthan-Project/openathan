@@ -31,7 +31,7 @@ inline bool valid_time(std::string_view value) {
 inline Frame present(const Inputs &in) {
   Frame f;
   text(f.clock, in.clock_valid && valid_time(in.local_time) ? in.local_time : "--:--");
-  text(f.footer, in.wifi_connected ? "Wi-Fi connected" : "Offline");
+  if (!in.wifi_connected) text(f.footer, "Offline");
   if (in.storage_fault || in.status.fault != Fault::NONE) {
     f.error = true;
     text(f.heading, "Error");

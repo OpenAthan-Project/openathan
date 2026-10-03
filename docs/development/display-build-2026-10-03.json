@@ -1,6 +1,6 @@
 {
   "baseline_source": "bf3b200e549dbfc9b216a27df0e04ae982855481",
-  "candidate_runtime_source_sha256": "28c9a67455361b4deb4726fe5e1925592e9e716e07303b0b21b1cebac5eb45dc",
+  "candidate_runtime_source_sha256": "f64bfd7ced1330a8ade28f79b3b54df5b87bab03acb3d685b641db306dbc3f71",
   "source_digest_algorithm": "SHA256 of sorted repository-relative path + NUL + file bytes + NUL for the two configuration files and both new components .py/.h/.cpp files",
   "toolchain": {
     "python": "3.13.0",
@@ -19,13 +19,13 @@
         "slot_free_bytes": 885472
       },
       "candidate": {
-        "application_bytes": 1249456,
-        "application_sha256": "b84bb1b28607bc92fd27492c070cf2e5a200f40e8ecdd07a35655a64e8e2fb0c",
+        "application_bytes": 1249424,
+        "application_sha256": "b9d5521e6f992e99745cfbb20bc3607d15deeb8443fe5836c67d4d8550bc7c72",
         "static_ram_bytes": 115123,
-        "application_budget_remaining_bytes": 323408,
-        "slot_free_bytes": 847696
+        "application_budget_remaining_bytes": 323440,
+        "slot_free_bytes": 847728
       },
-      "application_delta_bytes": 37776
+      "application_delta_bytes": 37744
     },
     "isolated": {
       "baseline": {
@@ -36,13 +36,13 @@
         "slot_free_bytes": 883648
       },
       "candidate": {
-        "application_bytes": 1251248,
-        "application_sha256": "8a662feccc569662304adb018164681f5e554144b084dddcd6f5ca967a11aa36",
+        "application_bytes": 1251200,
+        "application_sha256": "6bb2d1a7a4179712da8f6fd56bb39e198585ca9892545e9c56b14b0e0d2659e7",
         "static_ram_bytes": 115123,
-        "application_budget_remaining_bytes": 321616,
-        "slot_free_bytes": 845904
+        "application_budget_remaining_bytes": 321664,
+        "slot_free_bytes": 845952
       },
-      "application_delta_bytes": 37744
+      "application_delta_bytes": 37696
     },
     "qualification": {
       "baseline": {
@@ -53,13 +53,13 @@
         "slot_free_bytes": 878160
       },
       "candidate": {
-        "application_bytes": 1256672,
-        "application_sha256": "903adcd5c8ce2391c1dc9583aa2f714a34034db6398884185259d2edb1947d77",
+        "application_bytes": 1256640,
+        "application_sha256": "114d6db8847eb0c919657e6697294800dba8447ed9955b950b814c031441ba94",
         "static_ram_bytes": 115195,
-        "application_budget_remaining_bytes": 316192,
-        "slot_free_bytes": 840480
+        "application_budget_remaining_bytes": 316224,
+        "slot_free_bytes": 840512
       },
-      "application_delta_bytes": 37680
+      "application_delta_bytes": 37648
     },
     "rollback": {
       "baseline": {
@@ -70,13 +70,13 @@
         "slot_free_bytes": 878160
       },
       "candidate": {
-        "application_bytes": 1256672,
-        "application_sha256": "615536f7f857243c2108b4ebc096428d53bbefb4fe6f5901d74882c12f697520",
+        "application_bytes": 1256640,
+        "application_sha256": "1d51c307589364e9112a90f458247555db0aaf205682d9221ad544bd37cfa84e",
         "static_ram_bytes": 115195,
-        "application_budget_remaining_bytes": 316192,
-        "slot_free_bytes": 840480
+        "application_budget_remaining_bytes": 316224,
+        "slot_free_bytes": 840512
       },
-      "application_delta_bytes": 37680
+      "application_delta_bytes": 37648
     }
   },
   "fixture_inputs_matched": true
