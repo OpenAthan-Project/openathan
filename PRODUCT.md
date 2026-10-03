@@ -91,8 +91,10 @@ alone cannot establish the current time after a cold boot.
   updates. Website release adoption does not update speakers automatically.
   Reuse physical evidence only within its recorded source and scope; see the
   [current release evidence](docs/development/release-validation-2026-10-03.md).
-  Quran, adhkar, touch/display adapters, expanded storage and Home Assistant
-  integration remain future scope in the [roadmap](docs/development/roadmap.md).
+  The optional GC9107 status display is a post-v0.2.1 development candidate;
+  integrated hardware acceptance remains pending. Quran, adhkar, touch adapters,
+  expanded storage and Home Assistant integration remain future scope in the
+  [roadmap](docs/development/roadmap.md).
 - Software, documentation, and original hardware designs retain their respective
   [Apache-2.0](LICENSE), [CC BY 4.0](docs/LICENSE.md), and
   [CERN-OHL-P-2.0](hardware/LICENSE.md) licensing boundaries. Third-party recordings

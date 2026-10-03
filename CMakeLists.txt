@@ -94,3 +94,10 @@ target_include_directories(light_adapter_tests PRIVATE tests/stubs lib/openathan
   firmware/esphome/components/voice_pyramid)
 target_compile_definitions(light_adapter_tests PRIVATE USE_OPENATHAN_LIGHTS)
 add_test(NAME light_register_safety COMMAND light_adapter_tests)
+
+add_executable(display_tests tests/display_tests.cpp
+  firmware/esphome/components/atom_s3r_display/backlight.cpp)
+target_include_directories(display_tests PRIVATE tests/stubs lib/openathan-core/include
+  firmware/esphome/components/openathan_display firmware/esphome/components/atom_s3r_display)
+target_link_libraries(display_tests PRIVATE openathan_core)
+add_test(NAME display_status_and_backlight COMMAND display_tests)

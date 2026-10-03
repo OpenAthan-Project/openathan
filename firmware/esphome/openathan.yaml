@@ -12,6 +12,7 @@ esphome:
 packages:
   openathan: !include packages/openathan.yaml
   reference_hardware: !include packages/hardware/voice-pyramid.yaml
+  reference_display: !include boards/atom-s3r-gc9107-display.yaml
 
 esp32:
   partitions: feasibility/partitions.csv

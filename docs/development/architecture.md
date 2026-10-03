@@ -83,7 +83,11 @@ request/readback. See the [scheduler guide](../../firmware/esphome/scheduler/REA
 Optional lights now use `light_output_id` and the portable `LightOutput` capability;
 see the [light contract](lights.md). Light preferences have independent persistence
 and revisions, and light failures never gate the scheduler.
-The broader mapping of displays and controls remains planned;
+The reference development candidate has an optional GC9107 AtomS3R status
+display: a read-only presenter consumes existing scheduler/settings state,
+while the C126 board layer owns SPI and its internal-bus backlight adapter.
+See the [display contract](../../firmware/esphome/components/openathan_display/README.md)
+for its compatibility and acceptance limits. Broader display and control mappings remain planned;
 `firmware/esphome/examples/custom-hardware.yaml` illustrates that future mapping
 and is not a buildable release configuration.
 

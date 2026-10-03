@@ -1,6 +1,8 @@
 #include "openathan.h"
 #include "nvs_memory.h"
 #include "../firmware/esphome/components/openathan_device/upgrade_policy.h"
+#include "../firmware/esphome/components/openathan_display/status_display.h"
+#include "esphome/components/wifi/wifi_component.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -22,8 +24,10 @@ struct Audio : Playback {
 };
 struct Calculator : DayCalculator {
   Settings last_settings;
+  unsigned calls{};
   int shift_seconds{};
   bool calculate(const Settings &s, CivilDate date, PrayerDay &out) override {
+    ++calls;
     last_settings = s;
     constexpr unsigned hours[] = {5,6,12,15,18,20};
     for (unsigned i=0; i<6; ++i) out[i] = epoch(date,hours[i])+60*s.offsets[i]+shift_seconds;
@@ -228,6 +232,62 @@ static void timezones() {
       {7200,0,DstRuleType::MONTH_WEEK_DAY,10,1,0}, {10800,0,DstRuleType::MONTH_WEEK_DAY,4,1,0}};
   CHECK(f.device.local_date(epoch({2026,1,1},13),s.timezone,date) && day_number(date)==day_number({2026,1,2}));
   CHECK(f.device.local_date(epoch({2026,7,1},13),s.timezone,date) && day_number(date)==day_number({2026,7,1}));
+}
+
+static void display_adapter() {
+  struct LCD : esphome::display::Display {
+    std::array<uint32_t, 128 * 128> pixels{};
+    void fill(esphome::Color) override { pixels.fill(0); }
+    void draw_pixel_at(int x, int y, esphome::Color color) override {
+      CHECK(x >= 0 && x < 128 && y >= 0 && y < 128);
+      pixels[y * 128 + x] = (uint32_t(color.red) << 16) | (uint32_t(color.green) << 8) | color.blue;
+    }
+    void check_clock(const char *expected) {
+      std::array<uint32_t, 128 * 128> reference{};
+      auto pixel = [&reference](int x, int y, uint32_t rgb) { reference[y * 128 + x] = rgb; };
+      openathan::screen::draw_text(pixel, expected, 6, 1, 0xD0D8D8);
+      for (unsigned index = 6 * 128; index < 14 * 128; ++index) CHECK(pixels[index] == reference[index]);
+    }
+  } lcd;
+  esphome::wifi::WiFiComponent wifi;
+  esphome::wifi::global_wifi_component = &wifi;
+  Fixture f; f.device.valid = false; f.begin();
+  auto settings = f.value();
+  settings.timezone = {"America/Toronto",18000,14400,
+      {7200,0,DstRuleType::MONTH_WEEK_DAY,3,2,0}, {7200,0,DstRuleType::MONTH_WEEK_DAY,11,1,0}};
+  CHECK(f.save(settings) == SettingsResult::SAVED);
+  f.device.valid = true; f.device.utc = epoch({2026,3,8},6) + 59*60; f.device.step(0);
+  esphome::openathan_display::StatusDisplay screen;
+  lcd.set_writer([&screen](esphome::display::Display &canvas) { screen.draw(canvas); });
+  screen.set_display(&lcd); screen.set_openathan(&f.device); screen.setup();
+  CHECK(!screen.is_failed() && lcd.updates == 1); lcd.check_clock("01:59");
+  const auto calculations = f.calculator.calls, starts = f.audio.starts, stops = f.audio.stops;
+  const auto next = f.device.status().next;
+  const auto revision = f.device.settings_service()->saved()->revision;
+  for (unsigned i = 0; i < 20; ++i) screen.update();
+  CHECK(lcd.updates == 1 && f.calculator.calls == calculations && f.audio.starts == starts && f.audio.stops == stops);
+  CHECK(f.device.settings_service()->saved()->revision == revision && f.device.status().next->key == next->key);
+  f.device.step(60); screen.update(); lcd.check_clock("03:00"); // Spring DST gap.
+  f.device.utc = epoch({2026,11,1},5) + 59*60; f.device.step(0); screen.update(); lcd.check_clock("01:59");
+  f.device.step(60); screen.update(); lcd.check_clock("01:00"); // Autumn DST repeat.
+  f.device.utc = epoch({2026,9,25},3) + 59*60; f.device.step(0); screen.update(); lcd.check_clock("23:59");
+  f.device.step(60); screen.update(); lcd.check_clock("00:00");
+  const auto updates = lcd.updates;
+  wifi.connected = false; screen.update(); CHECK(lcd.updates == updates + 1 && f.device.status().automatic_ready);
+  lcd.mark_failed(); screen.update(); CHECK(lcd.updates == updates + 1);
+  CHECK(f.device.upgrade_health() && f.device.status().fault == Fault::NONE);
+  // Use fresh history: the DST tests deliberately visited later dates, whose
+  // consumption watermarks must prevent replay if the clock moves backwards.
+  Fixture healthy; healthy.begin();
+  esphome::openathan_display::StatusDisplay failed;
+  failed.set_display(&lcd); failed.set_openathan(&healthy.device); failed.setup();
+  CHECK(failed.is_failed());
+  healthy.device.utc = epoch({2026,9,25},4) + 59*60; healthy.device.step(0);
+  for (unsigned second = 0; second < 60; ++second) { healthy.device.step(1); failed.update(); }
+  CHECK(healthy.audio.starts == 1); // Core playback proceeds with a failed optional display.
+  esphome::openathan_display::StatusDisplay absent;
+  absent.setup(); CHECK(absent.is_failed());
+  esphome::wifi::global_wifi_component = nullptr;
 }
 
 static void occurrence_identity() {
@@ -538,6 +598,7 @@ static void json_transport() {
 #endif
 int main() {
   upgrade_boot_scheduler_health();
+  display_adapter();
   light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
   light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
