@@ -292,9 +292,11 @@ procedure. Recheck the actual device, active slot, settings, consumption history
 shared audio and recovery path before any installation. Do not use a fresh
 installer, historical NVS restore, or synthetic CI audio fixture for this task.
 
-- Confirm orientation and readable next prayer/time at the normal viewing
-  distance, with comfortable dimness in a dark room. Verify cold-start clock
-  waiting, then the saved timezone/time after synchronization.
+- Place the Pyramid's power/expansion ports and cord at the back, away from the
+  viewer. From the opposite side, confirm upright text and readable next
+  prayer/time at the normal viewing distance, with comfortable dimness in a
+  dark room. Verify cold-start clock waiting, then the saved timezone/time
+  after synchronization.
 - Observe next prayer, existing skip/cancel controls and normal/Fajr playback
   transitions. Confirm front-button timing/behavior and phone controls are
   unchanged. Do not alter production prayer history to manufacture a screen.

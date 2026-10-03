@@ -30,7 +30,8 @@ display:
     id: atom_status_lcd
     spi_id: atom_display_spi
     model: M5STACK-ATOMS3R-GC9107
-    rotation: 180
+    # Read from the side opposite the Pyramid's power/expansion ports.
+    rotation: 0
     color_depth: 8
     update_interval: never
     auto_clear_enabled: false

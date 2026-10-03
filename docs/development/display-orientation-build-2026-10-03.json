@@ -1,0 +1,94 @@
+{
+  "baseline_source": "162bfc73611e102de40eb4296b13db519b165bc8",
+  "baseline_runtime_source_sha256": "f64bfd7ced1330a8ade28f79b3b54df5b87bab03acb3d685b641db306dbc3f71",
+  "candidate_runtime_source_sha256": "bd66ab8d7abe4203e7dded1556d5399b9d85fc74f9bc3cc5843ca140128eeba9",
+  "source_digest_algorithm": "SHA256 of sorted repository-relative path + NUL + file bytes + NUL for the two configuration files and both new components .py/.h/.cpp files",
+  "toolchain": {
+    "python": "3.13.0",
+    "esphome": "2026.9.0",
+    "esp_idf": "5.5.5",
+    "compiler": "esp-14.2.0_20260121",
+    "tzdata": "2026.4"
+  },
+  "baseline_artifacts_retained": true,
+  "baseline_runtime_inputs_verified": true,
+  "fixture_inputs_matched": true,
+  "audio_fixture_sha256": "35690b080473049a8cf2b57124a638553b574df20b49dbec5bfb33cbe6f300b4",
+  "rotation_before": 180,
+  "rotation_after": 0,
+  "physical_orientation": "pending next attended candidate installation",
+  "variants": {
+    "reference": {
+      "before": {
+        "application_bytes": 1249424,
+        "application_sha256": "b9d5521e6f992e99745cfbb20bc3607d15deeb8443fe5836c67d4d8550bc7c72",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 323440,
+        "slot_free_bytes": 847728
+      },
+      "after": {
+        "application_bytes": 1249408,
+        "application_sha256": "5762724ff74a6e324ab76bd172e7fee0aa7c227c2bd6b90ef481117a4a95b5f9",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 323456,
+        "slot_free_bytes": 847744
+      },
+      "application_delta_bytes": -16,
+      "static_ram_delta_bytes": 0
+    },
+    "isolated": {
+      "before": {
+        "application_bytes": 1251200,
+        "application_sha256": "6bb2d1a7a4179712da8f6fd56bb39e198585ca9892545e9c56b14b0e0d2659e7",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 321664,
+        "slot_free_bytes": 845952
+      },
+      "after": {
+        "application_bytes": 1251184,
+        "application_sha256": "0602e1fcb6c5689138b06a2528cb5ac070865753cbd831e872695925c780fe87",
+        "static_ram_bytes": 115123,
+        "application_budget_remaining_bytes": 321680,
+        "slot_free_bytes": 845968
+      },
+      "application_delta_bytes": -16,
+      "static_ram_delta_bytes": 0
+    },
+    "qualification": {
+      "before": {
+        "application_bytes": 1256640,
+        "application_sha256": "114d6db8847eb0c919657e6697294800dba8447ed9955b950b814c031441ba94",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316224,
+        "slot_free_bytes": 840512
+      },
+      "after": {
+        "application_bytes": 1256624,
+        "application_sha256": "acbcae585c24b428ccfb8b5d9dab30b001fd433677f604ef127390b731478136",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316240,
+        "slot_free_bytes": 840528
+      },
+      "application_delta_bytes": -16,
+      "static_ram_delta_bytes": 0
+    },
+    "rollback": {
+      "before": {
+        "application_bytes": 1256640,
+        "application_sha256": "1d51c307589364e9112a90f458247555db0aaf205682d9221ad544bd37cfa84e",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316224,
+        "slot_free_bytes": 840512
+      },
+      "after": {
+        "application_bytes": 1256624,
+        "application_sha256": "fb26c5094e10912285d48ba13fb2c484a249c04262651bcac46949f5a1257aaf",
+        "static_ram_bytes": 115195,
+        "application_budget_remaining_bytes": 316240,
+        "slot_free_bytes": 840528
+      },
+      "application_delta_bytes": -16,
+      "static_ram_delta_bytes": 0
+    }
+  }
+}

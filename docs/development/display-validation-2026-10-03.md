@@ -9,6 +9,12 @@ Connected screens leave the footer blank; Wi-Fi loss shows `Offline`, and
 clock-unavailable states retain connection/synchronization guidance.
 This capability is not in the published v0.2.1 release.
 
+This report retains the original rotation-180 source and measurements. The
+[orientation correction](display-orientation-validation-2026-10-03.md) changes
+the reference default to rotation 0 so text faces the side opposite the
+Pyramid's power/expansion ports. That direction awaits physical confirmation
+at the next attended candidate installation.
+
 ## Matched firmware measurements
 
 Before/after builds use main `bf3b200e549dbfc9b216a27df0e04ae982855481`,
@@ -100,6 +106,11 @@ Observed results, separate from the host fixtures above:
 - Across 1,840.018 seconds and 313 distinct telemetry samples, the image had
   54 redraws, no observed reset, no display/backlight failure and no reported
   audio glitch. The operator confirmed both complete recordings and returns.
+
+The original orientation check did not define the Pyramid's ports as the back.
+The operator subsequently reported that text faced the port side. Thus the
+observations above establish readability at rotation 180 from the tested viewing
+side; they do not qualify the corrected rotation-0 front-facing direction.
 
 | Runtime measure, bytes | Initial | Minimum | Final quiet |
 | --- | ---: | ---: | ---: |

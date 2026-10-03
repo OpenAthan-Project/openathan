@@ -15,6 +15,11 @@ No soldering or custom PCB assembly is required:
    power for normal operation. Wait for Wi-Fi and time synchronization, then
    open the reported device address on the same home network.
 
+The reference build's front is the side opposite the Pyramid's power and
+expansion ports. Place those ports and the power cord at the back. Firmware
+with the optional status display is intended to show upright text when viewed
+from this front side.
+
 Follow the [complete setup instructions](https://openathan.com/docs/getting-started/)
 for password creation, location, timetable review and activation. If OpenAthan is
 already installed, use credential recovery or the

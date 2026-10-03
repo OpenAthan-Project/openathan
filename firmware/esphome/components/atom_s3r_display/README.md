@@ -21,5 +21,6 @@ The accompanying profile targets GC9107. The integrated dim display passed
 [attended isolated hardware acceptance](../../../../docs/development/display-validation-2026-10-03.md#attended-isolated-hardware-acceptance)
 on 2026-10-03, including upright text, readability and comfortable dimness at
 the 10% default. This bounded, instrumented maintainer test does not establish
-release readiness or long-soak behavior. Newer ST7735 revisions are not qualified
-by this profile.
+release readiness or long-soak behavior. That run used rotation 180; physical
+confirmation of the corrected ports-at-back rotation 0 remains pending.
+Newer ST7735 revisions are not qualified by this profile.
