@@ -5,6 +5,8 @@ AtomS3R display. It observes existing scheduler/setup/network state and saved
 timezone rules; it changes no prayer calculations, durable records, application
 slots, shared audio, front-button controls or public HTTP payloads.
 See the [display contract](../../firmware/esphome/components/openathan_display/README.md).
+Connected screens leave the footer blank; Wi-Fi loss shows `Offline`, and
+clock-unavailable states retain connection/synchronization guidance.
 This capability is not in the published v0.2.1 release.
 
 ## Matched firmware measurements
@@ -21,15 +23,15 @@ Actual `firmware.ota.bin` bytes, not linked-size estimates:
 
 | Variant | Before | After | Delta | Remaining 1.5 MiB budget |
 | --- | ---: | ---: | ---: | ---: |
-| Reference | 1,211,680 | 1,249,456 | +37,776 | 323,408 |
-| Isolated provisioning | 1,213,504 | 1,251,248 | +37,744 | 321,616 |
-| Upgrade qualification | 1,218,992 | 1,256,672 | +37,680 | 316,192 |
-| Forced startup rollback | 1,218,992 | 1,256,672 | +37,680 | 316,192 |
+| Reference | 1,211,680 | 1,249,424 | +37,744 | 323,440 |
+| Isolated provisioning | 1,213,504 | 1,251,200 | +37,696 | 321,664 |
+| Upgrade qualification | 1,218,992 | 1,256,640 | +37,648 | 316,224 |
+| Forced startup rollback | 1,218,992 | 1,256,640 | +37,648 | 316,224 |
 
 Every affected before/after image passes the existing capacity checker:
 dependency pins, factory/OTA consistency, production/isolated component
 exclusion and unchanged dual-2-MiB-slot/shared-3.5-MiB-audio partition contract.
-The candidate reference has 847,696 free bytes in each application slot.
+The candidate reference has 847,728 free bytes in each application slot.
 Reference static RAM increases from 113,351 to 115,123 bytes (+1,772).
 The two qualification variants increase from 113,431 to 115,195 bytes (+1,764).
 The current-main measurement baseline differs from the historical published
@@ -43,6 +45,8 @@ excluding documentation. Later source changes require new measurements.
 
 ## Automated and visual validation
 
+- After removing the connected footer, all 12 CTests and both real settings
+  adapter tests were repeated successfully, alongside all four firmware builds.
 - All 12 CTests pass with UndefinedBehaviorSanitizer.
 - All 103 Python tests pass without skips, including real production/isolated
   settings adapters, pinned timezone conversion and generated-display wiring.

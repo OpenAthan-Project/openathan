@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
   auto idle = present(in);
   CHECK(equal(idle.heading, "Dhuhr") && equal(idle.main, "12:30") && idle.main_scale == 3);
   CHECK(equal(idle.clock, "12:04") && equal(idle.detail, "Next Athan"));
+  CHECK(equal(idle.footer, "")); // Normal operation needs no successful-connection label.
   capture("idle", idle, directory);
   FrameCache cache;
   CHECK(cache.accept(idle)); CHECK(!cache.accept(idle));
@@ -49,7 +50,8 @@ int main(int argc, char **argv) {
   CHECK(equal(offline.footer, "Offline") && equal(offline.detail, "Next Athan"));
   capture("offline", offline, directory);
   in.wifi_connected = true; in.status.playing = true;
-  CHECK(equal(present(in).main, "Playing")); capture("playback", present(in), directory);
+  CHECK(equal(present(in).main, "Playing") && equal(present(in).footer, ""));
+  capture("playback", present(in), directory);
   in.status.playing = false; in.status.skip = key;
   CHECK(equal(present(in).detail, "Will be skipped")); capture("skip", present(in), directory);
   in.status.skip = EventKey{key.day, Prayer::FAJR};
