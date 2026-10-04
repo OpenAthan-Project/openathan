@@ -24,6 +24,7 @@ template<typename Pixel> void render(const Frame &frame, Pixel pixel) {
   draw_text(pixel, frame.clock.data(), 6, 1, 0xD0D8D8);
   draw_text(pixel, frame.heading.data(), 32, 2, 0xFFFFFF);
   draw_text(pixel, frame.main.data(), 58, frame.main_scale, 0xFFFFFF);
+  draw_text(pixel, frame.meridiem.data(), 84, 1, 0xD0D8D8);
   draw_text(pixel, frame.detail.data(), 96, 1, frame.error ? 0xFFB8A8 : 0xD0D8D8);
   draw_text(pixel, frame.footer.data(), 116, 1, 0xD0D8D8);
 }

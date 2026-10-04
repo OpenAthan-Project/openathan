@@ -14,6 +14,7 @@ static time::DSTRule applied_rule(const ::openathan::DstRule &r) {
   return {r.time_seconds, r.day, static_cast<time::DSTRuleType>(r.type), r.month, r.week, r.day_of_week};
 }
 void OpenAthan::setup() {
+  time_format_preferences_.begin();
   if (light_output_) light_preferences_.begin();
   scheduler_ = std::make_unique<::openathan::Scheduler>(*this, *calculator_source_, *state_store_, *playback_);
   settings_service_ = std::make_unique<::openathan::SettingsService>(*settings_store_);

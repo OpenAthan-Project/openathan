@@ -4,6 +4,10 @@ The reference firmware embeds this responsive interface and serves it locally
 at its unique `http://openathan-<suffix>.local/` address, with an IPv4 fallback.
 It includes first-run manual location/timezone/calculation setup, prayer and
 volume settings, schedule previews, status, stop, skip and cancel-skip controls.
+The unreleased **Time format** preference selects 24-hour time (the default) or
+12-hour time with AM/PM for the page and optional speaker screen. It persists
+independently of prayer settings and does not change announcement times. See the
+[development validation](../../docs/development/time-format-validation-2026-10-04.md).
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
 An optional **Find my location** link opens the public HTTPS helper in a new tab.

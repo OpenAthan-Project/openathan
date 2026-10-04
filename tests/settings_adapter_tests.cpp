@@ -206,10 +206,12 @@ static void volume_and_faults() {
   CHECK(f.device.status().automatic_ready && f.audio.volume == 32);
   nvs_test::fail_commit = true; changed.volume = 88;
   CHECK(f.save(changed) == SettingsResult::STORAGE);
+  CHECK(f.device.change_time_format(12,1) == TimeFormatResult::STORAGE);
   CHECK(f.value().volume == 32 && f.audio.volume == 32 && f.audio.active);
   CHECK(!f.device.status().automatic_ready);
   nvs_test::fail_commit = false;
   CHECK(f.save(changed) == SettingsResult::STORAGE);
+  CHECK(f.device.change_time_format(12,1) == TimeFormatResult::STORAGE);
   nvs_test::power_cycle(); Fixture reboot(false); reboot.begin(); CHECK(reboot.value().volume == 32);
   CHECK(std::string(reboot.device.settings_application_status()) != "storage_fault");
 }
@@ -272,7 +274,12 @@ static void display_adapter() {
   f.device.step(60); screen.update(); lcd.check_clock("01:00"); // Autumn DST repeat.
   f.device.utc = epoch({2026,9,25},3) + 59*60; f.device.step(0); screen.update(); lcd.check_clock("23:59");
   f.device.step(60); screen.update(); lcd.check_clock("00:00");
-  const auto updates = lcd.updates;
+  auto updates = lcd.updates;
+  CHECK(f.device.change_time_format(12,1) == TimeFormatResult::SAVED);
+  screen.update(); lcd.check_clock("12:00 AM");
+  CHECK(f.device.change_time_format(24,2) == TimeFormatResult::SAVED);
+  screen.update(); lcd.check_clock("00:00");
+  updates = lcd.updates;
   wifi.connected = false; screen.update(); CHECK(lcd.updates == updates + 1 && f.device.status().automatic_ready);
   lcd.mark_failed(); screen.update(); CHECK(lcd.updates == updates + 1);
   CHECK(f.device.upgrade_health() && f.device.status().fault == Fault::NONE);
@@ -332,12 +339,34 @@ static void maintenance_latches_writes() {
   const auto writes = nvs_test::writes;
   auto changed = f.value(); changed.volume = 35;
   CHECK(f.save(changed) == SettingsResult::STORAGE);
+  CHECK(f.device.change_time_format(12,1) == TimeFormatResult::STORAGE);
   CHECK(!f.device.finish_setup(1) && !f.device.skip_next() && !f.device.cancel_skip());
   f.device.step(86400); f.device.reload_schedule();
   CHECK(nvs_test::writes == writes && !f.device.activated() && f.audio.starts == 0);
 }
 #ifdef OPENATHAN_JSON_TEST
 #include "../firmware/esphome/components/openathan_device/local_api.h"
+static void time_format_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
+  const auto prayer=*f.device.settings_service()->saved();
+  const auto next=f.device.status().next;
+  auto call=[&](const char *method,const std::string &body="") {
+    ApiExchange request; request.method=method; request.uri="/api/time-format"; request.body=body;
+    api.handle(request); return request;
+  };
+  JsonDocument response; CHECK(!deserializeJson(response,call("GET").response));
+  CHECK(response["hours"] == 24 && response["revision"] == 1);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"hours":12})").code == 200);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"hours":24})").code == 409);
+  CHECK(*f.device.settings_service()->saved()==prayer && f.device.status().next->key==next->key && f.device.status().next->utc==next->utc);
+  for (auto invalid : {"13","256","-1","12.5","true","null","\"12\""})
+    CHECK(call("POST",std::string(R"({"schema":1,"expected_revision":2,"hours":)")+invalid+"}").code==400);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"hours":24,"extra":0})").code == 400);
+  nvs_test::fail_commit=true;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"hours":24})").code == 503);
+  CHECK(f.device.time_format_preferences().hours()==12 && f.device.status().automatic_ready);
+}
 static void light_api() {
   using namespace esphome::openathan_device;
   Fixture f; LightOutputProbe output; f.device.set_light_output(&output); f.begin();
@@ -601,6 +630,6 @@ int main() {
   display_adapter();
   light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
+  time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
 #endif
 }

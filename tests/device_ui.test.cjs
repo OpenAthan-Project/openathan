@@ -8,7 +8,7 @@ const {join}=require('node:path');
 const firmwareDigest=require('./device_digest.cjs');
 const {chromium,webkit}=require(require.resolve('playwright',{paths:[join(__dirname,'../web/device-ui')]}));
 const rules={standard_offset:0,daylight_offset:0,start:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0},end:{type:0,time_seconds:0,day:0,month:0,week:0,day_of_week:0}};
-function initial(){return {schema:1,revision:1,setup:'incomplete',application:'applied',automatic_ready:false,clock_ready:true,scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times:[{name:'Fajr',local:'2026-09-25 05:30'},{name:'Dhuhr',local:'2026-09-25 12:30'}],conflicts:[]}};}
+function initial(){return {time_format:{schema:1,revision:1,hours:24,application:'applied'},schema:1,revision:1,setup:'incomplete',application:'applied',automatic_ready:false,clock_ready:true,scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times:[{name:'Fajr',local:'2026-09-25 05:30'},{name:'Dhuhr',local:'2026-09-25 12:30'}],conflicts:[]}};}
 async function fixture(){
   const state={device:initial(),lightMutations:0,lightDrop:false,lightFailRead:false,mutations:0,drop:false,failRead:false,posts:[],authenticated:0,
     now:100, challenges:[],cnonces:new Set()};
@@ -28,6 +28,7 @@ async function fixture(){
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
     if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
+    if(req.method==='GET' && req.url==='/api/time-format'){if(state.timeFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.time_format);return;}
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
     if(req.method==='GET'){
       if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}
@@ -48,6 +49,12 @@ async function fixture(){
       else if(req.url.endsWith('/cancel')){firmware.state='idle';firmware.queued_version='';}
       if(state.firmwareDrop){state.firmwareDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
       send(200,firmware);return;
+    }
+    if(req.url==='/api/time-format'){
+      if(payload.expected_revision!==state.device.time_format.revision){send(409,{error:'Reload time format before saving'});return;}
+      state.timeMutations=(state.timeMutations||0)+1;state.device.time_format.hours=payload.hours;state.device.time_format.revision++;
+      if(state.timeDrop){state.timeDrop=false;req.socket.destroy();return;}
+      send(200,state.device.time_format);return;
     }
     if(req.url==='/api/lights'){
       if(payload.expected_revision!==state.device.lights.revision){send(409,{error:'Reload light settings'});return;}
@@ -81,6 +88,41 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: time format persists, reconciles a dropped save and preserves conflicting edits`,async()=>{
+  const f=await fixture();f.state.device.setup='active';
+  f.state.device.schedule.times=[{name:'Fajr',local:'2026-09-25 00:00'},{name:'Dhuhr',local:'2026-09-25 12:00'},{name:'Asr',local:'2026-09-25 13:30'}];
+  f.state.device.next={name:'Asr',local:'2026-09-25 13:30'};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'},viewport:{width:390,height:844}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#time-format').disabled);
+    assert.equal(await page.locator('#times dd').allTextContents().then(v=>v.join(',')),'00:00,12:00,13:30');
+    const revision=f.state.device.revision,settings=structuredClone(f.state.device.settings);
+    await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#preview-section').hidden);
+    await page.locator('#time-format').selectOption('12');f.state.timeDrop=true;
+    await page.locator('#time-format-save').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format-message').textContent.includes('confirmed'));
+    assert.deepEqual(await page.locator('#times dd').allTextContents(),['12:00 AM','12:00 PM','1:30 PM']);
+    assert.deepEqual(await page.locator('#preview-times dd').allTextContents(),['12:00 AM','12:00 PM','1:30 PM']);
+    assert.ok((await page.locator('#next').textContent()).includes('2026-09-25 1:30 PM'));
+    assert.equal(f.state.timeMutations,1);assert.equal(f.state.device.revision,revision);assert.deepEqual(f.state.device.settings,settings);
+    await page.reload();await page.waitForFunction(()=>!document.querySelector('#time-format').disabled);
+    assert.equal(await page.locator('#time-format').inputValue(),'12');
+    await page.locator('#time-format').selectOption('24');f.state.device.time_format.revision++;
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format-message').textContent.includes('another client'));
+    assert.equal(await page.locator('#time-format').inputValue(),'24');
+    await page.locator('#time-format-save').click();
+    await page.waitForFunction(()=>!document.querySelector('#time-format-save').disabled);
+    assert.equal(f.state.timeMutations,1);
+    page.once('dialog',dialog=>dialog.accept());await page.locator('#time-format-reload').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format').value==='12');
+    await page.locator('#time-format').selectOption('24');await page.locator('#time-format-save').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format-message').textContent==='Time format saved.');
+    assert.deepEqual(await page.locator('#times dd').allTextContents(),['00:00','12:00','13:30']);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  } finally {await browser.close();await f.close();}
+ });
  test(`${browserName}: a superseded queue clears its reconnect hint and permits checks`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.4.0',state:'current',result:'superseded',error:''};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

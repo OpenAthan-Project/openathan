@@ -96,6 +96,16 @@ int main(int argc, char **argv) {
     in.status.next->key.prayer = static_cast<Prayer>(p);
     capture(prayer_name(static_cast<Prayer>(p)), present(in), directory);
   }
+  in.local_time = "00:00"; in.next_time = "12:00"; in.hours = 12;
+  auto twelve = present(in);
+  CHECK(equal(twelve.clock,"12:00 AM") && equal(twelve.main,"12:00") && equal(twelve.meridiem,"PM"));
+  capture("twelve-noon",twelve,directory);
+  CHECK(cache.accept(twelve)); CHECK(!cache.accept(twelve));
+  in.local_time = "13:05"; in.next_time = "23:59";
+  twelve = present(in);
+  CHECK(equal(twelve.clock,"1:05 PM") && equal(twelve.main,"11:59") && equal(twelve.meridiem,"PM"));
+  capture("twelve-evening",twelve,directory);
+  in.hours = 24; CHECK(cache.accept(present(in)) && equal(present(in).meridiem,""));
   using esphome::atom_s3r_display::Backlight;
   Backlight light; light.setup(); CHECK(!light.is_failed() && light.writes.size() == 9);
   CHECK(light.writes.back().reg == 0x0E && light.writes.back().data[0] == 26);

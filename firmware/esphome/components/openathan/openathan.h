@@ -16,6 +16,10 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   OpenAthan() : PollingComponent(1000) {}
   void set_clock(time::RealTimeClock *clock) { clock_ = clock; }
   void set_light_output(::openathan::LightOutput *output) { light_output_ = output; }
+  const ::openathan::TimeFormatPreferences &time_format_preferences() const { return time_format_preferences_; }
+  ::openathan::TimeFormatResult change_time_format(uint8_t hours, uint32_t revision) {
+    return maintenance_ ? ::openathan::TimeFormatResult::STORAGE : time_format_preferences_.update(hours, revision);
+  }
   bool has_lights() const { return light_output_ != nullptr; }
   const ::openathan::LightPreferences &light_preferences() const { return light_preferences_; }
   ::openathan::LightSaveResult change_lights(::openathan::LightSettings value, uint32_t revision);
@@ -72,6 +76,8 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void log_status_();
   void update_lights_();
   ::openathan::LightOutput *light_output_{};
+  NvsTimeFormatStore time_format_store_;
+  ::openathan::TimeFormatPreferences time_format_preferences_{time_format_store_};
   NvsLightStore light_store_;
   ::openathan::LightPreferences light_preferences_{light_store_};
   ::openathan::LightSchedule light_schedule_;

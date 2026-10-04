@@ -35,6 +35,15 @@
       <div class="actions"><button id="preview" type="button" class="secondary" disabled>Preview schedule</button><button id="save" type="submit" disabled>Finish setup</button><button id="reload" type="button" class="quiet" disabled>Reload saved settings</button></div>
     </form>
   </section>
+  <section id="time-format-card" class="card" aria-labelledby="time-format-title" hidden>
+    <h2 id="time-format-title">Time format</h2>
+    <form id="time-format-form">
+      <label>Show times as<select id="time-format" disabled><option value="24">24-hour (13:30)</option><option value="12">12-hour (1:30 PM)</option></select></label>
+      <p class="hint">Applies to this page and the speaker screen.</p>
+      <p id="time-format-message" role="status" aria-live="polite"></p>
+      <div class="actions"><button id="time-format-save" type="submit" disabled>Save time format</button><button id="time-format-reload" type="button" class="quiet" disabled>Reload time format</button></div>
+    </form>
+  </section>
   <section id="lights-card" class="card" aria-labelledby="lights-title" hidden>
     <h2 id="lights-title">Lights</h2>
     <p class="hint">Green: more than 30 minutes until prayer. Orange: within 30 minutes. Red: within 10 minutes. Reminders include prayers with the Athan turned off or skipped.</p>

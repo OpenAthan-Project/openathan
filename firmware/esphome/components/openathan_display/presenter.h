@@ -1,5 +1,6 @@
 #pragma once
 #include "openathan/scheduler.h"
+#include "openathan/time_format.h"
 #include <array>
 #include <cstdio>
 #include <string_view>
@@ -9,9 +10,11 @@ struct Inputs {
   SchedulerStatus status;
   bool setup_complete{}, storage_fault{}, clock_valid{}, wifi_connected{}, prayers_enabled{};
   std::string_view local_time, next_time;
+  uint8_t hours{24};
 };
 struct Frame {
-  std::array<char, 6> clock{};
+  std::array<char, 9> clock{};
+  std::array<char, 3> meridiem{};
   std::array<char, 9> heading{}, main{};
   std::array<char, 16> detail{}, footer{};
   unsigned main_scale{2};
@@ -30,7 +33,8 @@ inline bool valid_time(std::string_view value) {
 }
 inline Frame present(const Inputs &in) {
   Frame f;
-  text(f.clock, in.clock_valid && valid_time(in.local_time) ? in.local_time : "--:--");
+  f.clock = format_clock(in.clock_valid ? in.local_time : std::string_view{}, in.hours);
+  if (!f.clock[0]) text(f.clock, "--:--");
   if (!in.wifi_connected) text(f.footer, "Offline");
   if (in.storage_fault || in.status.fault != Fault::NONE) {
     f.error = true;
@@ -47,7 +51,10 @@ inline Frame present(const Inputs &in) {
   } else if (!in.prayers_enabled) {
     text(f.heading, "Athan"); text(f.main, "Off"); text(f.detail, "All prayers off");
   } else if (in.status.next && valid_time(in.next_time)) {
-    text(f.heading, prayer_name(in.status.next->key.prayer)); text(f.main, in.next_time); f.main_scale = 3;
+    text(f.heading, prayer_name(in.status.next->key.prayer)); const auto formatted = format_clock(in.next_time, in.hours);
+    const std::string_view time(formatted.data());
+    text(f.main, time.substr(0, time.find(' '))); f.main_scale = 3;
+    if (in.hours == 12) text(f.meridiem, time.substr(time.size() - 2));
     const bool skipped = in.status.skip && (*in.status.skip == in.status.next->key ||
         (in.status.next->shared_with && *in.status.skip == *in.status.next->shared_with));
     text(f.detail, skipped ? "Will be skipped" : in.status.automatic_ready ? "Next Athan" : "Not ready yet");

@@ -5,6 +5,7 @@ const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 const methods = {muslim_world_league:"Muslim World League",egyptian:"Egyptian",karachi:"Karachi",umm_al_qura:"Umm al-Qura",dubai:"Dubai",moonsighting_committee:"Moonsighting Committee",north_america:"North America (ISNA)",kuwait:"Kuwait",qatar:"Qatar",singapore:"Singapore",tehran:"Tehran",turkey:"Turkey"};
 const faults = {"invalid settings":"Review the location, timezone and calculation settings, then save again","invalid prayer schedule":"These settings cannot produce a valid schedule. Review the location, method and offsets","durable state unavailable":"Saved data could not be read or written. Restart the device; do not erase its storage","audio unavailable":"Audio is unavailable. Check the device power and compatible audio installation","playback request rejected":"Audio could not start. Check the device power and audio installation"};
 let snapshot, editing, dirty = false, busy = false, loading = false, generation = 0;
+let timeSnapshot, timeEditing, timeDirty=false, timeUncertain=false, previewSchedule;
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
 let locationProposal, locationNeedsPreview=false, settingsVersion=0;
 const supportedZones=new Set();
@@ -66,6 +67,28 @@ addEventListener("hashchange",()=>{
   proposedLocation=incomingLocation();
   applyPendingLocation();
 });
+function timeMessage(text,error=false) { $("time-format-message").textContent=text;$("time-format-message").classList.toggle("error",error); }
+function fillTimeFormat(state) {
+  timeEditing=structuredClone(state);timeDirty=false;timeUncertain=false;
+  $("time-format").value=String(state.hours);
+}
+function renderTimeFormat(state) {
+  timeSnapshot=state;$("time-format-card").hidden=!state;
+  if(!state)return;
+  if(!timeEditing || (!timeDirty && !timeUncertain))fillTimeFormat(state);
+  if(state.application!=="applied")timeMessage("Time format storage is unavailable. Restart the device and reload; prayer scheduling continues.",true);
+  else if(timeUncertain)timeMessage("The save response was lost. Reload time format before trying again.",true);
+  else if(timeDirty && state.revision!==timeEditing.revision)timeMessage("Time format changed on another client. Your edits are preserved; reload before saving.",true);
+  else if(!timeDirty)timeMessage("Time format loaded.");
+}
+function localTime(value,includeDate=false) {
+  if(typeof value!=="string")return "Unavailable";
+  const match=/^(\d{4}-\d{2}-\d{2}) ([0-2]\d):([0-5]\d)$/.exec(value);
+  if(!match || Number(match[2])>23)return value;
+  const hour=Number(match[2]);
+  const time=timeSnapshot?.hours===12?`${hour%12 || 12}:${match[3]} ${hour<12?"AM":"PM"}`:`${match[2]}:${match[3]}`;
+  return includeDate?`${match[1]} ${time}`:time;
+}
 function fillLights(state) {
   lightEditing=structuredClone(state);lightDirty=false;lightUncertain=false;
   if(state.settings) {
@@ -86,6 +109,10 @@ function renderLights(state) {
   else if(!lightDirty)lightMessage("Light settings loaded.");
 }
 function controls() {
+  const timeBlocked=busy || loading || !timeEditing || timeSnapshot?.application!=="applied";
+  $("time-format").disabled=timeBlocked;
+  $("time-format-save").disabled=timeBlocked || timeUncertain;
+  $("time-format-reload").disabled=busy || loading || !timeSnapshot;
   const lightsBlocked=busy || loading || !lightEditing?.settings || ["storage_fault","save_failed"].includes(lightSnapshot?.application);
   $("lights-fields").disabled=lightsBlocked;
   $("lights-brightness").disabled=!$("lights-enabled").checked;
@@ -109,20 +136,22 @@ async function request(path, body) {
   return data;
 }
 function times(id, schedule) {
+  if(id==="preview-times")previewSchedule=schedule;
   const target=$(id);target.replaceChildren();
   for(const row of schedule?.times || []) {
     const name=document.createElement("dt"),value=document.createElement("dd");
-    name.textContent=row.name;value.textContent=row.local?.slice(11) || row.local || "Unavailable";
+    name.textContent=row.name;value.textContent=localTime(row.local);
     target.append(name,value);
   }
 }
 function render(state) {
   $("test-banner").hidden=state.test_mode!==true;
   snapshot=state;
+  renderTimeFormat(state.time_format);
   renderLights(state.lights);
   renderFirmware(state.firmware);
   $("setup-state").textContent=state.setup==="active"?"Setup complete":state.setup==="incomplete"?"Setup incomplete":"Storage fault";
-  $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${state.next.local}`:"No upcoming announcement available";
+  $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${localTime(state.next.local,true)}`:"No upcoming announcement available";
   const status=[];
   if(!state.clock_ready)status.push("Waiting for time synchronization");
   if(state.application==="volume_pending")status.push("Settings saved; applying volume");
@@ -134,6 +163,7 @@ function render(state) {
   $("health").textContent=status.join(" · ") || (state.automatic_ready?"Ready for the next announcement":"Waiting for setup or device readiness");
   $("address").textContent=state.hostname;
   times("times",state.schedule);
+  if(previewSchedule)times("preview-times",previewSchedule);
   $("conflicts").textContent=(state.schedule?.conflicts || []).join(" ");
   $("setup-help").hidden=state.setup==="active";
   controls();
@@ -250,6 +280,34 @@ $("lights-form").addEventListener("submit",async(event)=>{
     } catch {lightUncertain=true;lightMessage("Connection lost. Reload light settings before trying again.",true);}
   } finally {busy=false;controls();}
 });
+$("time-format").addEventListener("change",()=>{timeDirty=true;timeMessage("Time format changes apply when you save.");});
+function applyTimeFormat(state) { render({...snapshot,time_format:state}); }
+$("time-format-reload").addEventListener("click",async()=>{
+  if(busy || loading || (timeDirty && !confirm("Replace your unsaved time format with the saved setting?")))return;
+  busy=true;++generation;controls();
+  try {const state=await request("/api/time-format");fillTimeFormat(state);applyTimeFormat(state);}
+  catch(error){timeMessage(error.message+". Check the device connection.",true);}
+  finally{busy=false;controls();}
+});
+$("time-format-form").addEventListener("submit",async(event)=>{
+  event.preventDefault();if(busy || loading || timeUncertain || !timeEditing)return;
+  const hours=Number($("time-format").value),revision=timeEditing.revision;
+  busy=true;++generation;controls();
+  try {
+    const state=await request("/api/time-format",{schema:1,expected_revision:revision,hours});
+    fillTimeFormat(state);applyTimeFormat(state);timeMessage("Time format saved.");
+  } catch(error) {
+    timeUncertain=!error.status;timeMessage(error.message,true);
+    try {
+      const state=await request("/api/time-format");
+      if((!error.status || error.status===409) && state.hours===hours &&
+          (state.revision===revision+1 || (!error.status && state.revision===revision))) {
+        fillTimeFormat(state);applyTimeFormat(state);
+        if(state.application==="applied")timeMessage("Saved time format confirmed after reconnecting.");
+      } else applyTimeFormat(state);
+    } catch {timeUncertain=true;timeMessage("Connection lost. Reload time format before trying again.",true);}
+  } finally{busy=false;controls();}
+});
 async function loadTimezones() {
   if(timezonesReady || timezonesLoading)return;
   timezonesLoading=true;
@@ -297,7 +355,7 @@ function renderFirmware(state,confirmed=false) {
   const progress=state.state==="downloading" && state.total?` ${Math.floor(100*state.received/state.total)}%`:"";
   $("firmware-status").textContent=(state.supported===false?"This speaker needs a maintainer USB update before Wi-Fi installation. ":"")+(firmwareMessages[state.state] || "Reading update status…")+progress+(state.error?` ${state.error}`:"");
   if(firmwareUncertain)$("firmware-status").textContent="The response was lost. Waiting to read update status before allowing another action. Keep the speaker powered.";
-  $("firmware-last-check").textContent=state.last_check?`Last checked: ${new Date(state.last_check*1000).toLocaleString()}`:"No successful update check yet.";
+  $("firmware-last-check").textContent=state.last_check?`Last checked: ${new Date(state.last_check*1000).toLocaleString(undefined,{hour12:timeSnapshot?.hours===12})}`:"No successful update check yet.";
   const working=["checking","queued","downloading","verifying","restarting"].includes(state.state);
   $("firmware-check").disabled=firmwareBusy || firmwareUncertain || working || state.state==="storage_fault";
   $("firmware-install").hidden=!state.available || working;
