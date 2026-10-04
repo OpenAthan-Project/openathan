@@ -7,13 +7,15 @@ slots, shared audio, front-button controls or public HTTP payloads.
 See the [display contract](../../firmware/esphome/components/openathan_display/README.md).
 Connected screens leave the footer blank; Wi-Fi loss shows `Offline`, and
 clock-unavailable states retain connection/synchronization guidance.
-This capability is not in the published v0.2.1 release.
+This capability was absent from the then-published v0.2.1 release. It is now
+published in v0.3.0; see the [final release summary](release-validation-2026-10-04.md)
+for subsequent production acceptance and the focused longer memory run.
 
 This report retains the original rotation-180 source and measurements. The
 [orientation correction](display-orientation-validation-2026-10-03.md) changes
 the reference default to rotation 0 so text faces the side opposite the
-Pyramid's power/expansion ports. That direction awaits physical confirmation
-at the next attended candidate installation.
+Pyramid's power/expansion ports. Its later physical confirmation is recorded
+in that report; the original observations below retain their tested direction.
 
 ## Matched firmware measurements
 
@@ -145,6 +147,7 @@ recording, bootloader, partition, credential or historical NVS restore was used.
 source binding, runtime measurements and limits. Private evidence retains raw
 traces, compatible recovery, readbacks, listener reports and corrected harness
 oracles; no private credentials or recovery images are committed.
-Firmware publication and website adoption remain separate release work. Use
-this source-bound result with the [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md#optional-gc9107-status-display-acceptance)
+Firmware publication and website adoption were separate remaining work at this
+checkpoint; their final status is in the release summary linked above. Use this
+source-bound result with the [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md#optional-gc9107-status-display-acceptance)
 when selecting future acceptance checks.

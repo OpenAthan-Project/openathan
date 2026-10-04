@@ -2,7 +2,7 @@
 
 OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project. It supports an ordinary-user reference build and a reusable ESPHome integration for people who already have compatible hardware. The reference experience is intended to work without soldering, PCB design, Home Assistant, or embedded-development experience.
 
-> **Project status:** pre-1.0 reference releases are available. [v0.2.1](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.2.1) provides standalone scheduled Athan, phone-friendly setup and settings, USB Wi-Fi/password recovery, optional prayer lights and owner-requested firmware updates for AtomS3R C126 + Pyramid A167. See the [current release evidence and limits](docs/development/release-validation-2026-10-03.md); broader hardware/network coverage and long-term stability are not established.
+> **Project status:** pre-1.0 reference releases are available. [v0.3.0](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.3.0) adds a dim clock, next-prayer and playback display to standalone scheduled Athan, phone-friendly setup and settings, USB Wi-Fi/password recovery, optional prayer lights and owner-requested firmware updates for AtomS3R C126 + Pyramid A167. See the [current release evidence and limits](docs/development/release-validation-2026-10-04.md); newer ST7735 display revisions, broader hardware/network coverage and long-term stability remain unqualified.
 
 Use the [public setup guide](https://openathan.com/docs/getting-started/) for a
 new speaker and the [firmware update guide](docs/development/firmware-upgrades.md)
