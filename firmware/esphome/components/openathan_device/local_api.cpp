@@ -52,6 +52,14 @@ void LocalApi::preview_(JsonObject root, const ::openathan::DeviceSettings& sett
   auto notices = root["conflicts"].to<JsonArray>();
   for (const auto& conflict : conflicts) notices.add(::openathan::describe_conflict(conflict));
 }
+void LocalApi::time_format_(JsonObject root) {
+  const auto &preferences = athan_->time_format_preferences();
+  const auto &saved = preferences.saved();
+  root["schema"] = 1;
+  root["revision"] = saved ? saved->revision : 0;
+  root["hours"] = preferences.hours();
+  root["application"] = preferences.writable() ? "applied" : saved ? "save_failed" : "storage_fault";
+}
 void LocalApi::lights_(JsonObject root) {
   root["supported"] = athan_->has_lights();
   root["application"] = athan_->light_application_status();
@@ -66,6 +74,7 @@ void LocalApi::lights_(JsonObject root) {
 }
 void LocalApi::snapshot_(JsonObject root) {
   if (upgrade_) upgrade_->snapshot(root["firmware"].to<JsonObject>());
+  time_format_(root["time_format"].to<JsonObject>());
   lights_(root["lights"].to<JsonObject>());
   root["test_mode"] = openathan_storage::TEST_MODE;
   athan_->write_settings_json(root);
@@ -108,6 +117,8 @@ void LocalApi::handle(ApiExchange& request) {
     snapshot_(root);
   else if (request.method == "GET" && request.uri == "/api/firmware" && upgrade_)
     upgrade_->snapshot(root);
+  else if (request.method == "GET" && request.uri == "/api/time-format")
+    time_format_(root);
   else if (request.method == "GET" && request.uri == "/api/lights")
     lights_(root);
   else if (request.method == "GET" && request.uri == "/api/timezones") {
@@ -128,6 +139,17 @@ void LocalApi::handle(ApiExchange& request) {
       const int code = upgrade_->action(request.uri.substr(14), payload, message);
       if (code != 200) { error(request, code, message.c_str()); return; }
       upgrade_->snapshot(root);
+    } else if (request.uri == "/api/time-format") {
+      if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
+          !payload["expected_revision"].is<uint32_t>() || !payload["hours"].is<unsigned>() ||
+          (payload["hours"].as<unsigned>() != 12 && payload["hours"].as<unsigned>() != 24)) {
+        error(request, 400, "Choose 12-hour or 24-hour time"); return;
+      }
+      const auto result = athan_->change_time_format(payload["hours"].as<uint8_t>(), payload["expected_revision"].as<uint32_t>());
+      using ::openathan::TimeFormatResult;
+      if (result == TimeFormatResult::CONFLICT) { error(request, 409, "Reload time format before saving"); return; }
+      if (result == TimeFormatResult::STORAGE) { error(request, 503, "Time format could not be saved; restart the device"); return; }
+      time_format_(root);
     } else if (request.uri == "/api/lights") {
       if (!athan_->has_lights()) { error(request, 404, "Lights are not supported on this device"); return; }
       const auto settings = payload["settings"];

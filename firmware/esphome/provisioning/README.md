@@ -250,6 +250,26 @@ Host/browser simulations do not establish hidden-network radio behavior, broader
 phone/browser coverage or physical acceptance of every later revision. Preserve
 those source and coverage limits when selecting new acceptance work.
 
+## Time format (unreleased)
+
+`GET /api/time-format` and the `time_format` object in `/api/status` return
+`{schema: 1, revision, hours, application}`. `hours` is 12 or 24; existing devices
+and fresh installs default to 24 without a boot-time write. Save through
+`POST /api/time-format` with `{schema: 1, expected_revision, hours}`. A stale
+revision returns 409, invalid input 400, and unavailable storage 503.
+
+The local page and optional screen apply the confirmed saved preference. Local
+API timestamps retain their existing `YYYY-MM-DD HH:MM` representation; clients
+format these already-local values without browser timezone conversion. Midnight
+is `12:00 AM` and noon is `12:00 PM` in 12-hour mode.
+
+A separate checksummed 16-byte `time_format` record in the selected prayer NVS
+namespace preserves compatibility with older firmware's prayer settings and
+consumption records. Corrupt records remain untouched; presentation falls back
+to 24-hour time and saves are blocked. A failed save keeps the last confirmed
+format active and blocks further preference writes until restart. These failures
+never block scheduling or playback. Isolated builds use `oa_test`.
+
 ## Optional lights
 
 Reference firmware includes standalone prayer countdown and status lights with
