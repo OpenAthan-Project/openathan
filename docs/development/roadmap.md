@@ -1,9 +1,9 @@
 # Roadmap
 
-Status as of **2026-10-03**, following the v0.2.1 reference release and automatic
-website release adoption. Checked items describe implemented or published
-capabilities, not blanket physical qualification. See the [current release
-evidence and limits](release-validation-2026-10-03.md), [earlier device results](feasibility-report.md)
+Status as of **2026-10-04**, following the v0.3.0 reference release and verified
+website adoption. Checked items describe implemented or published capabilities,
+not blanket physical qualification. See the
+[current release evidence and limits](release-validation-2026-10-04.md), [earlier device results](feasibility-report.md)
 and [upgrade qualification](upgrade-qualification-2026-10-01.md).
 
 ## Current milestone
@@ -11,9 +11,10 @@ and [upgrade qualification](upgrade-qualification-2026-10-01.md).
 The standalone Athan reference experience is available on AtomS3R C126 +
 Voice Pyramid A167: precompiled USB installation, local setup/settings,
 scheduled stored normal/Fajr audio, durable skip/replay protection, optional
-prayer lights, USB credential recovery and owner-requested signed application
-updates. The website verifies and adopts approved stable releases; it never
-compiles firmware or updates a speaker on its owner's behalf.
+prayer lights, an optional GC9107 clock/prayer/playback display, USB credential
+recovery and owner-requested signed application updates. The website verifies
+and adopts approved stable releases; it never compiles firmware or updates a
+speaker on its owner's behalf.
 
 The current firmware needs internet time synchronization after a cold boot.
 Once the clock is valid, calculations and stored-recording playback operate
@@ -31,10 +32,12 @@ preserve installed audio; replacing recordings is separate from application OTA.
 - [ ] Resolve lower-right touch nonresponse and implement optional touch controls.
 - [ ] Qualify broader hardware/browser/network coverage and longer runtime operation.
 
-Measurements and physical results remain tied to their tested images. The exact
-v0.2.1 factory bundle has not received a new physical fresh-install test, and its
-maximum-length update-buffer allocation has not been measured during concurrent
-playback. Earlier accepted evidence is retained with these limits.
+Measurements and physical results remain tied to their tested images. The
+linked v0.3.0 evidence does not include a new physical fresh-install test or a
+public OTA application-transfer/slot-switch test. Its focused instrumented
+display/audio memory run contains a 13m50s observation gap and does not establish
+maximum-load production headroom or overnight stability. Earlier accepted
+evidence is retained within its source limits.
 
 ## Phase 1 — Standalone Athan MVP
 
@@ -48,8 +51,8 @@ playback. Earlier accepted evidence is retained with these limits.
 - [x] Optional encrypted developer settings/diagnostic console.
 - [x] Optional LED countdown/status adapter with independent on/off and brightness.
 - [ ] Optional touch playback/volume/dismiss adapter.
-- [x] Optional GC9107 AtomS3R display-status adapter (development candidate;
-      [bounded isolated hardware acceptance recorded](display-validation-2026-10-03.md)).
+- [x] Optional GC9107 AtomS3R display-status adapter (published in v0.3.0;
+      [production orientation and bounded memory results](release-validation-2026-10-04.md)).
 
 Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 

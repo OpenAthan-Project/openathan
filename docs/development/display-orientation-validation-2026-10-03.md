@@ -39,7 +39,7 @@ for reference/isolated and 115,195 bytes for both qualification variants.
 retain source digests, actual OTA hashes and budgets. Measurement images use
 synthetic, non-playable audio fixtures and must not be installed or played.
 
-## Physical evidence and remaining check
+## Physical evidence at the correction checkpoint
 
 The [original attended run](display-validation-2026-10-03.md#attended-isolated-hardware-acceptance)
 used rotation 180 and confirmed readability from the operator's viewing side.
@@ -47,12 +47,26 @@ The operator subsequently reported that the text faced the ports. The original
 source, audio/control observations and runtime measurements remain intact; they
 do not establish ports-at-back orientation for the corrected source.
 
-Physical confirmation of rotation 0 is pending the next attended candidate
-installation. With only Pyramid bottom power connected, place its power and
-expansion ports away from the viewer and confirm upright, readable clock and
-next-prayer text from the opposite side. Use the existing
+Physical confirmation of rotation 0 was pending the next attended candidate
+installation. The planned check used only Pyramid bottom power, with power and
+expansion ports away from the viewer, to confirm upright, readable clock and
+next-prayer text from the opposite side. It follows the existing
 [preserving hardware procedure](../../firmware/esphome/provisioning/HARDWARE_TEST.md#optional-gc9107-status-display-acceptance)
-and reuse accepted audio/control evidence within its source limits.
+and reuses accepted audio/control evidence within its source limits.
 No hardware access, installation or release action occurred for this correction.
 Long-soak/runtime-memory limits and unqualified ST7735 revisions remain as
 recorded in the original report.
+
+## Physical confirmation completed — 2026-10-03–04 Toronto
+
+The attended isolated derivative of release source
+`1915fe0a161640518f25d967ea3e58d5bc65b93d` was upright and readable with the
+ports and cord at the back on Pyramid bottom power. The owner separately
+confirmed the same viewing direction on the installed exact production v0.3.0
+application after its bottom-only restart. These observations complete the
+orientation check on the GC9107 reference unit.
+
+The [release summary](release-validation-2026-10-04.md) records the bounded
+memory results, production preservation/startup and remaining limits. The
+instrumented capture's 13m50s observation gap, maximum-load production headroom,
+long-term operation and unqualified ST7735 revisions remain explicit.

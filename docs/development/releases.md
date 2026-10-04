@@ -1,8 +1,10 @@
 # Firmware release preparation
 
-The next reference candidate is v0.3.0. Its [candidate notes](../releases/v0.3.0.md)
-and [preparation evidence](v0.3.0-preparation-2026-10-03.md) distinguish version
-preparation from the remaining exact-source build and hardware acceptance.
+[v0.3.0](../releases/v0.3.0.md) is the published stable reference release.
+The [release evidence](release-validation-2026-10-04.md) records its exact-source
+build, reference-device acceptance, public delivery and qualification limits.
+The earlier [preparation report](v0.3.0-preparation-2026-10-03.md) retains the
+matched development measurements.
 
 Upgrade-capable firmware also publishes signed application-only assets. Pass
 `--signing-key PATH` (a private P-256 key outside Git) to the packaging command;
@@ -21,7 +23,7 @@ revision containing that approval and the exact approved MP3 files. Other privat
 test recordings, CI audio fixtures and historical recovery images are not release
 inputs. This tooling never flashes or publishes. Once a qualified release is
 explicitly published as stable latest, the website's automatic policy can adopt
-it after validation. See the [current release evidence](release-validation-2026-10-03.md).
+it after validation. See the [current release evidence](release-validation-2026-10-04.md).
 
 ## Prerequisites
 
