@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define CHECK(c) do { if (!(c)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #c); std::abort(); } } while (0)
@@ -13,12 +14,27 @@ using namespace openathan;
 using namespace openathan::screen;
 bool equal(const auto &value, const char *expected) { return std::string_view(value.data()) == expected; }
 
-void capture(const char *name, const Frame &frame, const char *directory) {
+void capture(const char *name, const Frame &frame, const char *directory, bool upcoming = false) {
+  CHECK(frame.upcoming == upcoming);
   std::array<uint32_t, 128 * 128> pixels{};
   render(frame, [&pixels](int x, int y, uint32_t rgb) {
     CHECK(x >= 0 && x < 128 && y >= 0 && y < 128);
     pixels[y * 128 + x] = rgb;
   });
+  if (upcoming) {
+    const auto occupied = [&pixels](unsigned first, unsigned end) {
+      for (unsigned i = first * 128; i < end * 128; ++i)
+        if (pixels[i]) return true;
+      return false;
+    };
+    // The reading order must stay distinct, including the longest status label
+    // and prayer name. Empty bands prevent a duplicate label below the time.
+    CHECK(occupied(6, 14) && occupied(30, 38) && occupied(44, 60) && occupied(68, 92));
+    CHECK(occupied(100, 108) == !equal(frame.meridiem, ""));
+    CHECK(occupied(116, 124) == !equal(frame.footer, ""));
+    for (const auto &gap : {std::pair{14U, 30U}, {38U, 44U}, {60U, 68U}, {92U, 100U}, {108U, 116U}})
+      CHECK(!occupied(gap.first, gap.second));
+  }
   if (!directory) return;
   std::filesystem::create_directories(directory);
   std::ofstream file(std::filesystem::path(directory) / (std::string(name) + ".ppm"), std::ios::binary);
@@ -41,19 +57,19 @@ int main(int argc, char **argv) {
   CHECK(equal(idle.heading, "Dhuhr") && equal(idle.main, "12:30") && idle.main_scale == 3);
   CHECK(equal(idle.clock, "12:04") && equal(idle.detail, "Next Athan"));
   CHECK(equal(idle.footer, "")); // Normal operation needs no successful-connection label.
-  capture("idle", idle, directory);
+  capture("idle", idle, directory, true);
   FrameCache cache;
   CHECK(cache.accept(idle)); CHECK(!cache.accept(idle));
   in.local_time = "12:05"; CHECK(cache.accept(present(in)));
   in.wifi_connected = false;
   auto offline = present(in);
   CHECK(equal(offline.footer, "Offline") && equal(offline.detail, "Next Athan"));
-  capture("offline", offline, directory);
+  capture("offline", offline, directory, true);
   in.wifi_connected = true; in.status.playing = true;
   CHECK(equal(present(in).main, "Playing") && equal(present(in).footer, ""));
   capture("playback", present(in), directory);
   in.status.playing = false; in.status.skip = key;
-  CHECK(equal(present(in).detail, "Will be skipped")); capture("skip", present(in), directory);
+  CHECK(equal(present(in).detail, "Will be skipped")); capture("skip", present(in), directory, true);
   in.status.skip = EventKey{key.day, Prayer::FAJR};
   CHECK(equal(present(in).detail, "Next Athan")); // A stale/different skip must not label this event.
   in.status.next->shared_with = in.status.skip;
@@ -75,7 +91,7 @@ int main(int argc, char **argv) {
   CHECK(equal(present(in).detail, "No time set")); capture("no-next-time", present(in), directory);
   in.status.next = Event{key, 10000, true, {}};
   in.status.automatic_ready = false;
-  CHECK(equal(present(in).detail, "Not ready yet")); capture("not-ready", present(in), directory);
+  CHECK(equal(present(in).detail, "Not ready yet")); capture("not-ready", present(in), directory, true);
   in.status.fault = Fault::STORAGE;
   CHECK(present(in).error && equal(present(in).main, "Storage")); capture("storage-fault", present(in), directory);
   in.status.fault = Fault::AUDIO_UNAVAILABLE;
@@ -94,18 +110,41 @@ int main(int argc, char **argv) {
   in.next_time = "23:59";
   for (unsigned p = 0; p < 5; ++p) {
     in.status.next->key.prayer = static_cast<Prayer>(p);
-    capture(prayer_name(static_cast<Prayer>(p)), present(in), directory);
+    capture(prayer_name(static_cast<Prayer>(p)), present(in), directory, true);
   }
   in.local_time = "00:00"; in.next_time = "12:00"; in.hours = 12;
   auto twelve = present(in);
   CHECK(equal(twelve.clock,"12:00 AM") && equal(twelve.main,"12:00") && equal(twelve.meridiem,"PM"));
-  capture("twelve-noon",twelve,directory);
+  capture("twelve-noon",twelve,directory,true);
   CHECK(cache.accept(twelve)); CHECK(!cache.accept(twelve));
   in.local_time = "13:05"; in.next_time = "23:59";
   twelve = present(in);
   CHECK(equal(twelve.clock,"1:05 PM") && equal(twelve.main,"11:59") && equal(twelve.meridiem,"PM"));
-  capture("twelve-evening",twelve,directory);
+  capture("twelve-evening",twelve,directory,true);
   in.hours = 24; CHECK(cache.accept(present(in)) && equal(present(in).meridiem,""));
+  in.hours = 12; in.local_time = "20:30"; in.next_time = "06:02";
+  in.status.next->key.prayer = Prayer::FAJR;
+  capture("approved-layout", present(in), directory, true);
+  in.local_time = "12:00"; in.next_time = "00:00";
+  CHECK(equal(present(in).clock, "12:00 PM") && equal(present(in).main, "12:00") && equal(present(in).meridiem, "AM"));
+  capture("twelve-midnight", present(in), directory, true);
+  for (unsigned hours : {12U, 24U}) {
+    in.hours = hours; in.local_time = "23:59"; in.next_time = "23:59";
+    for (unsigned p = 0; p < 5; ++p) {
+      in.status.next->key.prayer = static_cast<Prayer>(p);
+      for (unsigned state = 0; state < 3; ++state) {
+        in.status.automatic_ready = state != 2;
+        in.status.skip = state == 1 ? std::optional{in.status.next->key} : std::nullopt;
+        for (bool online : {false, true}) {
+          in.wifi_connected = online;
+          const std::string name = std::string(prayer_name(static_cast<Prayer>(p))) + "-" +
+              std::to_string(hours) + "-" + (state == 0 ? "ready" : state == 1 ? "skipped" : "not-ready") +
+              (online ? "-online" : "-offline");
+          capture(name.c_str(), present(in), directory, true);
+        }
+      }
+    }
+  }
   using esphome::atom_s3r_display::Backlight;
   Backlight light; light.setup(); CHECK(!light.is_failed() && light.writes.size() == 9);
   CHECK(light.writes.back().reg == 0x0E && light.writes.back().data[0] == 26);

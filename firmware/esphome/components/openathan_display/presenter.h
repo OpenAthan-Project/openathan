@@ -18,7 +18,7 @@ struct Frame {
   std::array<char, 9> heading{}, main{};
   std::array<char, 16> detail{}, footer{};
   unsigned main_scale{2};
-  bool error{};
+  bool error{}, upcoming{};
   bool operator==(const Frame &) const = default;
 };
 template<size_t N> inline void text(std::array<char, N> &out, std::string_view value) {
@@ -51,6 +51,7 @@ inline Frame present(const Inputs &in) {
   } else if (!in.prayers_enabled) {
     text(f.heading, "Athan"); text(f.main, "Off"); text(f.detail, "All prayers off");
   } else if (in.status.next && valid_time(in.next_time)) {
+    f.upcoming = true;
     text(f.heading, prayer_name(in.status.next->key.prayer)); const auto formatted = format_clock(in.next_time, in.hours);
     const std::string_view time(formatted.data());
     text(f.main, time.substr(0, time.find(' '))); f.main_scale = 3;

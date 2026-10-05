@@ -52,10 +52,65 @@ images, including pinned dependencies, profiles, partition layout, factory/OTA
 consistency and exclusion of audio from application storage. Both application
 slots and the separate shared-audio partition remain unchanged.
 
-## Physical validation limits
+## Upcoming-prayer layout follow-up
 
-No device was accessed, flashed or played for this change. Host rendering does
-not establish physical readability, and static RAM/build success does not
-establish runtime heap, fragmentation or PSRAM headroom. No audio or network
-pipeline changes are introduced. Physical preference save/reboot and screen
-acceptance remain for a later attended development test or release qualification.
+The status label now appears above the prayer name. On the 128×128 screen,
+upcoming-event rows begin at y=6 (clock), 30 (status label), 44 (prayer name),
+68 (large time) and 100 (AM/PM). The Offline footer remains at y=116.
+“Will be skipped” and “Not ready yet” use the same label position as “Next Athan.”
+Setup, playback, waiting, disabled and fault screens retain their existing layout.
+The internal frame flag changes presentation only; public APIs, durable records
+and scheduling retain their existing behavior.
+
+All 14 UBSan CTests and 103 Python tests passed again. Renderer checks cover every
+prayer name in both time formats, ready/skipped/not-ready states, online/offline
+footers, midnight and noon. They verify bounds and empty separation bands between
+rows. Actual renderer previews were reviewed against the approved mockup;
+eight other-state renders remain pixel-identical to their pre-change captures.
+
+The baseline is the saved-format implementation at `5968de4`. Before/after builds
+reuse the same temporary source directory, compile-only identities, configurations
+and pinned toolchain described above. Capacity checks passed for both variants.
+
+| Build | Before OTA bytes | After OTA bytes | Delta | Remaining 1.5 MiB budget |
+| --- | ---: | ---: | ---: | ---: |
+| Reference | 1,252,912 | 1,253,008 | +96 | 319,856 |
+| Isolated provisioning | 1,254,640 | 1,254,752 | +112 | 318,112 |
+
+Static RAM remains 115,163 bytes for both variants. The revised layout has not
+been installed on hardware; its physical acceptance remains pending. The
+observations below apply to the earlier layout and exact image stated there.
+
+## Attended hardware validation
+
+The reference AtomS3R C126 + Voice Pyramid A167 was tested with an unpublished
+production-profile development image from `5968de4`. The exact application is
+1,252,944 bytes, SHA-256
+`123281f200520de3490b6e4faf33f0ca9a04d7996056f3f9a6ac12a35179f0c4`,
+leaving 319,920 bytes of application budget. Its source-bound build checks passed.
+The 32-byte difference from the compile-only measurement above comes from the
+exact build identity; this does not change the matched 3,504-byte feature cost.
+
+Fresh paired USB reads retained the installed released application for recovery.
+After another complete paired checkpoint comparison, one application-only write
+and independent readback passed. Full settings/history/credentials/OTA metadata,
+bootloader, inactive application and shared audio were byte-identical around
+installation. No factory image, synthetic audio or historical NVS was installed.
+
+On bottom-only power, authenticated status confirmed the exact development
+commit, active/applied setup and the existing device's 24-hour default. One
+revision-checked save applied 12-hour time at revision 2. Prayer settings/revision,
+history, light settings and the next occurrence were unchanged across that save.
+Later scheduling remained ready without fault; history advanced normally as
+scheduled occurrences passed.
+
+A supplied physical-screen photo shows the current clock at **8:30 PM** and next
+Fajr at **6:02 AM**, with both meridiem labels readable and no visible clipping.
+Authenticated follow-up agrees with the next occurrence and still reports the
+saved 12-hour preference. The photo was taken before the requested cold restart;
+physical cold-restart persistence remains pending.
+
+Static RAM/build success does not establish runtime heap, fragmentation or PSRAM
+headroom. No audio or network pipeline changes are introduced, and unrelated
+completed playback checks were not repeated. These observations establish
+development behavior, not qualification of a new published release.
