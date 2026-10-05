@@ -637,11 +637,20 @@ automated coverage and hardware acceptance limits.
 ## Screen brightness default — 2026-10-05
 
 The unreleased default is now 50%; existing saved brightness values retain their
-value and revision. Startup, missing/corrupt-record fallback and device-page
-guidance agree. The final reference OTA is 1,256,128 bytes, a 64-byte decrease
-from matched `c0cb0d6`, leaving 316,736 bytes of application budget. Static RAM
-remains 115,219 bytes. All six before/after profile capacity checks, 16 UBSan host
-suites, 103 pinned Python tests, 54 Chromium/WebKit cases and nine configurations
-passed. The new default-change image has not been installed. See the
-[dated validation report](screen-brightness-default-validation-2026-10-05.md) for
-measurements, earlier saved-50% physical evidence and remaining hardware limits.
+value and revision. Matched builds against `c0cb0d6` use Python 3.13.0,
+ESPHome 2026.9.0, ESP-IDF 5.5.5 and `esp-14.2.0_20260121`, with the same
+public compile-only identity and synthetic fixtures; never install these images.
+
+| Profile | Before OTA bytes | After OTA bytes | Delta | Remaining 1.5 MiB budget |
+| --- | ---: | ---: | ---: | ---: |
+| Reference | 1,256,192 | 1,256,128 | -64 | 316,736 |
+| Isolated provisioning | 1,257,952 | 1,257,888 | -64 | 314,976 |
+| Scheduler device | 1,121,104 | 1,121,104 | 0 | 451,760 |
+| Scheduler validation | 1,138,640 | 1,138,640 | 0 | 434,224 |
+| Upgrade qualification | 1,263,328 | 1,263,280 | -48 | 309,584 |
+| Forced startup failure | 1,263,328 | 1,263,280 | -48 | 309,584 |
+
+All six before/after capacity checks, 16 UBSan host suites, 103 Python tests,
+54 Chromium/WebKit cases and nine configurations passed. Static RAM is unchanged
+(reference: 115,219 bytes). The new image has not been installed; runtime heap,
+fragmentation and PSRAM are not qualified by these build results.
