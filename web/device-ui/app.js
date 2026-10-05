@@ -116,6 +116,8 @@ function fillScreen(state) {
   $("screen-brightness-value").value=`${state.brightness_percent}%`;
 }
 function renderScreen(state) {
+  // Time-format actions redraw from this shared snapshot between status polls.
+  if(snapshot)snapshot.display=state;
   screenSnapshot=state;$("screen-card").hidden=!state?.supported;
   if(!state?.supported)return;
   if(!screenEditing || (!screenDirty && !screenUncertain))fillScreen(state);

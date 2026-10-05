@@ -11,23 +11,23 @@
   "profiles": {
     "reference": {
       "before_application_bytes": 1253008,
-      "after_application_bytes": 1256112,
-      "delta_bytes": 3104,
-      "application_budget_remaining_bytes": 316752,
+      "after_application_bytes": 1256192,
+      "delta_bytes": 3184,
+      "application_budget_remaining_bytes": 316672,
       "after_static_ram_bytes": 115219,
       "static_ram_delta_bytes": 56,
       "before_application_sha256": "0c6d2d155f67a725b763b6904303d26e09d4535cba028ff714ce97bb67b4809c",
-      "after_application_sha256": "c63f17a9d211022da753a1a259ba8c5f845906c61e0fe8504f85393b7d36dacd"
+      "after_application_sha256": "deb9bf8720011647faedc8c643d1123dac6ea0d4bc77bc33c260cc489b121e7d"
     },
     "isolated": {
       "before_application_bytes": 1254752,
-      "after_application_bytes": 1257872,
-      "delta_bytes": 3120,
-      "application_budget_remaining_bytes": 314992,
+      "after_application_bytes": 1257952,
+      "delta_bytes": 3200,
+      "application_budget_remaining_bytes": 314912,
       "after_static_ram_bytes": 115219,
       "static_ram_delta_bytes": 56,
       "before_application_sha256": "196db95b66a35a86cb5aabe63db32e32004861cb50cff252c84fff77104e35db",
-      "after_application_sha256": "50d52a62ad7e7d93d6b2c1609c44df938d9384dc3b0d95d8f89f2a6a3ee9973a"
+      "after_application_sha256": "788cc8931c102f6773e01b56e2f6ad215445662b727c73ae8f88b5ef5178598e"
     },
     "scheduler": {
       "before_application_bytes": 1120032,
@@ -51,23 +51,66 @@
     },
     "qualification": {
       "before_application_bytes": 1260208,
-      "after_application_bytes": 1263280,
-      "delta_bytes": 3072,
-      "application_budget_remaining_bytes": 309584,
+      "after_application_bytes": 1263328,
+      "delta_bytes": 3120,
+      "application_budget_remaining_bytes": 309536,
       "after_static_ram_bytes": 115291,
       "static_ram_delta_bytes": 56,
       "before_application_sha256": "28f0b82272c9a3f95ad9fe21044c2a7170060af1a7e3cc1b94fb996849ab5807",
-      "after_application_sha256": "b2c4a0a4ad1824c49556e41dbf633b9e54bf6e7be6c7eae336dce12a83dbeb83"
+      "after_application_sha256": "95035a8e2ae36f2874f0efca787e1ef6c16d2e1915a2b045c08fa9ab3e2ce7f9"
     },
     "rollback": {
       "before_application_bytes": 1260208,
-      "after_application_bytes": 1263280,
-      "delta_bytes": 3072,
-      "application_budget_remaining_bytes": 309584,
+      "after_application_bytes": 1263328,
+      "delta_bytes": 3120,
+      "application_budget_remaining_bytes": 309536,
       "after_static_ram_bytes": 115291,
       "static_ram_delta_bytes": 56,
       "before_application_sha256": "f64bdb7fd0dd90b1873a521dce2135a7bde47c24bbfacf990225a90edaa116a0",
-      "after_application_sha256": "e601809d550e96edfe5b3094a748ce23c497aa7e522472ef9d2ab6944ee62d9a"
+      "after_application_sha256": "1649d241d809f9390993a169f140a6cddfb603921ed433744493175ddf32b926"
+    }
+  },
+  "review_follow_up": {
+    "date": "2026-10-05",
+    "baseline_commit": "1dd8ad5ffaba87dc851ad9f2e3f074e5b62b2510",
+    "change": "Synchronize screen responses with the shared device-page snapshot",
+    "profiles": {
+      "reference": {
+        "before_application_bytes": 1256112,
+        "after_application_bytes": 1256192,
+        "delta_bytes": 80,
+        "application_budget_remaining_bytes": 316672,
+        "static_ram_delta_bytes": 0,
+        "before_application_sha256": "c63f17a9d211022da753a1a259ba8c5f845906c61e0fe8504f85393b7d36dacd",
+        "after_application_sha256": "deb9bf8720011647faedc8c643d1123dac6ea0d4bc77bc33c260cc489b121e7d"
+      },
+      "isolated": {
+        "before_application_bytes": 1257872,
+        "after_application_bytes": 1257952,
+        "delta_bytes": 80,
+        "application_budget_remaining_bytes": 314912,
+        "static_ram_delta_bytes": 0,
+        "before_application_sha256": "50d52a62ad7e7d93d6b2c1609c44df938d9384dc3b0d95d8f89f2a6a3ee9973a",
+        "after_application_sha256": "788cc8931c102f6773e01b56e2f6ad215445662b727c73ae8f88b5ef5178598e"
+      },
+      "qualification": {
+        "before_application_bytes": 1263280,
+        "after_application_bytes": 1263328,
+        "delta_bytes": 48,
+        "application_budget_remaining_bytes": 309536,
+        "static_ram_delta_bytes": 0,
+        "before_application_sha256": "b2c4a0a4ad1824c49556e41dbf633b9e54bf6e7be6c7eae336dce12a83dbeb83",
+        "after_application_sha256": "95035a8e2ae36f2874f0efca787e1ef6c16d2e1915a2b045c08fa9ab3e2ce7f9"
+      },
+      "rollback": {
+        "before_application_bytes": 1263280,
+        "after_application_bytes": 1263328,
+        "delta_bytes": 48,
+        "application_budget_remaining_bytes": 309536,
+        "static_ram_delta_bytes": 0,
+        "before_application_sha256": "e601809d550e96edfe5b3094a748ce23c497aa7e522472ef9d2ab6944ee62d9a",
+        "after_application_sha256": "1649d241d809f9390993a169f140a6cddfb603921ed433744493175ddf32b926"
+      }
     }
   }
 }
