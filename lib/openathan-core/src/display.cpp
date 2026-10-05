@@ -40,7 +40,7 @@ void DisplayPreferences::begin() {
   const auto loaded = store_.load(value);
   if (loaded == LoadResult::ERROR) return;
   // Absence is a virtual revision 1. Booting does not write flash.
-  if (loaded == LoadResult::EMPTY) value = {1, 10};
+  if (loaded == LoadResult::EMPTY) value = {1, DEFAULT_DISPLAY_BRIGHTNESS_PERCENT};
   if (!value.revision || (value.brightness_percent < 1 || value.brightness_percent > 100)) return;
   saved_ = value; writable_ = true;
 }

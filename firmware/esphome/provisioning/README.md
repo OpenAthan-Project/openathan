@@ -284,8 +284,9 @@ stale revisions 409, and maintenance or unavailable storage 503.
 A separate checksummed 16-byte `display` record in the selected prayer NVS
 namespace retains brightness across restart without changing prayer settings,
 light preferences, time format, consumption history or shared audio. Missing
-records default to 10% at virtual revision 1 without writing flash. Corrupt
-records remain untouched; the device uses 10% and blocks brightness saves.
+records default to 50% at virtual revision 1 without writing flash. Existing
+saved brightness values are retained. Corrupt records remain untouched; the
+device uses 50% and blocks brightness saves.
 Unchanged saves do not write flash or increment the revision. Isolated builds
 use `oa_test`, and compatible older firmware ignores the new record.
 

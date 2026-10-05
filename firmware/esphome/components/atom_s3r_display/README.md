@@ -5,12 +5,13 @@ internal I2C bus (SDA GPIO45, SCL GPIO0, address `0x30`). It does not access
 the Pyramid bus, amplifier, LEDs or touch controller. Failed initialization
 stops this component without changing scheduler or upgrade health.
 
-The reference configuration initializes at 10% linear PWM duty and retains
+The reference configuration initializes at 50% linear PWM duty and retains
 17.5 mA white-channel current. `display_brightness_percent` remains a build-time
 initialization value (1–100). When wired through `display_output_id`, the saved
 screen preference takes precedence after OpenAthan starts; a missing or corrupt
-record uses 10%. Runtime changes write only the PWM register, preserve the current
-and other channels, and skip unchanged values. Failed runtime writes can be
+record uses 50%. Existing saved values remain unchanged. Runtime changes write
+only the PWM register, preserve the current and other channels, and skip
+unchanged values. Failed runtime writes can be
 retried without repeating initialization. The local page saves through
 `/api/display`; see the [API contract](../../provisioning/README.md#screen-brightness-unreleased).
 Always-on operation does not automatically raise brightness for faults/playback.

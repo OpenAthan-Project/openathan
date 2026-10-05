@@ -8,7 +8,7 @@
 <body>
 <main>
   <aside id="test-banner" class="test-banner" hidden><strong>Test firmware</strong> — isolated test settings and playback history. Restore production firmware after testing.</aside>
-  <header><div><p class="eyebrow">YOUR PRAYER COMPANION</p><h1>OpenAthan</h1></div><span id="setup-state" class="badge">Connecting</span></header>
+  <header><div><h1>OpenAthan</h1></div><span id="setup-state" class="badge">Connecting</span></header>
   <p id="message" role="status" aria-live="polite">Reading your device…</p>
   <section class="card" aria-labelledby="today-title">
     <div class="section-heading"><h2 id="today-title">Today</h2><button id="refresh" class="quiet" type="button">Refresh</button></div>
@@ -47,8 +47,8 @@
   <section id="screen-card" class="card" aria-labelledby="screen-title" hidden>
     <h2 id="screen-title">Screen</h2>
     <form id="screen-form">
-      <label for="screen-brightness">Screen brightness <output id="screen-brightness-value" for="screen-brightness">10%</output></label>
-      <input id="screen-brightness" type="range" min="1" max="100" step="1" value="10" disabled aria-describedby="screen-hint">
+      <label for="screen-brightness">Screen brightness <output id="screen-brightness-value" for="screen-brightness">50%</output></label>
+      <input id="screen-brightness" type="range" min="1" max="100" step="1" value="50" disabled aria-describedby="screen-hint">
       <p id="screen-hint" class="hint">Changes apply when you save. The screen stays on.</p>
       <p id="screen-message" role="status" aria-live="polite"></p>
       <div class="actions"><button id="screen-save" type="submit" disabled>Save screen brightness</button><button id="screen-reload" type="button" class="quiet" disabled>Reload screen brightness</button></div>

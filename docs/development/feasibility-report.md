@@ -633,3 +633,15 @@ audio coexistence plus runtime heap/fragmentation/PSRAM remain untested for this
 source; no hardware was accessed. See the
 [development report](screen-brightness-validation-2026-10-04.md) for measurements,
 automated coverage and hardware acceptance limits.
+
+## Screen brightness default — 2026-10-05
+
+The unreleased default is now 50%; existing saved brightness values retain their
+value and revision. Startup, missing/corrupt-record fallback and device-page
+guidance agree. The final reference OTA is 1,256,128 bytes, a 64-byte decrease
+from matched `c0cb0d6`, leaving 316,736 bytes of application budget. Static RAM
+remains 115,219 bytes. All six before/after profile capacity checks, 16 UBSan host
+suites, 103 pinned Python tests, 54 Chromium/WebKit cases and nine configurations
+passed. The new default-change image has not been installed. See the
+[dated validation report](screen-brightness-default-validation-2026-10-05.md) for
+measurements, earlier saved-50% physical evidence and remaining hardware limits.

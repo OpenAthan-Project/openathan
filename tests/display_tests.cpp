@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   }
   using esphome::atom_s3r_display::Backlight;
   Backlight light; light.setup(); CHECK(!light.is_failed() && light.writes.size() == 9);
-  CHECK(light.writes.back().reg == 0x0E && light.writes.back().data[0] == 26);
+  CHECK(light.writes.back().reg == 0x0E && light.writes.back().data[0] == 128);
   for (const auto &write : light.writes) CHECK(write.reg <= 0x0F || write.reg == 0x70);
   for (unsigned fail = 1; fail <= 9; ++fail) {
     Backlight broken; broken.fail_at = fail; broken.setup();
