@@ -77,9 +77,20 @@ and pinned toolchain described above. Capacity checks passed for both variants.
 | Reference | 1,252,912 | 1,253,008 | +96 | 319,856 |
 | Isolated provisioning | 1,254,640 | 1,254,752 | +112 | 318,112 |
 
-Static RAM remains 115,163 bytes for both variants. The revised layout has not
-been installed on hardware; its physical acceptance remains pending. The
-observations below apply to the earlier layout and exact image stated there.
+Static RAM remains 115,163 bytes for both variants.
+
+The exact `39cc037` production-profile development application was then installed
+on the reference device: 1,253,040 bytes, SHA-256
+`c957077df85c674147491a1deb90e6aada3120ae6f95f16ab01a9113d526bda0`,
+leaving 319,824 bytes of application budget. Fresh paired reads and independent
+application readback passed. Full control/settings/history/credentials/OTA
+metadata, bootloader, inactive application and shared audio remained byte-identical
+around this application-only installation. Before installation, the durable
+preference decoded as 12-hour time/revision 2, with settings revision 3 and current
+prayer-consumption history retained. Physical bottom-power startup, revised-layout
+readability and 10-second cold-restart persistence remain pending.
+
+The observations below apply to the earlier layout and exact image stated there.
 
 ## Attended hardware validation
 
