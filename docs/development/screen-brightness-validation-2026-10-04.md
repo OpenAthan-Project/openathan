@@ -27,10 +27,12 @@ scheduling or update health.
   startup restoration, application failure/recovery, saves during simulated
   playback, maintenance write denial and unchanged scheduler readiness/history.
 - All nine CI configuration checks passed.
-- All 48 Chromium/WebKit browser cases passed, including authenticated brightness
+- All 54 Chromium/WebKit browser cases passed, including authenticated brightness
   reads/writes, keyboard bounds, persistence after page reload, unsaved edits,
   revision conflicts, dropped save responses, storage/application failures and
-  hiding unsupported controls.
+  hiding unsupported controls. Consecutive brightness and time-format actions
+  retain the latest brightness and revision after a save, reload or lost-response
+  reconciliation.
 - Desktop and 390-pixel-wide screen-card captures were reviewed. The added control
   reuses the existing page styling and fits without horizontal overflow. The UI
   detector reported existing header typography/decorative-label findings;
@@ -46,14 +48,14 @@ synthetic, compile-only bytes. These images are not installation/release artifac
 
 | Profile | Before OTA bytes | After OTA bytes | Delta | Remaining 1.5 MiB budget |
 | --- | ---: | ---: | ---: | ---: |
-| Reference | 1,253,008 | 1,256,112 | +3,104 | 316,752 |
-| Isolated provisioning | 1,254,752 | 1,257,872 | +3,120 | 314,992 |
+| Reference | 1,253,008 | 1,256,192 | +3,184 | 316,672 |
+| Isolated provisioning | 1,254,752 | 1,257,952 | +3,200 | 314,912 |
 | Scheduler device | 1,120,032 | 1,121,104 | +1,072 | 451,760 |
 | Scheduler validation | 1,137,552 | 1,138,640 | +1,088 | 434,224 |
-| Upgrade qualification | 1,260,208 | 1,263,280 | +3,072 | 309,584 |
-| Forced startup failure | 1,260,208 | 1,263,280 | +3,072 | 309,584 |
+| Upgrade qualification | 1,260,208 | 1,263,328 | +3,120 | 309,536 |
+| Forced startup failure | 1,260,208 | 1,263,328 | +3,120 | 309,536 |
 
-Reference growth is **3,104 bytes**, with **316,752 bytes** of application budget
+Reference growth is **3,184 bytes**, with **316,672 bytes** of application budget
 remaining. Reference static RAM grows by 56 bytes to 115,219. The
 [measurement data](screen-brightness-build-2026-10-04.json) records all six profiles
 and image hashes. Existing capacity checks passed for every profile before and
@@ -72,6 +74,16 @@ All 16 UBSan CTests passed again. The four profiles containing the adapter were
 rebuilt with the same pinned dependencies and configuration; the table above
 reflects the reviewed implementation. The two scheduler-only profiles are
 unaffected by this adapter change.
+
+A brightness response previously left the shared page snapshot stale, allowing
+time-format save/reload to restore an older brightness and revision before the
+next status poll. Brightness rendering now synchronizes that snapshot after
+save, reload and uncertain-save readback. Six new Chromium/WebKit regressions
+reproduced the reset against `1dd8ad5`; all 54 browser cases pass after the fix.
+The regressions also verify that the next brightness save uses the current
+revision without a false conflict. All four profiles embedding the UI were rebuilt
+with the same pinned configuration; their capacity checks passed. The matched
+before/after images and deltas for this fix are recorded in the measurement data.
 
 ## Physical validation remaining
 

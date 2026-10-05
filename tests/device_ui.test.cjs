@@ -96,6 +96,45 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const screenResponse of ['save','reload','reconcile']){
+ test(`${browserName}: time format actions retain screen ${screenResponse} state`,async()=>{
+  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:10,application:'applied'};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  // Exercise consecutive preference actions before polling can refresh the snapshot.
+  await page.addInitScript(()=>{window.setInterval=()=>0;});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#screen-brightness').disabled);
+    if(screenResponse==='reload'){
+      f.state.device.display.brightness_percent=100;f.state.device.display.revision++;
+      await page.locator('#screen-reload').click();
+      await page.waitForFunction(()=>document.querySelector('#screen-brightness').value==='100' && !document.querySelector('#screen-brightness').disabled);
+    }else{
+      f.state.screenDrop=screenResponse==='reconcile';
+      await page.locator('#screen-brightness').focus();await page.keyboard.press('End');
+      await page.locator('#screen-save').click();
+      await page.waitForFunction(()=>/saved\.|confirmed/.test(document.querySelector('#screen-message').textContent));
+      assert.equal(f.state.screenMutations,1);
+    }
+    await page.locator('#time-format').selectOption('12');await page.locator('#time-format-save').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format-message').textContent==='Time format saved.');
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'100');
+    assert.equal(await page.locator('#screen-brightness-value').textContent(),'100%');
+    f.state.device.time_format.hours=24;f.state.device.time_format.revision++;
+    await page.locator('#time-format-reload').click();
+    await page.waitForFunction(()=>document.querySelector('#time-format').value==='24' && !document.querySelector('#time-format').disabled);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'100');
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('Home');
+    await page.locator('#screen-save').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent==='Screen brightness saved.');
+    const lastSave=f.state.posts.filter(post=>post.url==='/api/display').at(-1);
+    assert.equal(lastSave.payload.expected_revision,2);
+    assert.equal(f.state.device.display.brightness_percent,1);
+    assert.equal(f.state.device.display.revision,3);
+    assert.equal(f.state.screenMutations,screenResponse==='reload'?1:2);
+  }finally{await browser.close();await f.close();}
+ });
+ }
  test(`${browserName}: screen brightness saves, reconciles and preserves edits`,async()=>{
   const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:10,application:'applied'};
   const prayer=structuredClone(f.state.device.settings);
