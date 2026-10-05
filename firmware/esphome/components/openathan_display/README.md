@@ -38,8 +38,12 @@ The clock includes its AM/PM marker; the large next-prayer digits retain their
 size with AM/PM on a separate line. Formatting never changes timezone conversion
 or scheduling. This addition is unreleased; see its
 [development validation](../../../../docs/development/time-format-validation-2026-10-04.md).
-On a black background, the local clock starts at y=6, heading at y=32,
-main value at y=58, explanation at y=96 and connection status at y=116.
+On a black background, the local clock starts at y=6. Upcoming-prayer screens
+place the status label at y=30, prayer name at y=44, large time at y=68 and
+AM/PM at y=100. “Next Athan,” “Will be skipped” and “Not ready yet” appear
+above the prayer name, keeping the time and its meridiem together below it.
+Other states retain the heading at y=32, main value at y=58 and explanation
+at y=96. Connection status stays at y=116 in every state.
 The 8×8 bitmap font is scaled 1× for small text, 2× for headings/messages
 and 3× for the prayer time. Text is centered and bounded to the screen.
 Primary text is white, secondary text `#D0D8D8`, and fault guidance `#FFB8A8`.
