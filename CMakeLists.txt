@@ -9,7 +9,7 @@ add_test(NAME upgrade_safe_window COMMAND upgrade_policy_tests)
 file(GLOB ADHAN_SOURCES CONFIGURE_DEPENDS third_party/adhan-cpp/src/*.cpp)
 add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp
-  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/time_format.cpp ${ADHAN_SOURCES})
+  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp ${ADHAN_SOURCES})
 target_include_directories(openathan_core PUBLIC lib/openathan-core/include third_party/adhan-cpp/include)
 add_executable(prayer_tests tests/prayer_tests.cpp)
 target_link_libraries(prayer_tests PRIVATE openathan_core)
@@ -101,6 +101,17 @@ target_include_directories(display_tests PRIVATE tests/stubs lib/openathan-core/
   firmware/esphome/components/openathan_display firmware/esphome/components/atom_s3r_display)
 target_link_libraries(display_tests PRIVATE openathan_core)
 add_test(NAME display_status_and_backlight COMMAND display_tests)
+
+foreach(mode IN ITEMS production isolated)
+  add_executable(display_preferences_${mode}_tests tests/display_preferences_tests.cpp
+    firmware/esphome/components/openathan/nvs_settings_store.cpp)
+  target_include_directories(display_preferences_${mode}_tests PRIVATE tests/stubs firmware/esphome/components/openathan)
+  target_link_libraries(display_preferences_${mode}_tests PRIVATE openathan_core)
+  if(mode STREQUAL "isolated")
+    target_compile_definitions(display_preferences_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)
+  endif()
+  add_test(NAME display_preferences_${mode} COMMAND display_preferences_${mode}_tests)
+endforeach()
 
 foreach(mode IN ITEMS production isolated)
   add_executable(time_format_${mode}_tests tests/time_format_tests.cpp

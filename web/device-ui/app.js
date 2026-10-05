@@ -6,6 +6,7 @@ const methods = {muslim_world_league:"Muslim World League",egyptian:"Egyptian",k
 const faults = {"invalid settings":"Review the location, timezone and calculation settings, then save again","invalid prayer schedule":"These settings cannot produce a valid schedule. Review the location, method and offsets","durable state unavailable":"Saved data could not be read or written. Restart the device; do not erase its storage","audio unavailable":"Audio is unavailable. Check the device power and compatible audio installation","playback request rejected":"Audio could not start. Check the device power and audio installation"};
 let snapshot, editing, dirty = false, busy = false, loading = false, generation = 0;
 let timeSnapshot, timeEditing, timeDirty=false, timeUncertain=false, previewSchedule;
+let screenSnapshot, screenEditing, screenDirty=false, screenUncertain=false;
 let lightSnapshot, lightEditing, lightDirty=false, lightUncertain=false;
 let locationProposal, locationNeedsPreview=false, settingsVersion=0;
 const supportedZones=new Set();
@@ -108,7 +109,28 @@ function renderLights(state) {
   else if(lightDirty && state.revision!==lightEditing.revision)lightMessage("Light settings changed on another client. Your edits are preserved; reload before saving.",true);
   else if(!lightDirty)lightMessage("Light settings loaded.");
 }
+function screenMessage(text,error=false) { $("screen-message").textContent=text;$("screen-message").classList.toggle("error",error); }
+function fillScreen(state) {
+  screenEditing=structuredClone(state);screenDirty=false;screenUncertain=false;
+  $("screen-brightness").value=state.brightness_percent;
+  $("screen-brightness-value").value=`${state.brightness_percent}%`;
+}
+function renderScreen(state) {
+  screenSnapshot=state;$("screen-card").hidden=!state?.supported;
+  if(!state?.supported)return;
+  if(!screenEditing || (!screenDirty && !screenUncertain))fillScreen(state);
+  if(state.application==="storage_fault")screenMessage("Screen brightness could not be read. Using 10%. Restart the device; existing data has been retained.",true);
+  else if(state.application==="save_failed")screenMessage("Screen brightness could not be saved. Restart the device and reload screen brightness.",true);
+  else if(state.application==="output_unavailable")screenMessage("Screen brightness is saved, but the backlight is unavailable. Restart the device if it does not recover; prayer scheduling continues.",true);
+  else if(screenUncertain)screenMessage("The save response was lost. Reload screen brightness before trying again.",true);
+  else if(screenDirty && state.revision!==screenEditing.revision)screenMessage("Screen brightness changed on another client. Your edits are preserved; reload before saving.",true);
+  else if(!screenDirty)screenMessage("Screen brightness loaded.");
+}
 function controls() {
+  const screenBlocked=busy || loading || !screenSnapshot?.supported || !screenEditing || ["storage_fault","save_failed"].includes(screenSnapshot.application);
+  $("screen-brightness").disabled=screenBlocked;
+  $("screen-save").disabled=screenBlocked || screenUncertain;
+  $("screen-reload").disabled=busy || loading || !screenSnapshot?.supported;
   const timeBlocked=busy || loading || !timeEditing || timeSnapshot?.application!=="applied";
   $("time-format").disabled=timeBlocked;
   $("time-format-save").disabled=timeBlocked || timeUncertain;
@@ -149,6 +171,7 @@ function render(state) {
   snapshot=state;
   renderTimeFormat(state.time_format);
   renderLights(state.lights);
+  renderScreen(state.display);
   renderFirmware(state.firmware);
   $("setup-state").textContent=state.setup==="active"?"Setup complete":state.setup==="incomplete"?"Setup incomplete":"Storage fault";
   $("next").textContent=state.setup!=="active"?"Finish setup to enable announcements":state.next?`${state.next.name} · ${localTime(state.next.local,true)}`:"No upcoming announcement available";
@@ -279,6 +302,40 @@ $("lights-form").addEventListener("submit",async(event)=>{
       }
     } catch {lightUncertain=true;lightMessage("Connection lost. Reload light settings before trying again.",true);}
   } finally {busy=false;controls();}
+});
+$("screen-brightness").addEventListener("input",()=>{
+  screenDirty=true;$("screen-brightness-value").value=`${$("screen-brightness").value}%`;controls();
+});
+$("screen-reload").addEventListener("click",async()=>{
+  if(busy || loading || (screenDirty && !confirm("Replace your unsaved screen brightness with the saved setting?")))return;
+  busy=true;++generation;controls();
+  try {const state=await request("/api/display");fillScreen(state);renderScreen(state);}
+  catch(error){screenMessage(error.message+". Check the device connection.",true);}
+  finally{busy=false;controls();}
+});
+$("screen-form").addEventListener("submit",async(event)=>{
+  event.preventDefault();if(busy || loading || screenUncertain || !screenEditing || !screenSnapshot?.supported)return;
+  const brightness_percent=Number($("screen-brightness").value),revision=screenEditing.revision;
+  busy=true;++generation;controls();
+  try {
+    const state=await request("/api/display",{schema:1,expected_revision:revision,brightness_percent});
+    fillScreen(state);renderScreen(state);
+    if(state.application==="applied")screenMessage("Screen brightness saved.");
+  } catch(error) {
+    screenUncertain=!error.status;screenMessage(error.message,true);
+    // Read back once after an uncertain save; never repeat the write automatically.
+    try {
+      const state=await request("/api/display");
+      if((!error.status || error.status===409) && state.brightness_percent===brightness_percent &&
+          (state.revision===revision+1 || (!error.status && state.revision===revision))) {
+        fillScreen(state);renderScreen(state);
+        if(state.application==="applied")screenMessage("Saved screen brightness confirmed after reconnecting.");
+      } else {
+        renderScreen(state);
+        if(error.status===409)screenMessage("Screen brightness changed on another client. Your edits are preserved; reload before saving.",true);
+      }
+    } catch {screenUncertain=true;screenMessage("Connection lost. Reload screen brightness before trying again.",true);}
+  } finally{busy=false;controls();}
 });
 $("time-format").addEventListener("change",()=>{timeDirty=true;timeMessage("Time format changes apply when you save.");});
 function applyTimeFormat(state) { render({...snapshot,time_format:state}); }

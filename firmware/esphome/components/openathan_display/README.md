@@ -6,9 +6,12 @@ This is development work after v0.2.1, not a capability in the published v0.2.1
 bundle. The dated report records isolated hardware acceptance; successor
 release qualification remains separate.
 
-The board profile keeps the screen on at a build-time default of 10% backlight
-brightness (`display_brightness_percent`) and rotation 0. The intended viewing
-side is opposite the Pyramid's power/expansion ports, with the cord at the back.
+The board profile keeps the screen on with a saved brightness preference
+(1–100%, default 10%) and rotation 0. The local settings page provides a separate
+**Screen brightness** slider that applies when saved and survives restart.
+This preference is unreleased; see the
+[API contract](../../provisioning/README.md#screen-brightness-unreleased).
+The intended viewing side is opposite the Pyramid's power/expansion ports, with the cord at the back.
 The earlier isolated run used rotation 180 and confirmed dimness and readability
 from the operator's viewing side; it did not establish this front/back convention.
 Physical confirmation of the corrected orientation is pending the next attended

@@ -13,6 +13,7 @@ AUTO_LOAD = ["json"]
 core = cg.global_ns.namespace("openathan")
 Playback = core.class_("Playback")
 LightOutput = core.class_("LightOutput")
+DisplayOutput = core.class_("DisplayOutput")
 Method = core.enum("Method", is_class=True)
 HighLatitudeRule = core.enum("HighLatitudeRule", is_class=True)
 ns = cg.esphome_ns.namespace("openathan_component")
@@ -41,6 +42,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required("time_id"): cv.use_id(time.RealTimeClock),
     cv.Required("playback_id"): cv.use_id(Playback),
     cv.Optional("light_output_id"): cv.use_id(LightOutput),
+    cv.Optional("display_output_id"): cv.use_id(DisplayOutput),
     cv.Required("latitude"): coordinate(-90, 90),
     cv.Required("longitude"): coordinate(-180, 180),
     cv.Required("method"): cv.enum(METHODS, lower=True),
@@ -82,6 +84,8 @@ async def to_code(config):
     cg.add(var.set_playback(await cg.get_variable(config["playback_id"])))
     if "light_output_id" in config:
         cg.add(var.set_light_output(await cg.get_variable(config["light_output_id"])))
+    if "display_output_id" in config:
+        cg.add(var.set_display_output(await cg.get_variable(config["display_output_id"])))
     for field in ("latitude", "longitude", "method", "hanafi", "high_latitude"):
         cg.add(getattr(var, "set_" + field)(config[field]))
     for index, name in enumerate(EVENTS):

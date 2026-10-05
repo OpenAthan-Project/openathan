@@ -15,6 +15,19 @@ void Backlight::setup() {
   delayMicroseconds(200);
   // Direct PWM, no engines or RGB outputs. Keep the white-channel current at the verified 17.5 mA.
   if (!write(0x70, 0) || !write(0x05, 0) || !write(0x06, 0) || !write(0x07, 0) || !write(0x0F, 175)) return;
-  write(0x0E, static_cast<uint8_t>((brightness_ * 255 + 50) / 100));
+  if (!write(0x0E, static_cast<uint8_t>((brightness_ * 255 + 50) / 100))) return;
+  applied_ = brightness_;
+  initialized_ = true;
+}
+bool Backlight::apply(uint8_t percent) {
+  if (!initialized_ || is_failed() || percent < 1 || percent > 100) return false;
+  if (percent == applied_) return true;
+  // Runtime changes touch only PWM, never reset, channel current or RGB outputs.
+  // A failed acknowledgement may still have changed PWM; invalidate the cache
+  // so restoring the previous preference performs a real write too.
+  applied_ = 0;
+  if (!write_byte(0x0E, static_cast<uint8_t>((percent * 255 + 50) / 100))) return false;
+  applied_ = percent;
+  return true;
 }
 }

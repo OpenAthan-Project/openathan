@@ -20,7 +20,11 @@ spi:
     clk_pin: GPIO15
     mosi_pin: GPIO21
 
+openathan:
+  display_output_id: atom_backlight
+
 atom_s3r_display:
+  id: atom_backlight
   i2c_id: atom_internal_bus
   address: 0x30
   brightness_percent: ${display_brightness_percent}

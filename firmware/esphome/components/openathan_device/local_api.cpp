@@ -60,6 +60,14 @@ void LocalApi::time_format_(JsonObject root) {
   root["hours"] = preferences.hours();
   root["application"] = preferences.writable() ? "applied" : saved ? "save_failed" : "storage_fault";
 }
+void LocalApi::display_(JsonObject root) {
+  const auto &preferences = athan_->display_preferences();
+  root["schema"] = 1;
+  root["supported"] = athan_->has_display();
+  root["revision"] = preferences.saved() ? preferences.saved()->revision : 0;
+  root["brightness_percent"] = preferences.brightness_percent();
+  root["application"] = athan_->display_application_status();
+}
 void LocalApi::lights_(JsonObject root) {
   root["supported"] = athan_->has_lights();
   root["application"] = athan_->light_application_status();
@@ -76,6 +84,7 @@ void LocalApi::snapshot_(JsonObject root) {
   if (upgrade_) upgrade_->snapshot(root["firmware"].to<JsonObject>());
   time_format_(root["time_format"].to<JsonObject>());
   lights_(root["lights"].to<JsonObject>());
+  display_(root["display"].to<JsonObject>());
   root["test_mode"] = openathan_storage::TEST_MODE;
   athan_->write_settings_json(root);
   root["setup"] = athan_->setup_state();
@@ -119,6 +128,8 @@ void LocalApi::handle(ApiExchange& request) {
     upgrade_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/time-format")
     time_format_(root);
+  else if (request.method == "GET" && request.uri == "/api/display")
+    display_(root);
   else if (request.method == "GET" && request.uri == "/api/lights")
     lights_(root);
   else if (request.method == "GET" && request.uri == "/api/timezones") {
@@ -150,6 +161,18 @@ void LocalApi::handle(ApiExchange& request) {
       if (result == TimeFormatResult::CONFLICT) { error(request, 409, "Reload time format before saving"); return; }
       if (result == TimeFormatResult::STORAGE) { error(request, 503, "Time format could not be saved; restart the device"); return; }
       time_format_(root);
+    } else if (request.uri == "/api/display") {
+      if (!athan_->has_display()) { error(request, 404, "Screen brightness is not supported on this device"); return; }
+      if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
+          !payload["expected_revision"].is<uint32_t>() || !payload["brightness_percent"].is<unsigned>() ||
+          payload["brightness_percent"].as<unsigned>() < 1 || payload["brightness_percent"].as<unsigned>() > 100) {
+        error(request, 400, "Choose screen brightness from 1 to 100 percent"); return;
+      }
+      const auto result = athan_->change_display(payload["brightness_percent"].as<uint8_t>(), payload["expected_revision"].as<uint32_t>());
+      using ::openathan::DisplayResult;
+      if (result == DisplayResult::CONFLICT) { error(request, 409, "Reload screen brightness before saving"); return; }
+      if (result == DisplayResult::STORAGE) { error(request, 503, "Screen brightness could not be saved; restart the device"); return; }
+      display_(root);
     } else if (request.uri == "/api/lights") {
       if (!athan_->has_lights()) { error(request, 404, "Lights are not supported on this device"); return; }
       const auto settings = payload["settings"];
