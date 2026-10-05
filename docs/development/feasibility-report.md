@@ -633,24 +633,3 @@ audio coexistence plus runtime heap/fragmentation/PSRAM remain untested for this
 source; no hardware was accessed. See the
 [development report](screen-brightness-validation-2026-10-04.md) for measurements,
 automated coverage and hardware acceptance limits.
-
-## Screen brightness default — 2026-10-05
-
-The unreleased default is now 50%; existing saved brightness values retain their
-value and revision. Matched builds against `c0cb0d6` use Python 3.13.0,
-ESPHome 2026.9.0, ESP-IDF 5.5.5 and `esp-14.2.0_20260121`, with the same
-public compile-only identity and synthetic fixtures; never install these images.
-
-| Profile | Before OTA bytes | After OTA bytes | Delta | Remaining 1.5 MiB budget |
-| --- | ---: | ---: | ---: | ---: |
-| Reference | 1,256,192 | 1,256,128 | -64 | 316,736 |
-| Isolated provisioning | 1,257,952 | 1,257,888 | -64 | 314,976 |
-| Scheduler device | 1,121,104 | 1,121,104 | 0 | 451,760 |
-| Scheduler validation | 1,138,640 | 1,138,640 | 0 | 434,224 |
-| Upgrade qualification | 1,263,328 | 1,263,280 | -48 | 309,584 |
-| Forced startup failure | 1,263,328 | 1,263,280 | -48 | 309,584 |
-
-All six before/after capacity checks, 16 UBSan host suites, 103 Python tests,
-54 Chromium/WebKit cases and nine configurations passed. Static RAM is unchanged
-(reference: 115,219 bytes). The new image has not been installed; runtime heap,
-fragmentation and PSRAM are not qualified by these build results.

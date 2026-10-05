@@ -16,9 +16,6 @@ write only the Atom's white-channel PWM register; its current and other outputs
 retain their existing configuration. Optional display faults never gate audio,
 scheduling or update health.
 
-The [2026-10-05 follow-up](feasibility-report.md#screen-brightness-default--2026-10-05)
-changes the default to 50% while retaining saved preferences.
-
 ## Automated and browser validation
 
 - All 16 UBSan CTests passed. Coverage includes production/isolated preference
