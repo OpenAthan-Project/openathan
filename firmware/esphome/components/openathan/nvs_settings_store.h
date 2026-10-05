@@ -2,6 +2,7 @@
 #include "openathan/settings.h"
 #include "openathan/lights.h"
 #include "openathan/time_format.h"
+#include "openathan/display.h"
 #include "storage_config.h"
 #include <nvs.h>
 
@@ -33,6 +34,15 @@ class NvsTimeFormatStore : public ::openathan::TimeFormatStore {
   ~NvsTimeFormatStore() override { if (opened_) nvs_close(handle_); }
   ::openathan::LoadResult load(::openathan::SavedTimeFormat &value) override;
   bool save(const ::openathan::SavedTimeFormat &value) override;
+ private:
+  nvs_handle_t handle_{};
+  bool opened_{};
+};
+class NvsDisplayStore : public ::openathan::DisplayStore {
+ public:
+  ~NvsDisplayStore() override { if (opened_) nvs_close(handle_); }
+  ::openathan::LoadResult load(::openathan::SavedDisplay &value) override;
+  bool save(const ::openathan::SavedDisplay &value) override;
  private:
   nvs_handle_t handle_{};
   bool opened_{};

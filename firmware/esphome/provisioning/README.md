@@ -270,6 +270,36 @@ to 24-hour time and saves are blocked. A failed save keeps the last confirmed
 format active and blocks further preference writes until restart. These failures
 never block scheduling or playback. Isolated builds use `oa_test`.
 
+## Screen brightness (unreleased)
+
+`GET /api/display` and the `display` object in `/api/status` return
+`{schema: 1, supported, revision, brightness_percent, application}`. Supported
+means an adjustable backlight adapter is configured. The local page hides its
+**Screen** card otherwise. Saves use `POST /api/display` with
+`{schema: 1, expected_revision, brightness_percent}`; brightness is an integer
+from 1 to 100. Both endpoints use the existing authentication; writes retain
+same-origin JSON protection. Unsupported writes return 404, invalid input 400,
+stale revisions 409, and maintenance or unavailable storage 503.
+
+A separate checksummed 16-byte `display` record in the selected prayer NVS
+namespace retains brightness across restart without changing prayer settings,
+light preferences, time format, consumption history or shared audio. Missing
+records default to 10% at virtual revision 1 without writing flash. Corrupt
+records remain untouched; the device uses 10% and blocks brightness saves.
+Unchanged saves do not write flash or increment the revision. Isolated builds
+use `oa_test`, and compatible older firmware ignores the new record.
+
+`application` is `unsupported`, `storage_fault`, `save_failed`,
+`output_unavailable`, or `applied`. A successful save can return
+`output_unavailable`: persistence succeeded but backlight application failed.
+The device retries application at one-second intervals; this never gates audio,
+scheduling or update health. A storage save failure retains the last confirmed
+brightness and blocks further preference writes until restart. The page reads
+back uncertain saves without automatically repeating them and preserves edits
+across status refreshes and conflicts. The screen remains on; screen-off and
+automatic night dimming are outside this preference. See the
+[development validation and size measurements](../../../docs/development/screen-brightness-validation-2026-10-04.md).
+
 ## Optional lights
 
 Reference firmware includes standalone prayer countdown and status lights with

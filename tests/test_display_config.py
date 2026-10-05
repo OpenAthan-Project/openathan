@@ -31,6 +31,7 @@ class DisplayConfigTests(unittest.TestCase):
             self.assertIn("athan_status_screen->draw(it)", source)
             self.assertNotIn("atom_status_lcd->show_test_card()", source)
             self.assertIn("->set_brightness(10)", source)
+            self.assertIn("athan_scheduler->set_display_output(atom_backlight)", source)
             for invalid in (0, 101):
                 config.write_text(base + f'substitutions:\n  display_brightness_percent: "{invalid}"\n')
                 result = subprocess.run([sys.executable, "-m", "esphome", "config", str(config)],

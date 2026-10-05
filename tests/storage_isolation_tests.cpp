@@ -56,6 +56,10 @@ void fill_test_records() {
   openathan::SavedLights previous_lights;
   CHECK(lights.load(previous_lights)==LoadResult::EMPTY);
   CHECK(lights.save({2,{true,35}}));
+  NvsDisplayStore display;
+  openathan::SavedDisplay previous_display;
+  CHECK(display.load(previous_display)==LoadResult::EMPTY);
+  CHECK(display.save({2,37}));
   CHECK(gate.activate());
   CredentialStore credentials;
   CHECK(credentials.save_wifi({"test network", "test password"}));

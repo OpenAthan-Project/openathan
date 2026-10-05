@@ -15,6 +15,7 @@ static time::DSTRule applied_rule(const ::openathan::DstRule &r) {
 }
 void OpenAthan::setup() {
   time_format_preferences_.begin();
+  if (display_output_) { display_preferences_.begin(); apply_display_(); }
   if (light_output_) light_preferences_.begin();
   scheduler_ = std::make_unique<::openathan::Scheduler>(*this, *calculator_source_, *state_store_, *playback_);
   settings_service_ = std::make_unique<::openathan::SettingsService>(*settings_store_);
@@ -121,6 +122,7 @@ void OpenAthan::apply_volume_() {
 void OpenAthan::loop() {
   update_lights_();
   const auto now = static_cast<uint64_t>(esp_timer_get_time() / 1000);
+  if (display_output_ && !maintenance_ && !display_output_ok_ && now >= display_next_check_) apply_display_();
   if (now >= next_volume_check_) {
     apply_volume_();
     next_volume_check_ = now + 250;
@@ -211,6 +213,25 @@ void OpenAthan::log_status_() {
       }
     }
   }
+}
+::openathan::DisplayResult OpenAthan::change_display(uint8_t brightness_percent, uint32_t revision) {
+  if (!has_display() || maintenance_) return ::openathan::DisplayResult::STORAGE;
+  const auto result = display_preferences_.update(brightness_percent, revision);
+  if (result == ::openathan::DisplayResult::SAVED || result == ::openathan::DisplayResult::UNCHANGED)
+    apply_display_();
+  return result;
+}
+const char *OpenAthan::display_application_status() const {
+  if (!has_display()) return "unsupported";
+  if (!display_preferences_.saved()) return "storage_fault";
+  if (!display_preferences_.writable()) return "save_failed";
+  return display_output_ok_ ? "applied" : "output_unavailable";
+}
+void OpenAthan::apply_display_() {
+  if (!display_output_ || maintenance_) return;
+  // Retain a readable default on corrupt storage; never rewrite the damaged record.
+  display_output_ok_ = display_output_->apply(display_preferences_.brightness_percent());
+  display_next_check_ = static_cast<uint64_t>(esp_timer_get_time() / 1000) + 1000;
 }
 ::openathan::LightSaveResult OpenAthan::change_lights(::openathan::LightSettings value, uint32_t revision) {
   if (!has_lights() || maintenance_) return ::openathan::LightSaveResult::STORAGE;

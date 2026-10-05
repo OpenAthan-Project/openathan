@@ -153,6 +153,23 @@ int main(int argc, char **argv) {
     Backlight broken; broken.fail_at = fail; broken.setup();
     CHECK(broken.is_failed() && broken.writes.size() == fail); // Stop immediately after I2C failure.
   }
+  const auto count = light.writes.size();
+  CHECK(light.apply(1) && light.writes.size()==count+1);
+  CHECK(light.writes.back().reg==0x0E && light.writes.back().data[0]==3);
+  CHECK(light.apply(1) && light.writes.size()==count+1);
+  CHECK(!light.apply(0) && !light.apply(101) && light.writes.size()==count+1);
+  light.fail_at=count+2;
+  CHECK(!light.apply(100) && !light.is_failed());
+  CHECK(light.apply(100) && light.writes.back().reg==0x0E && light.writes.back().data[0]==255);
+  const auto restored_count = light.writes.size();
+  light.fail_at=restored_count+1;
+  CHECK(!light.apply(50));
+  // The failed transaction may have reached hardware. Reverting to the last
+  // acknowledged value must send PWM again rather than trust the stale cache.
+  CHECK(light.apply(100) && light.writes.size()==restored_count+2);
+  CHECK(light.writes.back().reg==0x0E && light.writes.back().data[0]==255);
+  CHECK(light.apply(100) && light.writes.size()==restored_count+2);
+  Backlight uninitialized; CHECK(!uninitialized.apply(10) && uninitialized.writes.empty());
   Backlight maximum; maximum.set_brightness(100); maximum.setup(); CHECK(maximum.writes.back().data[0] == 255);
   for (unsigned value : {0U, 101U}) {
     Backlight bad; bad.set_brightness(value); bad.setup(); CHECK(bad.is_failed() && bad.writes.empty());

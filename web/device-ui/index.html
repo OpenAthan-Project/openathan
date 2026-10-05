@@ -44,6 +44,16 @@
       <div class="actions"><button id="time-format-save" type="submit" disabled>Save time format</button><button id="time-format-reload" type="button" class="quiet" disabled>Reload time format</button></div>
     </form>
   </section>
+  <section id="screen-card" class="card" aria-labelledby="screen-title" hidden>
+    <h2 id="screen-title">Screen</h2>
+    <form id="screen-form">
+      <label for="screen-brightness">Screen brightness <output id="screen-brightness-value" for="screen-brightness">10%</output></label>
+      <input id="screen-brightness" type="range" min="1" max="100" step="1" value="10" disabled aria-describedby="screen-hint">
+      <p id="screen-hint" class="hint">Changes apply when you save. The screen stays on.</p>
+      <p id="screen-message" role="status" aria-live="polite"></p>
+      <div class="actions"><button id="screen-save" type="submit" disabled>Save screen brightness</button><button id="screen-reload" type="button" class="quiet" disabled>Reload screen brightness</button></div>
+    </form>
+  </section>
   <section id="lights-card" class="card" aria-labelledby="lights-title" hidden>
     <h2 id="lights-title">Lights</h2>
     <p class="hint">Green: more than 30 minutes until prayer. Orange: within 30 minutes. Red: within 10 minutes. Reminders include prayers with the Athan turned off or skipped.</p>

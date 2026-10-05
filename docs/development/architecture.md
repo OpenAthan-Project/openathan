@@ -86,6 +86,9 @@ and revisions, and light failures never gate the scheduler.
 The reference development candidate has an optional GC9107 AtomS3R status
 display: a read-only presenter consumes existing scheduler/settings state,
 while the C126 board layer owns SPI and its internal-bus backlight adapter.
+Optional saved brightness uses `display_output_id` and the portable
+`DisplayOutput` backlight capability, with independent persistence and revisions.
+Backlight failures never gate scheduling or update health.
 See the [display contract](../../firmware/esphome/components/openathan_display/README.md)
 for its compatibility and acceptance limits. Broader display and control mappings remain planned;
 `firmware/esphome/examples/custom-hardware.yaml` illustrates that future mapping

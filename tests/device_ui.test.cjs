@@ -29,6 +29,7 @@ async function fixture(){
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
     if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
     if(req.method==='GET' && req.url==='/api/time-format'){if(state.timeFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.time_format);return;}
+    if(req.method==='GET' && req.url==='/api/display'){if(state.screenFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.display||{supported:false});return;}
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
     if(req.method==='GET'){
       if(state.failRead && req.url==='/api/status'){send(503,{error:'Status unavailable'});return;}
@@ -55,6 +56,13 @@ async function fixture(){
       state.timeMutations=(state.timeMutations||0)+1;state.device.time_format.hours=payload.hours;state.device.time_format.revision++;
       if(state.timeDrop){state.timeDrop=false;req.socket.destroy();return;}
       send(200,state.device.time_format);return;
+    }
+    if(req.url==='/api/display'){
+      if(payload.expected_revision!==state.device.display.revision){send(409,{error:'Reload screen brightness before saving'});return;}
+      if(state.screenSaveFail){state.device.display.application='save_failed';send(503,{error:'Screen brightness could not be saved; restart the device'});return;}
+      if(payload.brightness_percent!==state.device.display.brightness_percent){state.screenMutations=(state.screenMutations||0)+1;state.device.display.brightness_percent=payload.brightness_percent;state.device.display.revision++;}
+      if(state.screenDrop){state.screenDrop=false;req.socket.destroy();return;}
+      send(200,state.device.display);return;
     }
     if(req.url==='/api/lights'){
       if(payload.expected_revision!==state.device.lights.revision){send(409,{error:'Reload light settings'});return;}
@@ -88,6 +96,87 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: screen brightness saves, reconciles and preserves edits`,async()=>{
+  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:10,application:'applied'};
+  const prayer=structuredClone(f.state.device.settings);
+  assert.equal((await fetch(f.url+'/api/display')).status,401);
+  assert.equal((await fetch(f.url+'/api/display',{method:'POST',body:'{}'})).status,401);
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'},viewport:{width:390,height:844}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#screen-brightness').disabled);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'10');
+    await page.locator('#latitude').fill('44.4');
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('Home');
+    assert.equal(await page.locator('#screen-brightness-value').textContent(),'1%');
+    await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#screen-save').disabled);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'1');
+    f.state.screenDrop=true;
+    await page.locator('#screen-save').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('confirmed'));
+    assert.equal(f.state.screenMutations,1);
+    assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+    assert.deepEqual(f.state.device.settings,prayer);
+    await page.reload();await page.waitForFunction(()=>document.querySelector('#screen-brightness').value==='1');
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('End');
+    assert.equal(await page.locator('#screen-brightness-value').textContent(),'100%');
+    f.state.device.display.revision++;
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('another client'));
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'100');
+    await page.locator('#screen-save').click();await page.waitForFunction(()=>!document.querySelector('#screen-save').disabled);
+    assert.equal(f.state.screenMutations,1);
+    page.once('dialog',dialog=>dialog.accept());await page.locator('#screen-reload').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-brightness').value==='1');
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('End');await page.locator('#screen-save').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent==='Screen brightness saved.');
+    assert.equal(f.state.device.display.brightness_percent,100);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    if(process.env.OPENATHAN_UI_CAPTURE && browserName==='chromium'){
+      await page.locator('#screen-card').screenshot({path:join(process.env.OPENATHAN_UI_CAPTURE,'screen-mobile.png')});
+      await page.setViewportSize({width:1280,height:900});
+      await page.locator('#screen-card').screenshot({path:join(process.env.OPENATHAN_UI_CAPTURE,'screen-desktop.png')});
+    }
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: screen save failures disable retries until readback`,async()=>{
+  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:10,application:'applied'};
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#screen-brightness').disabled);
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('End');
+    f.state.screenDrop=true;f.state.screenFailRead=true;await page.locator('#screen-save').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('Connection lost'));
+    assert.ok(await page.locator('#screen-save').isDisabled());
+    assert.equal(f.state.screenMutations,1);
+    f.state.screenFailRead=false;page.once('dialog',dialog=>dialog.accept());await page.locator('#screen-reload').click();
+    await page.waitForFunction(()=>!document.querySelector('#screen-save').disabled);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'100');
+    await page.locator('#screen-brightness').focus();await page.keyboard.press('Home');
+    f.state.screenSaveFail=true;await page.locator('#screen-save').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('could not be saved'));
+    assert.ok(await page.locator('#screen-brightness').isDisabled());
+    assert.equal(f.state.device.display.brightness_percent,100);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'1');
+    assert.ok(await page.locator('#screen-reload').isEnabled());
+  }finally{await browser.close();await f.close();}
+ });
+ test(`${browserName}: unsupported screen hides controls and backlight faults retain saved value`,async()=>{
+  const f=await fixture();const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);await page.waitForFunction(()=>!document.querySelector('#fields').disabled);
+    assert.ok(await page.locator('#screen-card').isHidden());
+    f.state.device.display={schema:1,supported:true,revision:2,brightness_percent:37,application:'output_unavailable'};
+    await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#screen-card').hidden);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'37');
+    assert.match(await page.locator('#screen-message').textContent(),/backlight is unavailable/);
+    f.state.device.display.application='storage_fault';await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('could not be read'));
+    assert.ok(await page.locator('#screen-save').isDisabled());
+  }finally{await browser.close();await f.close();}
+ });
  test(`${browserName}: time format persists, reconciles a dropped save and preserves conflicting edits`,async()=>{
   const f=await fixture();f.state.device.setup='active';
   f.state.device.schedule.times=[{name:'Fajr',local:'2026-09-25 00:00'},{name:'Dhuhr',local:'2026-09-25 12:00'},{name:'Asr',local:'2026-09-25 13:30'}];

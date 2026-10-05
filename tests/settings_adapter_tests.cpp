@@ -84,6 +84,41 @@ static void upgrade_boot_scheduler_health() {
   CHECK(!offline.device.status().clock_ready && !offline.device.status().automatic_ready);
   CHECK(esphome::openathan_device::boot_scheduler_healthy(offline.device.status().fault));
 }
+struct DisplayOutputProbe : DisplayOutput {
+  unsigned calls{}; bool fail{}; uint8_t brightness{};
+  bool apply(uint8_t value) override { ++calls; brightness=value; return !fail; }
+};
+static void display_integration() {
+  Fixture f; DisplayOutputProbe output; f.device.set_display_output(&output); f.begin();
+  CHECK(output.calls==1 && output.brightness==10 && std::string(f.device.display_application_status())=="applied");
+  const auto settings=*f.device.settings_service()->saved();
+  const auto next=f.device.status().next;
+  output.fail=true;
+  CHECK(f.device.change_display(37,1)==DisplayResult::SAVED);
+  CHECK(std::string(f.device.display_application_status())=="output_unavailable");
+  CHECK(f.device.status().automatic_ready && f.device.upgrade_health());
+  const auto calls=output.calls; f.device.loop(); CHECK(output.calls==calls);
+  output.fail=false; mono+=1000; f.device.loop();
+  CHECK(output.brightness==37 && std::string(f.device.display_application_status())=="applied");
+  CHECK(*f.device.settings_service()->saved()==settings && f.device.status().next->utc==next->utc);
+  CHECK(f.device.change_display(0,2)==DisplayResult::INVALID && output.brightness==37);
+  CHECK(f.device.change_display(100,1)==DisplayResult::CONFLICT && output.brightness==37);
+  nvs_test::fail_commit=true;
+  CHECK(f.device.change_display(100,2)==DisplayResult::STORAGE && output.brightness==37);
+  CHECK(std::string(f.device.display_application_status())=="save_failed" && f.device.status().automatic_ready);
+  nvs_test::fail_commit=false; nvs_test::power_cycle();
+  Fixture reboot(false); DisplayOutputProbe restored; reboot.device.set_display_output(&restored); reboot.begin();
+  CHECK(restored.brightness==37 && reboot.device.display_preferences().saved()->revision==2);
+  reboot.audio.active=true;
+  CHECK(reboot.device.change_display(1,2)==DisplayResult::SAVED && reboot.audio.active && reboot.audio.stops==0);
+  reboot.device.quiesce_for_maintenance();
+  CHECK(reboot.device.change_display(100,3)==DisplayResult::STORAGE && restored.brightness==1);
+  Fixture corrupt;
+  nvs_test::committed[{esphome::openathan_storage::PRAYER,"display"}]={0};
+  DisplayOutputProbe fallback; corrupt.device.set_display_output(&fallback); corrupt.begin();
+  CHECK(fallback.brightness==10 && std::string(corrupt.device.display_application_status())=="storage_fault");
+  CHECK(corrupt.device.status().automatic_ready && corrupt.device.upgrade_health());
+}
 struct LightOutputProbe : LightOutput {
   unsigned calls{}; bool fail{}; LightFrame frame;
   bool apply(LightFrame value) override { ++calls; frame=value; return !fail; }
@@ -346,6 +381,42 @@ static void maintenance_latches_writes() {
 }
 #ifdef OPENATHAN_JSON_TEST
 #include "../firmware/esphome/components/openathan_device/local_api.h"
+static void display_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; DisplayOutputProbe output; f.device.set_display_output(&output); f.begin(); LocalApi api(&f.device,nullptr,0);
+  const auto prayer=*f.device.settings_service()->saved();
+  auto call=[&](const char *method,const std::string &body="",const char *uri="/api/display") {
+    ApiExchange request; request.method=method; request.uri=uri; request.body=body;
+    api.handle(request); return request;
+  };
+  JsonDocument response; CHECK(!deserializeJson(response,call("GET").response));
+  CHECK(response["supported"].as<bool>() && response["brightness_percent"]==10 && response["revision"]==1);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"brightness_percent":1})").code==200);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"brightness_percent":100})").code==409);
+  for (auto invalid : {"0","101","256","-1","1.5","true","null","\"10\""})
+    CHECK(call("POST",std::string(R"({"schema":1,"expected_revision":2,"brightness_percent":)")+invalid+"}").code==400);
+  for (auto invalid : {R"({"schema":2,"expected_revision":2,"brightness_percent":10})",
+       R"({"schema":1,"expected_revision":-1,"brightness_percent":10})",
+       R"({"schema":1,"expected_revision":2,"brightness_percent":10,"extra":0})"})
+    CHECK(call("POST",invalid).code==400);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"brightness_percent":100})").code==200);
+  CHECK(output.brightness==100 && *f.device.settings_service()->saved()==prayer);
+  const auto writes=nvs_test::writes;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":3,"brightness_percent":100})").code==200 && nvs_test::writes==writes);
+  CHECK(!deserializeJson(response,call("GET","","/api/status").response));
+  CHECK(response["display"]["brightness_percent"]==100 && response["display"]["application"]=="applied");
+  output.fail=true;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":3,"brightness_percent":37})").code==200);
+  CHECK(!deserializeJson(response,call("GET").response));
+  CHECK(response["application"]=="output_unavailable" && response["brightness_percent"]==37);
+  nvs_test::fail_commit=true;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":4,"brightness_percent":50})").code==503);
+  nvs_test::fail_commit=false;
+  f.device.quiesce_for_maintenance();
+  CHECK(call("POST",R"({"schema":1,"expected_revision":4,"brightness_percent":50})").code==503);
+  f.device.set_display_output(nullptr); CHECK(call("POST",R"({"schema":1,"expected_revision":4,"brightness_percent":50})").code==404);
+  CHECK(!deserializeJson(response,call("GET").response)); CHECK(!response["supported"].as<bool>());
+}
 static void time_format_api() {
   using namespace esphome::openathan_device;
   Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
@@ -628,8 +699,8 @@ static void json_transport() {
 int main() {
   upgrade_boot_scheduler_health();
   display_adapter();
-  light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
+  display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
+  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
 #endif
 }

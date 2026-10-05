@@ -20,6 +20,11 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   ::openathan::TimeFormatResult change_time_format(uint8_t hours, uint32_t revision) {
     return maintenance_ ? ::openathan::TimeFormatResult::STORAGE : time_format_preferences_.update(hours, revision);
   }
+  void set_display_output(::openathan::DisplayOutput *output) { display_output_ = output; }
+  bool has_display() const { return display_output_ != nullptr; }
+  const ::openathan::DisplayPreferences &display_preferences() const { return display_preferences_; }
+  ::openathan::DisplayResult change_display(uint8_t brightness_percent, uint32_t revision);
+  const char *display_application_status() const;
   bool has_lights() const { return light_output_ != nullptr; }
   const ::openathan::LightPreferences &light_preferences() const { return light_preferences_; }
   ::openathan::LightSaveResult change_lights(::openathan::LightSettings value, uint32_t revision);
@@ -76,6 +81,12 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void log_status_();
   void update_lights_();
   ::openathan::LightOutput *light_output_{};
+  ::openathan::DisplayOutput *display_output_{};
+  NvsDisplayStore display_store_;
+  ::openathan::DisplayPreferences display_preferences_{display_store_};
+  bool display_output_ok_{};
+  uint64_t display_next_check_{};
+  void apply_display_();
   NvsTimeFormatStore time_format_store_;
   ::openathan::TimeFormatPreferences time_format_preferences_{time_format_store_};
   NvsLightStore light_store_;

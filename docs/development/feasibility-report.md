@@ -620,3 +620,16 @@ These are the reviewed-source build measurements. The earlier physical results
 remain evidence for the pre-review image, which stays installed with the new
 normal recording. The two review fixes have not been physically installed or
 retested; the review session did not access or alter the speaker.
+
+## Saved screen brightness — 2026-10-04
+
+The unreleased optional-backlight preference adds a device-page 1–100% slider
+with a saved 10% default, separate revisions/storage and PWM-only runtime updates.
+All 16 UBSan host suites, 103 pinned Python tests, 48 Chromium/WebKit cases and
+nine configurations passed. Matched reference OTA grows by 3,104 bytes to
+1,256,112, leaving 316,752 bytes of the 1.5 MiB budget; all six profiles pass
+capacity checks. Static RAM grows by 56 bytes. Physical brightness, restart and
+audio coexistence plus runtime heap/fragmentation/PSRAM remain untested for this
+source; no hardware was accessed. See the
+[development report](screen-brightness-validation-2026-10-04.md) for measurements,
+automated coverage and hardware acceptance limits.

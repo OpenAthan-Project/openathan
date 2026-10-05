@@ -1,0 +1,73 @@
+{
+  "baseline_commit": "a7fbef5ce04c9558197b94a47522f57fd174fc99",
+  "candidate": "Unreleased screen-brightness implementation based on the baseline commit",
+  "configuration": "Matched public compile-only fixtures; do not install",
+  "toolchain": {
+    "python": "3.13.0",
+    "esphome": "2026.9.0",
+    "esp_idf": "5.5.5",
+    "compiler": "esp-14.2.0_20260121"
+  },
+  "profiles": {
+    "reference": {
+      "before_application_bytes": 1253008,
+      "after_application_bytes": 1256112,
+      "delta_bytes": 3104,
+      "application_budget_remaining_bytes": 316752,
+      "after_static_ram_bytes": 115219,
+      "static_ram_delta_bytes": 56,
+      "before_application_sha256": "0c6d2d155f67a725b763b6904303d26e09d4535cba028ff714ce97bb67b4809c",
+      "after_application_sha256": "c63f17a9d211022da753a1a259ba8c5f845906c61e0fe8504f85393b7d36dacd"
+    },
+    "isolated": {
+      "before_application_bytes": 1254752,
+      "after_application_bytes": 1257872,
+      "delta_bytes": 3120,
+      "application_budget_remaining_bytes": 314992,
+      "after_static_ram_bytes": 115219,
+      "static_ram_delta_bytes": 56,
+      "before_application_sha256": "196db95b66a35a86cb5aabe63db32e32004861cb50cff252c84fff77104e35db",
+      "after_application_sha256": "50d52a62ad7e7d93d6b2c1609c44df938d9384dc3b0d95d8f89f2a6a3ee9973a"
+    },
+    "scheduler": {
+      "before_application_bytes": 1120032,
+      "after_application_bytes": 1121104,
+      "delta_bytes": 1072,
+      "application_budget_remaining_bytes": 451760,
+      "after_static_ram_bytes": 113167,
+      "static_ram_delta_bytes": 48,
+      "before_application_sha256": "83fe188d5a95e8583954cbf06e7ada003198d0c6bdb67f81f3012c1c5300dace",
+      "after_application_sha256": "9ae6e74e5e951086d798bba1550ebf9f6bcc3f0735a81a467e1a466a9ae279b4"
+    },
+    "scheduler-test": {
+      "before_application_bytes": 1137552,
+      "after_application_bytes": 1138640,
+      "delta_bytes": 1088,
+      "application_budget_remaining_bytes": 434224,
+      "after_static_ram_bytes": 113879,
+      "static_ram_delta_bytes": 48,
+      "before_application_sha256": "52b7c190283aa1f8a19d82bba3f4a5c9413ccc8d44bee6c860bb16ab7f108dd7",
+      "after_application_sha256": "4ecb0f8cd6b42c4052ad261f2ec3c80ffca5f682e5931d8c792697546447fe29"
+    },
+    "qualification": {
+      "before_application_bytes": 1260208,
+      "after_application_bytes": 1263280,
+      "delta_bytes": 3072,
+      "application_budget_remaining_bytes": 309584,
+      "after_static_ram_bytes": 115291,
+      "static_ram_delta_bytes": 56,
+      "before_application_sha256": "28f0b82272c9a3f95ad9fe21044c2a7170060af1a7e3cc1b94fb996849ab5807",
+      "after_application_sha256": "b2c4a0a4ad1824c49556e41dbf633b9e54bf6e7be6c7eae336dce12a83dbeb83"
+    },
+    "rollback": {
+      "before_application_bytes": 1260208,
+      "after_application_bytes": 1263280,
+      "delta_bytes": 3072,
+      "application_budget_remaining_bytes": 309584,
+      "after_static_ram_bytes": 115291,
+      "static_ram_delta_bytes": 56,
+      "before_application_sha256": "f64bdb7fd0dd90b1873a521dce2135a7bde47c24bbfacf990225a90edaa116a0",
+      "after_application_sha256": "e601809d550e96edfe5b3094a748ce23c497aa7e522472ef9d2ab6944ee62d9a"
+    }
+  }
+}

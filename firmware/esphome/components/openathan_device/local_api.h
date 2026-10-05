@@ -27,6 +27,7 @@ class LocalApi {
 
  private:
   void time_format_(JsonObject root);
+  void display_(JsonObject root);
   void lights_(JsonObject root);
   void snapshot_(JsonObject root);
   void preview_(JsonObject root, const ::openathan::DeviceSettings& settings);
