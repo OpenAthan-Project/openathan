@@ -11,7 +11,7 @@ class Backlight : public Component, public i2c::I2CDevice, public ::openathan::D
   void setup() override;
   bool apply(uint8_t percent) override;
  private:
-  unsigned brightness_{10};
+  unsigned brightness_{50};
   bool initialized_{};
   uint8_t applied_{};
 };

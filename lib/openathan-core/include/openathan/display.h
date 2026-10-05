@@ -2,9 +2,10 @@
 #include "scheduler.h"
 
 namespace openathan {
+inline constexpr uint8_t DEFAULT_DISPLAY_BRIGHTNESS_PERCENT = 50;
 struct SavedDisplay {
   uint32_t revision{};
-  uint8_t brightness_percent{10};
+  uint8_t brightness_percent{DEFAULT_DISPLAY_BRIGHTNESS_PERCENT};
   bool operator==(const SavedDisplay &) const = default;
 };
 using DisplayRecord = std::array<uint8_t, 16>;
@@ -24,7 +25,7 @@ class DisplayPreferences {
   DisplayResult update(uint8_t brightness_percent, uint32_t revision);
   const std::optional<SavedDisplay> &saved() const { return saved_; }
   bool writable() const { return writable_; }
-  uint8_t brightness_percent() const { return saved_ ? saved_->brightness_percent : 10; }
+  uint8_t brightness_percent() const { return saved_ ? saved_->brightness_percent : DEFAULT_DISPLAY_BRIGHTNESS_PERCENT; }
  private:
   DisplayStore &store_;
   std::optional<SavedDisplay> saved_;

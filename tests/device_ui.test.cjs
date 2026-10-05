@@ -98,7 +98,7 @@ async function fixture(){
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
  for(const screenResponse of ['save','reload','reconcile']){
  test(`${browserName}: time format actions retain screen ${screenResponse} state`,async()=>{
-  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:10,application:'applied'};
+  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
   const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
   // Exercise consecutive preference actions before polling can refresh the snapshot.
@@ -211,8 +211,10 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#screen-card').hidden);
     assert.equal(await page.locator('#screen-brightness').inputValue(),'37');
     assert.match(await page.locator('#screen-message').textContent(),/backlight is unavailable/);
-    f.state.device.display.application='storage_fault';await page.locator('#refresh').click();
+    f.state.device.display.application='storage_fault';f.state.device.display.brightness_percent=50;await page.locator('#refresh').click();
     await page.waitForFunction(()=>document.querySelector('#screen-message').textContent.includes('could not be read'));
+    assert.match(await page.locator('#screen-message').textContent(),/Using 50%/);
+    assert.equal(await page.locator('#screen-brightness').inputValue(),'50');
     assert.ok(await page.locator('#screen-save').isDisabled());
   }finally{await browser.close();await f.close();}
  });

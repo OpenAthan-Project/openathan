@@ -90,7 +90,7 @@ struct DisplayOutputProbe : DisplayOutput {
 };
 static void display_integration() {
   Fixture f; DisplayOutputProbe output; f.device.set_display_output(&output); f.begin();
-  CHECK(output.calls==1 && output.brightness==10 && std::string(f.device.display_application_status())=="applied");
+  CHECK(output.calls==1 && output.brightness==50 && std::string(f.device.display_application_status())=="applied");
   const auto settings=*f.device.settings_service()->saved();
   const auto next=f.device.status().next;
   output.fail=true;
@@ -116,7 +116,7 @@ static void display_integration() {
   Fixture corrupt;
   nvs_test::committed[{esphome::openathan_storage::PRAYER,"display"}]={0};
   DisplayOutputProbe fallback; corrupt.device.set_display_output(&fallback); corrupt.begin();
-  CHECK(fallback.brightness==10 && std::string(corrupt.device.display_application_status())=="storage_fault");
+  CHECK(fallback.brightness==50 && std::string(corrupt.device.display_application_status())=="storage_fault");
   CHECK(corrupt.device.status().automatic_ready && corrupt.device.upgrade_health());
 }
 struct LightOutputProbe : LightOutput {
@@ -390,7 +390,7 @@ static void display_api() {
     api.handle(request); return request;
   };
   JsonDocument response; CHECK(!deserializeJson(response,call("GET").response));
-  CHECK(response["supported"].as<bool>() && response["brightness_percent"]==10 && response["revision"]==1);
+  CHECK(response["supported"].as<bool>() && response["brightness_percent"]==50 && response["revision"]==1);
   CHECK(call("POST",R"({"schema":1,"expected_revision":1,"brightness_percent":1})").code==200);
   CHECK(call("POST",R"({"schema":1,"expected_revision":1,"brightness_percent":100})").code==409);
   for (auto invalid : {"0","101","256","-1","1.5","true","null","\"10\""})

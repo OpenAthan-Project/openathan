@@ -9,10 +9,11 @@ The unreleased **Time format** preference selects 24-hour time (the default) or
 independently of prayer settings and does not change announcement times. See the
 [development validation](../../docs/development/time-format-validation-2026-10-04.md).
 The unreleased **Screen** card adds a saved 1–100% brightness slider, defaulting
-to 10%, on devices with an adjustable backlight. Changes apply when saved; the
+to 50%, on devices with an adjustable backlight. Changes apply when saved; the
 screen stays on. Its save/reload and conflict handling are independent of prayer
 and light settings. See the
 [screen API](../../firmware/esphome/provisioning/README.md#screen-brightness-unreleased).
+Existing saved brightness values are retained when the default changes.
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
 An optional **Find my location** link opens the public HTTPS helper in a new tab.

@@ -121,7 +121,7 @@ function renderScreen(state) {
   screenSnapshot=state;$("screen-card").hidden=!state?.supported;
   if(!state?.supported)return;
   if(!screenEditing || (!screenDirty && !screenUncertain))fillScreen(state);
-  if(state.application==="storage_fault")screenMessage("Screen brightness could not be read. Using 10%. Restart the device; existing data has been retained.",true);
+  if(state.application==="storage_fault")screenMessage("Screen brightness could not be read. Using 50%. Restart the device; existing data has been retained.",true);
   else if(state.application==="save_failed")screenMessage("Screen brightness could not be saved. Restart the device and reload screen brightness.",true);
   else if(state.application==="output_unavailable")screenMessage("Screen brightness is saved, but the backlight is unavailable. Restart the device if it does not recover; prayer scheduling continues.",true);
   else if(screenUncertain)screenMessage("The save response was lost. Reload screen brightness before trying again.",true);

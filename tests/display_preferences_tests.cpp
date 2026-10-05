@@ -10,10 +10,10 @@ int main() {
   nvs_test::reset();
   esphome::openathan_component::NvsDisplayStore store;
   DisplayPreferences preferences(store); preferences.begin();
-  CHECK(preferences.brightness_percent() == 10 && preferences.saved()->revision == 1 && nvs_test::writes == 0);
+  CHECK(preferences.brightness_percent() == 50 && preferences.saved()->revision == 1 && nvs_test::writes == 0);
   CHECK(preferences.update(0, 1) == DisplayResult::INVALID);
   CHECK(preferences.update(12, 0) == DisplayResult::CONFLICT);
-  CHECK(preferences.update(10, 1) == DisplayResult::UNCHANGED && nvs_test::writes == 0);
+  CHECK(preferences.update(50, 1) == DisplayResult::UNCHANGED && nvs_test::writes == 0);
   nvs_test::committed[{openathan_storage::PRAYER, "settings"}] = {1,2,3};
   nvs_test::committed[{openathan_storage::PRAYER, "scheduler"}] = {4,5,6};
   const auto before = nvs_test::committed;
@@ -41,7 +41,7 @@ int main() {
     CHECK(cut); nvs_test::power_cycle(); nvs_test::cut_after_write=nvs_test::cut_after_commit=false;
     esphome::openathan_component::NvsDisplayStore restored_store;
     DisplayPreferences restored(restored_store); restored.begin();
-    CHECK(restored.writable() && restored.brightness_percent()==((committed || early) ? 12 : 10));
+    CHECK(restored.writable() && restored.brightness_percent()==((committed || early) ? 12 : 50));
   }
   auto record = encode_display({2,12}); SavedDisplay decoded;
   CHECK(decode_display(record,decoded) && decoded.brightness_percent == 12);
@@ -53,7 +53,7 @@ int main() {
   nvs_test::committed[{openathan_storage::PRAYER,"display"}] = {0};
   esphome::openathan_component::NvsDisplayStore broken_store;
   DisplayPreferences broken(broken_store); broken.begin();
-  CHECK(broken.brightness_percent() == 10 && !broken.writable());
+  CHECK(broken.brightness_percent() == 50 && !broken.writable());
   CHECK(broken.update(12,1) == DisplayResult::STORAGE);
   CHECK(nvs_test::committed.at({openathan_storage::PRAYER,"display"}) == std::vector<uint8_t>{0});
   CHECK(preferences.update(101, 1) == DisplayResult::INVALID);
@@ -68,6 +68,16 @@ int main() {
   nvs_test::fail_read=true;
   esphome::openathan_component::NvsDisplayStore unreadable_store;
   DisplayPreferences unreadable(unreadable_store); unreadable.begin();
-  CHECK(!unreadable.writable() && unreadable.brightness_percent()==10);
+  CHECK(!unreadable.writable() && unreadable.brightness_percent()==50);
+
+  // A previously saved 10% preference remains authoritative after the default changes.
+  nvs_test::reset();
+  const auto previous = encode_display({7,10});
+  nvs_test::committed[{openathan_storage::PRAYER,"display"}]={previous.begin(),previous.end()};
+  const auto existing = nvs_test::committed;
+  esphome::openathan_component::NvsDisplayStore previous_store;
+  DisplayPreferences retained(previous_store); retained.begin();
+  CHECK(retained.writable() && retained.brightness_percent()==10 && retained.saved()->revision==7);
+  CHECK(nvs_test::committed==existing && nvs_test::writes==0);
 
 }

@@ -7,7 +7,7 @@ bundle. The dated report records isolated hardware acceptance; successor
 release qualification remains separate.
 
 The board profile keeps the screen on with a saved brightness preference
-(1–100%, default 10%) and rotation 0. The local settings page provides a separate
+(1–100%, default 50%) and rotation 0. The local settings page provides a separate
 **Screen brightness** slider that applies when saved and survives restart.
 This preference is unreleased; see the
 [API contract](../../provisioning/README.md#screen-brightness-unreleased).
