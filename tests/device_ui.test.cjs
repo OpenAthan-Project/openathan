@@ -96,6 +96,33 @@ async function fixture(){
   }};
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: header fits narrow and desktop viewports during setup and normal use`,async()=>{
+  const f=await fixture();
+  const browser=await ({chromium,webkit}[browserName]).launch({headless:true});
+  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'}});
+  try {
+    await page.goto(f.url);
+    for(const setup of ['incomplete','active']){
+      f.state.device.setup=setup;f.state.device.automatic_ready=setup==='active';
+      await page.locator('#refresh').click();
+      const badge=setup==='incomplete'?'Setup incomplete':'Setup complete';
+      await page.waitForFunction(text=>document.querySelector('#setup-state').textContent===text,badge);
+      for(const width of [320,390,1280]){
+        await page.setViewportSize({width,height:900});
+        if(process.env.OPENATHAN_UI_CAPTURE)await page.screenshot({path:join(process.env.OPENATHAN_UI_CAPTURE,`header-${setup}-${width}-${browserName}.png`),clip:{x:0,y:0,width,height:220}});
+        const fits=await page.evaluate(()=>{
+          const header=document.querySelector('header').getBoundingClientRect();
+          const children=[document.querySelector('header h1'),document.querySelector('#setup-state')];
+          return document.documentElement.scrollWidth<=innerWidth && children.every(child=>{
+            const bounds=child.getBoundingClientRect();
+            return bounds.left>=header.left && bounds.right<=header.right;
+          });
+        });
+        assert.ok(fits,`${setup} header must fit at ${width}px`);
+      }
+    }
+  }finally{await browser.close();await f.close();}
+ });
  for(const screenResponse of ['save','reload','reconcile']){
  test(`${browserName}: time format actions retain screen ${screenResponse} state`,async()=>{
   const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};
