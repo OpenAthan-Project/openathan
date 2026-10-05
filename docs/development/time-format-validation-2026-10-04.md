@@ -87,8 +87,17 @@ application readback passed. Full control/settings/history/credentials/OTA
 metadata, bootloader, inactive application and shared audio remained byte-identical
 around this application-only installation. Before installation, the durable
 preference decoded as 12-hour time/revision 2, with settings revision 3 and current
-prayer-consumption history retained. Physical bottom-power startup, revised-layout
-readability and 10-second cold-restart persistence remain pending.
+prayer-consumption history retained.
+
+The operator confirmed both power ports were unplugged for 10 seconds before
+bottom-only startup, and confirmed the revised label and AM/PM placement were
+readable. Authenticated status after startup verified exact `39cc037`,
+active/applied setup, synchronized clock, automatic scheduling ready, idle playback
+and no scheduler fault. The saved 12-hour preference remained applied at revision
+2. Full prayer settings and light settings/revisions matched the earlier session;
+all five consumption watermarks matched the fresh installation baseline, with no
+skip. The next Fajr was 6:02 AM on October 5 in America/Toronto. Revised-layout
+readability and 10-second cold-restart preference persistence therefore pass.
 
 The observations below apply to the earlier layout and exact image stated there.
 
@@ -119,7 +128,8 @@ A supplied physical-screen photo shows the current clock at **8:30 PM** and next
 Fajr at **6:02 AM**, with both meridiem labels readable and no visible clipping.
 Authenticated follow-up agrees with the next occurrence and still reports the
 saved 12-hour preference. The photo was taken before the requested cold restart;
-physical cold-restart persistence remains pending.
+the revised-layout section above records the later confirmed cold-restart
+persistence and readability checks.
 
 Static RAM/build success does not establish runtime heap, fragmentation or PSRAM
 headroom. No audio or network pipeline changes are introduced, and unrelated
