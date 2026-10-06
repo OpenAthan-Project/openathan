@@ -53,6 +53,12 @@ observed occurrence, timetable, device date, readiness and Skip state. Action
 feedback follows that accepted state when the prayer changes during a request.
 Stale screen, light and time-format readbacks also keep the observed connection
 and active Stop controls available while requiring fresh saved-state recovery.
+Save acknowledgments in all four revision domains also protect newer healthy
+snapshots and application feedback. Stale replies/readbacks retain edits and
+require fresh readback before confirmation; newer conflicting revisions offer
+Retry or Use saved values. The confirmed time format remains in use while an edit
+is unresolved. New calculation observations invalidate a preview even during a
+preference save, retaining the prayer draft for fresh review.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.

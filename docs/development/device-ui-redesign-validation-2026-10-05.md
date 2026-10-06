@@ -73,6 +73,16 @@ Stale screen/light/time-format save and recovery readbacks retain connection
 state; they keep active Stop available while preserving edits and requiring fresh
 saved-state recovery. Actual request/read failures retain the existing recovery.
 
+Save acknowledgments now check the known revision and response order before
+replacing or acknowledging data in any of the four settings domains. Older
+healthy replies/readbacks retain newer confirmed preferences and application
+feedback, not only storage faults. Fresh readback reconciles the outcome before
+another write; conflicting revisions retain edits for Retry or Use saved values.
+Displayed prayer times use the confirmed format while a format edit is unresolved.
+New calculation observations invalidate an old preview during an in-flight
+preference save, retaining the prayer draft. A stale prayer confirmation cannot
+discard that draft or bypass fresh preview/confirmation after another client's edit.
+
 First run follows location → calculation → timetable review → Finish setup.
 The optional HTTPS helper precedes manual coordinates. Helper proposals require
 ready preview; manual setup can finish while waiting for valid time with a warning.
@@ -83,7 +93,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **194 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **226 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -131,6 +141,14 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   appears for stale data; independent saves continue, fresh recovery confirms the
   committed preferences without another write, and Stop remains usable. The
   reviewed-head fixtures reproduced both defects before the corrections.
+- Another 32 regression checks cover stale healthy replies and readbacks in all
+  four revision domains, Retry/Use saved values and expected revisions, same-revision
+  screen/light application feedback, and explicit format recovery without a
+  transient obsolete time format. Prayer drafts and coordinate precision survive
+  automatic preference recovery; a conflicted reviewed prayer edit requires fresh
+  preview/confirmation before writing. All 32 failed on the reviewed head and
+  passed after the corrections in Chromium/WebKit. Stop and connected state remain
+  available, and stale acknowledgments cannot clear the pending edits.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -166,13 +184,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,263,280 | +7,136 | 309,584 |
-| isolated | 1,257,904 | 1,265,056 | +7,152 | 307,808 |
-| qualification | 1,263,280 | 1,270,448 | +7,168 | 302,416 |
-| rollback | 1,263,280 | 1,270,448 | +7,168 | 302,416 |
+| reference | 1,256,144 | 1,263,376 | +7,232 | 309,488 |
+| isolated | 1,257,904 | 1,265,168 | +7,264 | 307,696 |
+| qualification | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
+| rollback | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
 
-Reference slot free space is 833,872 bytes;
-the largest affected image leaves 826,704
+Reference slot free space is 833,776 bytes;
+the largest affected image leaves 826,608
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -181,19 +199,19 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,389 | +836 |
-| `app.js` | 8,048 | 12,832 | +4,784 |
+| `app.js` | 8,048 | 12,917 | +4,869 |
 | `style.css` | 1,524 | 2,989 | +1,465 |
 
 Total compressed UI assets grow from 12,125
-to 19,210 bytes. No frontend framework, font,
+to 19,295 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `ad16df8e043ba3233a7dd49276347bb286fec7ce452788054192921f954bc4e2` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `ca94f952e8c21d1293ab6cd1f9cfa7afe13ca98f1048e653bec635dbc4b6785e` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `0803a37566e008744f91d1db4c640de7ebafc2c9a9812f53e50ef68716cde7bd` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `20005c64908f54178b184ac1566d6b7cb174ecefcfcb3fbd5112005c486481a9` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `3aa3b75a502b3e1c0133a2cfbbe2abf17dc3f8c6af864a5f39c006d037fe1245` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `af0f4150ad2c1fd2bef464a8c5a1986f1a4b1185bf3820b0d8b5319318394323` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `51f91109c4e125f84bff0372bfdeb4d3a1d2e620461fdd9d4efa8fcd5567875a` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `e848843ecab665e539e8cb186e769f2a7ddc4311286cf761891fc52502fd9a08` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -267,10 +285,27 @@ pinned configurations with the corrected UI.
 | qualification | 1,270,368 | 1,270,448 | +80 |
 | rollback | 1,270,368 | 1,270,448 | +80 |
 
-All four current capacity checks pass and each current OTA contains the exact
-final gzip assets. At least 302,416 bytes remain under the application budget.
+All four capacity checks passed with the then-current gzip assets.
+At least 302,416 bytes remained under the application budget.
 Static RAM, partitions, dependencies and polling cadence remain unchanged; the
 response-order state is bounded browser state.
+
+The healthy-acknowledgment corrections use reviewed head
+`50d620f58193b5b27937ded6edafb7a64125c2a9` as their matched baseline.
+Exact images, measurements and logs were archived before compiling the corrected
+assets in the same pinned configurations.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Healthy-acknowledgment review delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,263,280 | 1,263,376 | +96 |
+| isolated | 1,265,056 | 1,265,168 | +112 |
+| qualification | 1,270,448 | 1,270,544 | +96 |
+| rollback | 1,270,448 | 1,270,544 | +96 |
+
+All four current capacity checks pass. Every current OTA includes the exact final
+gzip assets, and at least 302,320 bytes remain under the application budget.
+Static RAM, partitions, dependencies and polling cadence remain unchanged.
+The guard reuses the existing uncertain-save readback/recovery flow.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

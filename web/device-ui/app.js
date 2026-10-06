@@ -48,12 +48,13 @@ function acceptDomain(key,state,ack=false){
  if(!fault&&!valueFrom(key,state))return;
  const next=fault?{revision:d?.snapshot.revision??state.revision,value:d?.snapshot.value??(state.revision>0&&valueFrom(key,state)?clone(valueFrom(key,state)):null),application:state.application}:domainState(key,state);
  if(!d){d=domains[key]={snapshot:next,desired:{},pending:{},busy:false,blocked:null,groups:new Set(),meta:null};return;}
- if(next.revision<d.snapshot.revision&&!settingsFault(d.snapshot)||d.busy&&!ack&&!fault)return;
+ if(next.revision<d.snapshot.revision&&!settingsFault(d.snapshot))return;
  const changed=next.revision!==d.snapshot.revision;
  if(changed&&key==="settings"&&stable(calculation(next.value))!==stable(calculation(d.snapshot.value))){
   preview=undefined;if(draftDirty)status("prayer","Saved prayer settings changed. Your draft is kept; preview again.","warning");
   else if(!firstRun)fillDraft(next.value);
  }
+ if(d.busy&&!ack&&!fault)return;
  if(changed&&!ack&&Object.keys(d.desired).length){d.blocked="conflict";notify(key,"Changed on another client. Your edits are kept; choose which values to use.","error");recovery(key);}
  d.snapshot=next;
 }
@@ -87,9 +88,13 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
  render();applyPendingLocation();
 }
 function acceptSavedState(key,raw){
+ const known=key==="settings"?snapshot:snapshot?.[key],order=responseOrders.get(raw)||0,knownOrder=key==="settings"?statusOrder:responseOrders.get(known)||0;
+ const lower=known&&!settingsFault(raw)&&raw.revision<known.revision;
+ if(known&&(lower||order<knownOrder&&(raw.revision===known.revision||settingsFault(known)||settingsFault(raw)))){
+  const error=new Error("Newer saved state requires fresh readback");error.stale=true;if(lower)error.status=409;throw error;
+ }
  if(key==="settings")acceptStatus(raw,key);
  else{
-  const known=snapshot?.[key];if(settingsFault(known)&&(responseOrders.get(raw)||0)<(responseOrders.get(known)||0)){const error=new Error("A newer storage fault requires saved-state readback");error.stale=true;throw error;}
   acceptDomain(key,raw,true);if(snapshot)snapshot[key]=raw;if(key==="time_format"&&!settingsFault(raw))timeSnapshot=raw;
  }
 }
