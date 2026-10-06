@@ -2,76 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>OpenAthan · Device settings</title><link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <meta name="color-scheme" content="dark"><title>OpenAthan · Device settings</title>
+  <link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
 </head>
 <body>
-<main>
-  <aside id="test-banner" class="test-banner" hidden><strong>Test firmware</strong> — isolated test settings and playback history. Restore production firmware after testing.</aside>
-  <header><div><h1>OpenAthan</h1></div><span id="setup-state" class="badge">Connecting</span></header>
-  <p id="message" role="status" aria-live="polite">Reading your device…</p>
-  <section class="card" aria-labelledby="today-title">
-    <div class="section-heading"><h2 id="today-title">Today</h2><button id="refresh" class="quiet" type="button">Refresh</button></div>
-    <p id="next" class="next">Waiting for device status</p><p id="health" class="muted"></p>
-    <dl id="times" class="times"></dl><p id="conflicts" class="muted"></p>
-    <div class="actions"><button id="stop" type="button" class="secondary">Stop playback</button><button id="skip" type="button" class="secondary">Skip next announcement</button><button id="cancel-skip" type="button" class="quiet" hidden>Cancel skip</button></div>
-  </section>
-  <section class="card" aria-labelledby="settings-title">
-    <h2 id="settings-title">Your settings</h2><p id="setup-help" class="muted">Choose your location and calculation settings. Review the timetable before finishing setup.</p>
-    <form id="settings">
-      <fieldset id="fields" disabled>
-        <legend class="sr-only">Prayer settings</legend>
-        <div class="grid"><label>Latitude<input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" required inputmode="decimal" placeholder="e.g. 44.3894"></label><label>Longitude<input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" required inputmode="decimal" placeholder="e.g. −79.6903"></label></div>
-        <p class="location-help"><a id="find-location" href="https://openathan.com/location/" target="_blank" rel="noopener noreferrer">Find my location</a> <span class="hint">Opens an optional helper in a new tab. Your edits stay here.</span></p>
-        <p id="location-review" class="location-review" role="status" hidden></p>
-        <label>Timezone<input id="timezone" name="timezone" list="zones" required autocomplete="off" placeholder="Search, e.g. America/Toronto"></label><datalist id="zones"></datalist>
-        <label>Calculation method<select id="method" required><option value="">Choose a method</option></select></label>
-        <label>Asr calculation<select id="asr"><option value="standard">Standard</option><option value="hanafi">Hanafi</option></select></label>
-        <fieldset class="prayers"><legend>Play Athan for</legend><div id="enabled" class="checks"></div></fieldset>
-        <label for="volume">Volume <output id="volume-value" for="volume">70%</output></label><input id="volume" type="range" min="0" max="100" value="70"><p class="hint">Changes apply when you save. Zero is silent.</p>
-        <details><summary>Advanced settings</summary><label>High-latitude rule<select id="high-latitude"><option value="auto">Automatic</option><option value="middle_of_night">Middle of the night</option><option value="seventh_of_night">One seventh of the night</option><option value="twilight_angle">Twilight angle</option></select></label><p class="hint">Prayer offsets, in minutes (−120 to +120).</p><div id="offsets" class="grid"></div><label class="check"><input id="refresh-timezone" type="checkbox">Refresh saved timezone rules from this firmware</label></details>
-      </fieldset>
-      <section id="preview-section" class="preview" hidden aria-labelledby="preview-title"><h3 id="preview-title">Schedule preview</h3><dl id="preview-times" class="times"></dl><p id="preview-message"></p></section>
-      <div class="actions"><button id="preview" type="button" class="secondary" disabled>Preview schedule</button><button id="save" type="submit" disabled>Finish setup</button><button id="reload" type="button" class="quiet" disabled>Reload saved settings</button></div>
-    </form>
-  </section>
-  <section id="time-format-card" class="card" aria-labelledby="time-format-title" hidden>
-    <h2 id="time-format-title">Time format</h2>
-    <form id="time-format-form">
-      <label>Show times as<select id="time-format" disabled><option value="24">24-hour (13:30)</option><option value="12">12-hour (1:30 PM)</option></select></label>
-      <p class="hint">Applies to this page and the speaker screen.</p>
-      <p id="time-format-message" role="status" aria-live="polite"></p>
-      <div class="actions"><button id="time-format-save" type="submit" disabled>Save time format</button><button id="time-format-reload" type="button" class="quiet" disabled>Reload time format</button></div>
-    </form>
-  </section>
-  <section id="screen-card" class="card" aria-labelledby="screen-title" hidden>
-    <h2 id="screen-title">Screen</h2>
-    <form id="screen-form">
-      <label for="screen-brightness">Screen brightness <output id="screen-brightness-value" for="screen-brightness">50%</output></label>
-      <input id="screen-brightness" type="range" min="1" max="100" step="1" value="50" disabled aria-describedby="screen-hint">
-      <p id="screen-hint" class="hint">Changes apply when you save. The screen stays on.</p>
-      <p id="screen-message" role="status" aria-live="polite"></p>
-      <div class="actions"><button id="screen-save" type="submit" disabled>Save screen brightness</button><button id="screen-reload" type="button" class="quiet" disabled>Reload screen brightness</button></div>
-    </form>
-  </section>
-  <section id="lights-card" class="card" aria-labelledby="lights-title" hidden>
-    <h2 id="lights-title">Lights</h2>
-    <p class="hint">Green: more than 30 minutes until prayer. Orange: within 30 minutes. Red: within 10 minutes. Reminders include prayers with the Athan turned off or skipped.</p>
-    <form id="lights-form">
-      <fieldset id="lights-fields" disabled>
-        <legend class="sr-only">Light settings</legend>
-        <label class="check"><input id="lights-enabled" type="checkbox">Enable lights</label>
-        <label for="lights-brightness">Brightness <output id="lights-brightness-value" for="lights-brightness">20%</output></label>
-        <input id="lights-brightness" type="range" min="0" max="100" step="1" value="20">
-        <p class="hint">Changes apply when you save. Zero turns all lights off, including status signals.</p>
-      </fieldset>
-      <p class="hint">Gentle pulses: blue during Athan, white during setup or time synchronization, red when the device needs attention.</p>
-      <p id="lights-message" role="status" aria-live="polite"></p>
-      <div class="actions"><button id="lights-save" type="submit" disabled>Save light settings</button><button id="lights-reload" type="button" class="quiet" disabled>Reload light settings</button></div>
-    </form>
-  </section>
-  <section id="firmware-section" hidden aria-labelledby="firmware-title">
-    <h2 id="firmware-title">Firmware</h2>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="device">
+  <header class="device-header"><div><h1>OpenAthan</h1><p id="address">Connecting to speaker</p></div><p id="device-date" class="date" hidden></p></header>
+  <nav class="navigation" aria-label="Device navigation">
+    <button data-view="today" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h2m4 0h2m-8 4h2"/></svg><span>Today</span></button>
+    <button data-view="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1-2 4 2 2v4l4 2 3-1 3 1 4-2v-4l2-2-2-4-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg><span>Settings</span></button>
+  </nav>
+  <main id="main" tabindex="-1">
+<aside id="test-banner" class="notice warning" hidden><strong>Test firmware</strong> — isolated test settings and playback history. Restore production firmware after testing.</aside>
+<section id="connection-banner" class="notice" hidden aria-label="Connection status"><h2 id="connection-heading">Connection lost</h2><p id="connection-detail">Displayed information is stale. Playback may still be active.</p><button id="reconnect">Reconnect</button></section>
+    <section id="today-view" class="today-grid" aria-label="Today">
+      <div class="next-and-controls">
+        <section class="next-section" aria-labelledby="next-heading">
+          <h2 id="next-heading">Next prayer: <strong id="next-name">—</strong></h2>
+          <p id="next-time" class="next-time">—</p>
+          <p id="readiness" class="readiness" role="status"><span class="state-dot" aria-hidden="true"></span><span id="readiness-text">Connecting to speaker</span></p>
+          <p id="state-detail" class="hint" hidden></p>
+        </section>
+        <section class="audio" aria-label="Audio controls">
+          <label for="volume" class="range-label">Volume <output id="volume-value" for="volume">—</output></label>
+          <input id="volume" type="range" min="0" max="100" disabled aria-describedby="volume-feedback">
+          <p id="volume-feedback" class="feedback success" role="status">Reading saved preferences…</p>
+          <div id="volume-recovery" class="actions" hidden></div>
+          <button id="stop" class="primary" hidden>Stop playback</button>
+          <button id="skip" class="primary" disabled>No Athan to skip</button>
+          <p id="action-feedback" class="feedback" role="status" hidden></p>
+        </section>
+      </div>
+      <section class="timetable" aria-labelledby="today-heading"><h2 id="today-heading">Today</h2><dl id="times"></dl><p id="timezone-note" class="timezone-note"></p><p id="conflicts" class="hint"></p></section>
+    </section>
+<section id="settings-view" hidden aria-labelledby="settings-heading">
+<div class="view-heading"><h2 id="settings-heading">Settings</h2><p id="settings-intro" class="hint">Everyday preferences save automatically.</p></div>
+<p id="settings-playback-feedback" class="feedback settings-playback-feedback" role="status" hidden></p>
+<section id="settings-playing" class="playing-bar" hidden><p><strong>Playing</strong><br><span class="hint">Playback is active on the speaker.</span></p><button id="settings-stop" class="primary">Stop playback</button></section>
+<div class="settings-grid"><div class="settings-simple">
+<section class="setting-group" aria-labelledby="preferences-heading"><h3 id="preferences-heading">Athan preferences</h3><fieldset><legend>Play Athan for</legend><div id="enabled-prayers" class="checks"></div></fieldset><p class="hint">Sunrise marks the start of daylight; it has no Athan.</p><label class="range-label" for="settings-volume">Volume <output id="settings-volume-value">—</output></label><input id="settings-volume" type="range" min="0" max="100" disabled><p id="preferences-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="preferences-recovery" class="actions" hidden></div></section>
+<section id="hardware-group" class="setting-group" aria-labelledby="hardware-heading"><h3 id="hardware-heading">Screen and lights</h3><div id="screen-controls"><label class="range-label" for="screen-brightness">Screen brightness <output id="screen-brightness-value">50%</output></label><input id="screen-brightness" type="range" min="1" max="100" value="50"><p class="hint">The screen stays on.</p><p id="screen-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="screen-recovery" class="actions" hidden></div></div><div id="light-controls"><label class="check"><input id="lights-enabled" type="checkbox" checked>Enable lights</label><label class="range-label" for="lights-brightness">Light brightness <output id="lights-brightness-value">20%</output></label><input id="lights-brightness" type="range" min="0" max="100" value="20"><p class="hint">Zero turns all lights off, including status signals. Prayer reminders include muted and skipped prayers.</p><p id="lights-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="lights-recovery" class="actions" hidden></div></div></section>
+<section id="format-group" class="setting-group" aria-labelledby="format-heading"><h3 id="format-heading">Time format</h3><label for="time-format">Show times as</label><select id="time-format"><option value="24">24-hour (13:30)</option><option value="12">12-hour (1:30 PM)</option></select><p class="hint">Device-local times on this page and the speaker screen.</p><p id="format-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="format-recovery" class="actions" hidden></div></section>
+  <section class="setting-group" id="firmware-section" hidden aria-labelledby="firmware-title">
+    <h3 id="firmware-title">Updates</h3>
     <p id="firmware-version"></p>
     <p id="firmware-status" role="status" aria-live="polite"></p>
     <p id="firmware-last-check"></p>
@@ -79,7 +53,19 @@
     <p>Updates keep your settings and recordings. Installation waits until playback ends and the next Athan is at least 15 minutes away.</p>
     <div class="actions"><button id="firmware-check" type="button">Check for updates</button><button id="firmware-install" type="button" hidden>Install update</button><button id="firmware-cancel" type="button" class="quiet" hidden>Cancel queued update</button></div>
   </section>
-  <footer><span id="address"></span><p>Wi‑Fi or password changed? Connect by USB to recover access. Keep your phone on the same network as the device.</p></footer>
-</main>
+</div><section id="prayer-group" class="setting-group" aria-labelledby="prayer-heading">
+<h3 id="prayer-heading">Prayer times</h3><p id="prayer-intro" class="hint">Location and calculation changes need a timetable review before they are saved.</p>
+<ol id="setup-progress" class="setup-progress" hidden><li>Location</li><li>Calculation</li><li>Review</li><li>Finish</li></ol><form id="prayer-form">
+<fieldset id="location-fields"><legend id="location-heading" tabindex="-1" class="step-focus">Location</legend><a id="find-location" class="helper-link" target="_blank" rel="noopener noreferrer" href="https://openathan.com/location/">Find my location</a><p class="hint">Optional HTTPS helper opens in a new tab. Your edits stay here; manual entry works locally.</p>
+<p id="location-feedback" class="hint" hidden></p>
+<div class="coordinate-grid"><label>Latitude<input id="latitude" type="number" step="any" min="-90" max="90" required inputmode="decimal"></label><label>Longitude<input id="longitude" type="number" step="any" min="-180" max="180" required inputmode="decimal"></label></div><label>Timezone<input id="timezone" list="zones" maxlength="64" required placeholder="Choose a supported timezone"><datalist id="zones"></datalist></label></fieldset>
+<fieldset id="calculation-fields"><legend id="calculation-heading" tabindex="-1" class="step-focus">Calculation conventions</legend><label>Calculation method<select id="method" required><option value="">Choose a method</option><option value="north_america">North America (ISNA)</option><option value="muslim_world_league">Muslim World League</option><option value="egyptian">Egyptian</option><option value="karachi">Karachi</option><option value="umm_al_qura">Umm al-Qura</option><option value="dubai">Dubai</option><option value="moonsighting_committee">Moonsighting Committee</option><option value="kuwait">Kuwait</option><option value="qatar">Qatar</option><option value="singapore">Singapore</option><option value="tehran">Tehran</option><option value="turkey">Turkey</option></select></label><p class="hint">Use the convention followed by your local mosque.</p><label>Asr calculation<select id="asr"><option value="standard">Standard</option><option value="hanafi">Hanafi</option></select></label>
+<details><summary>High-latitude rules and offsets</summary><label>High-latitude rule<select id="high-latitude"><option value="auto">Automatic</option><option value="middle_of_night">Middle of the night</option><option value="seventh_of_night">One seventh of the night</option><option value="twilight_angle">Twilight angle</option></select></label><p class="hint">Adjust calculated times in minutes (−120 to +120).</p><div id="offsets" class="coordinate-grid"></div><label class="check"><input id="refresh-timezone" type="checkbox">Refresh saved timezone rules</label></details></fieldset>
+<p id="prayer-feedback" class="feedback" role="status">Reading prayer settings…</p><div id="prayer-recovery" class="actions" hidden></div><section id="prayer-preview" class="timetable review-timetable" hidden aria-labelledby="review-heading"><h3 id="review-heading" tabindex="-1" class="step-focus">Review timetable</h3><p id="review-summary" class="hint"></p><p id="preview-warning" class="warning" hidden></p><dl id="preview-times"></dl></section>
+<div class="actions prayer-actions"><button id="setup-back" type="button" hidden>Back</button><button id="setup-next" type="button" class="primary" hidden>Continue</button><button id="preview" type="button">Preview timetable</button><button id="confirm" type="submit" class="primary" hidden>Confirm prayer changes</button><button id="discard" type="button" hidden>Discard draft</button></div></form></section></div>
+<p class="device-help"><button id="refresh" type="button">Refresh status</button><br>Keep your phone on the same network as your speaker. Wi-Fi or password changed? Connect by USB to recover access.</p></section>
+  </main>
+
+</div>
 </body>
 </html>

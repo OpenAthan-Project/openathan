@@ -2,18 +2,30 @@
 
 The reference firmware embeds this responsive interface and serves it locally
 at its unique `http://openathan-<suffix>.local/` address, with an IPv4 fallback.
-It includes first-run manual location/timezone/calculation setup, prayer and
-volume settings, schedule previews, status, stop, skip and cancel-skip controls.
-The unreleased **Time format** preference selects 24-hour time (the default) or
-12-hour time with AM/PM for the page and optional speaker screen. It persists
-independently of prayer settings and does not change announcement times. See the
-[development validation](../../docs/development/time-format-validation-2026-10-04.md).
-The unreleased **Screen** card adds a saved 1–100% brightness slider, defaulting
-to 50%, on devices with an adjustable backlight. Changes apply when saved; the
-screen stays on. Its save/reload and conflict handling are independent of prayer
-and light settings. See the
-[screen API](../../firmware/esphome/provisioning/README.md#screen-brightness-unreleased).
-Existing saved brightness values are retained when the default changes.
+Today leads with the device’s authoritative next prayer, its local time and
+readiness, followed immediately by volume and named Skip/Restore controls. The
+highlight stays on that occurrence when skipped. An occurrence outside today’s
+timetable has a dated hero and no highlighted row. Connection loss freezes the
+last observed information and marks it stale; it does not assert playback stopped.
+Stop stays reachable from Today and Settings while playback is reported active.
+
+Settings groups Athan preferences, prayer calculations, optional screen/lights,
+time format and updates. Volume, enabled prayers, screen/light preferences and
+12/24-hour format save automatically. Sliders display input immediately, save
+on release and coalesce keyboard adjustments. Save feedback and recovery actions
+appear beside the affected group. Time format, lights and display have independent
+revision domains; prayer preferences share the existing settings revision.
+
+Location, timezone, calculation conventions, high-latitude rules and offsets stay
+in a draft until **Preview timetable → Confirm prayer changes**. First run guides
+location → calculation → review → Finish setup. Manual setup can finish while
+waiting for a valid clock, with an explicit warning. Drafts survive Today/Settings
+navigation and refreshes; browser navigation warns before discarding prayer edits.
+Automatic preference writes start from confirmed settings, retaining coordinate
+precision and excluding calculation drafts. Writes are serialized, with Stop
+available independently; uncertain outcomes require readback before more writes
+in their revision domain. Failed/conflicting edits remain available for recovery.
+
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
 An optional **Find my location** link opens the public HTTPS helper in a new tab.
@@ -62,7 +74,11 @@ colors, separate persistence, and LED hardware acceptance.
 
 The [firmware upgrade flow](../../docs/development/firmware-upgrades.md) checks
 for stable releases and queues owner-requested application updates between prayers.
-The authenticated **Firmware** section provides check, install, cancel and
+The authenticated **Updates** group provides check, install, cancel and
 reconnect/status controls. The public USB installer remains a fresh-install and
 credential-recovery tool. Quran/adhkar and owner-facing audio replacement remain
 future work.
+
+The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
+records automated browser/API coverage, matched OTA sizes and runtime limitations.
+Browser fixtures are simulated; they do not establish physical-device behavior.

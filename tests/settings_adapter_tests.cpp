@@ -476,6 +476,14 @@ static void light_api() {
   nvs_test::fail_commit=false;
   f.device.set_light_output(nullptr); CHECK(call("POST",body()).code==404);
 }
+static void local_api_date() {
+  using namespace esphome::openathan_device;
+  Fixture f;f.begin();f.device.utc=epoch({2026,9,25},23);
+  auto settings=f.value();settings.timezone={"Etc/GMT-2",-7200,0,{},{}};
+  CHECK(f.save(settings)==SettingsResult::SAVED);
+  LocalApi api(&f.device,nullptr,0);ApiExchange state;state.method="GET";state.uri="/api/status";api.handle(state);
+  JsonDocument json;CHECK(!deserializeJson(json,state.response));CHECK(json["local_date"]=="2026-09-26");
+}
 static void local_api() {
   using namespace esphome::openathan_device;
   Fixture f;f.device.require_setup();f.begin();
@@ -489,13 +497,16 @@ static void local_api() {
   JsonDocument current;CHECK(!deserializeJson(current,initial.response));
   CHECK(current["setup"]=="incomplete" && current["clock_ready"].as<bool>());
   CHECK(current["schedule"]["state"]=="setup_required");
+  CHECK(current["local_date"]=="2026-09-25");
   CHECK(current["test_mode"].is<bool>() && current["test_mode"].as<bool>() == esphome::openathan_storage::TEST_MODE);
+  JsonDocument local;
   JsonDocument request;request["schema"]=1;request["expected_revision"]=1;request["settings"]=current["settings"];
   request["settings"]["latitude"]=44.3894;
   auto body=[&](){std::string value;serializeJson(request,value);return value;};
   const auto writes=nvs_test::writes;
   CHECK(call("POST","/api/preview",body()).code==200 && nvs_test::writes==writes);
   f.device.valid=false;
+  CHECK(!deserializeJson(local,call("GET","/api/status").response));CHECK(local["local_date"].isUnbound());
   CHECK(call("POST","/api/preview",body()).response.find("waiting_for_time")!=std::string::npos);
   auto saved=call("POST","/api/activate",body());CHECK(saved.code==200);
   CHECK(f.device.activated() && !f.device.status().automatic_ready);
@@ -701,6 +712,6 @@ int main() {
   display_adapter();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_coordinates();
+  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_date(); local_api_coordinates();
 #endif
 }
