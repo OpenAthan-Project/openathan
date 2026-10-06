@@ -64,6 +64,11 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
   return;
  }
  if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)return;
+ if(snapshot&&order<statusOrder&&state.revision===snapshot.revision){
+  const next={...snapshot,settings:state.settings};
+  for(const key of ["display","lights","time_format","firmware"])if(state[key])next[key]=state[key];
+  state=next;
+ }
  for(const key of ["display","lights","time_format"]){
   const known=snapshot?.[key],next=state[key],older=(responseOrders.get(next)||order)<(responseOrders.get(known)||0);
   if(known&&next&&(next.revision<known.revision&&!settingsFault(next)||older&&(next.revision===known.revision||settingsFault(next)||settingsFault(known))))state={...state,[key]:known};
@@ -84,7 +89,7 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
 function acceptSavedState(key,raw){
  if(key==="settings")acceptStatus(raw,key);
  else{
-  const known=snapshot?.[key];if(settingsFault(known)&&(responseOrders.get(raw)||0)<(responseOrders.get(known)||0))throw new Error("A newer storage fault requires saved-state readback");
+  const known=snapshot?.[key];if(settingsFault(known)&&(responseOrders.get(raw)||0)<(responseOrders.get(known)||0)){const error=new Error("A newer storage fault requires saved-state readback");error.stale=true;throw error;}
   acceptDomain(key,raw,true);if(snapshot)snapshot[key]=raw;if(key==="time_format"&&!settingsFault(raw))timeSnapshot=raw;
  }
 }
@@ -301,9 +306,9 @@ async function previewDraft(){
 }
 async function runAction(action){
  ++generation;const playbackAtStart=playbackVersion;
- try{acceptStatus(preservePlayback(await request(action.restore?"/api/cancel-skip":"/api/skip",{expected_revision:domains.settings.snapshot.revision,occurrence:action.occurrence}),playbackAtStart));status("action",action.name+(action.restore?" restored":" will be skipped"),"success");}
+ try{acceptStatus(preservePlayback(await request(action.restore?"/api/cancel-skip":"/api/skip",{expected_revision:domains.settings.snapshot.revision,occurrence:action.occurrence}),playbackAtStart));const changed=!sameKey(action.occurrence,snapshot.next)||isSkipped(action.occurrence,snapshot.skip)===!!action.restore;status("action",changed?"Prayer state changed · review the current prayer":action.name+(action.restore?" restored":" will be skipped"),changed?"warning":"success");}
  catch(error){
-  try{const state=preservePlayback(await request("/api/status"),playbackAtStart);acceptStatus(state);status("action",error.status===409?"The prayer or settings changed. Check the current prayer before trying again.":"Skip state checked · "+(isSkipped(action.occurrence,state.skip)?"Athan is skipped":"Athan is on"),error.status===409?"warning":"");}
+  try{const state=preservePlayback(await request("/api/status"),playbackAtStart);acceptStatus(state);const changed=!sameKey(action.occurrence,snapshot.next);status("action",error.status===409?"The prayer or settings changed. Check the current prayer before trying again.":changed?"Prayer state changed · review the current prayer":"Skip state checked · "+(isSkipped(action.occurrence,snapshot.skip)?"Athan is skipped":"Athan is on"),error.status===409||changed?"warning":"");}
   catch{connected=false;actionUncertain=true;status("action",(action.restore?"Restore":"Skip")+" unconfirmed · reconnect to check","warning");}
  }finally{actionBusy=false;$("action-feedback").hidden=false;render();}
 }

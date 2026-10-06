@@ -48,6 +48,11 @@ This ordering guard also covers prayer settings, including delayed save readback
 and Skip responses after a newer Stop observation. Rejected stale confirmations
 retain pending preferences and reviewed prayer drafts without reporting connection
 loss. Recovery checks fresh saved state before confirming an already committed write.
+At the same prayer-settings revision, older complete replies retain the newer
+observed occurrence, timetable, device date, readiness and Skip state. Action
+feedback follows that accepted state when the prayer changes during a request.
+Stale screen, light and time-format readbacks also keep the observed connection
+and active Stop controls available while requiring fresh saved-state recovery.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
