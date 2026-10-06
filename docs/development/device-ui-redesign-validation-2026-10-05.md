@@ -57,7 +57,9 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   after Stop, initial unreadable prayer storage, fault/recovery draft retention,
   uncertain save readback during a storage fault and a preview arriving during
   that fault. Independent time-format saves and Stop remain usable where the
-  authoritative device state allows them.
+  authoritative device state allows them. Unchanged storage-fault polls do not
+  mutate the live feedback text; preview-arrival checks await the response body
+  and browser rendering rather than a fixed delay.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -93,12 +95,12 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,262,448 | +6,304 | 310,416 |
+| reference | 1,256,144 | 1,262,464 | +6,320 | 310,400 |
 | isolated | 1,257,904 | 1,264,240 | +6,336 | 308,624 |
 | qualification | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
 | rollback | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
 
-Reference slot free space is 834,704 bytes;
+Reference slot free space is 834,688 bytes;
 the largest affected image leaves 827,536
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
@@ -108,19 +110,19 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,389 | +836 |
-| `app.js` | 8,048 | 11,988 | +3,940 |
+| `app.js` | 8,048 | 11,995 | +3,947 |
 | `style.css` | 1,524 | 2,989 | +1,465 |
 
 Total compressed UI assets grow from 12,125
-to 18,366 bytes. No frontend framework, font,
+to 18,373 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `8be9eadbbb5b57d4ece9cf376a5bdc796bb22d141b35d2b1f57555eaad16c55f` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `cd5c2bc8984c89359b969b6d3ac97ab398e4f23e41fd4a1281e62676b608f725` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `d355d72c8f8fa883ee2621dcbeb46f6d42d4d042563c3380e1b0e85e6852035f` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `1863cc54a027e01adf4f40bb7bd55a3c48c2374536d7e7d16b0c1f10045ccb74` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `84b5c708f211af03a703bacbc2c0fed612252fcf5694c512b0e10c07d6b37928` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `c2f4409159c43508e7c4d647c8716a0739758f86f5eafce23f451090fe98ed0b` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `8e58bdd700af4be8f8dcd00d7b3ee3dec3614b5c6fa00891a7bcfb3d50dbd7d1` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `566b0f660de13ba1b76da2c4a3cbc99e5b50d632a9af4d65d3051f7c65744ed1` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -128,7 +130,7 @@ directories and configurations, with prior images/logs archived before rebuildin
 
 | Variant | Reviewed OTA bytes | Corrected OTA bytes | Review-fix delta |
 | --- | ---: | ---: | ---: |
-| reference | 1,262,128 | 1,262,448 | +320 |
+| reference | 1,262,128 | 1,262,464 | +336 |
 | isolated | 1,263,904 | 1,264,240 | +336 |
 | qualification | 1,269,280 | 1,269,616 | +336 |
 | rollback | 1,269,280 | 1,269,616 | +336 |

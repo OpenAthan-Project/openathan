@@ -88,7 +88,7 @@ function renderPreferences(){
  if(current("time_format"))$("time-format").value=current("time_format").hours;
  for(const [key,d] of Object.entries(domains)){
   const fault=["storage_fault","save_failed"].includes(d.snapshot.application)||key==="settings"&&settingsFault();
-  if(!d.busy&&!d.blocked&&!Object.keys(d.desired).length)notify(key,...savedMessage(key));
+  if(!d.busy&&!d.blocked&&!Object.keys(d.desired).length&&!(key==="settings"&&settingsFault()))notify(key,...savedMessage(key));
   const elements=key==="settings"?["volume","settings-volume",...prayers.map(p=>"enabled-"+p)]:key==="display"?["screen-brightness"]:key==="lights"?["lights-enabled","lights-brightness"]:["time-format"];
   elements.forEach(id=>$(id).disabled=fault||firstRun);
  }
