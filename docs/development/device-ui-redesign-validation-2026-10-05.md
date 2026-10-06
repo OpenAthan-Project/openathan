@@ -25,6 +25,15 @@ uncertain outcomes require readback before further writes in their revision doma
 Discarding preference edits does not discard a separate prayer draft. Drafts
 survive in-page navigation and warn before browser navigation.
 
+Review corrections on 2026-10-06 invalidate ready previews when conflict recovery
+reads changed calculation settings, before replacing the confirmed snapshot.
+Delayed Skip/Restore responses and uncertain-action readbacks preserve playback
+confirmed by a newer Stop. Successful status responses without settings, when
+storage is explicitly faulty, remain connected and show the device fault.
+Prayer controls and confirmation are disabled; drafts and pending edits survive,
+with independent preferences and reported playback Stop still available. Recovery
+requires confirmed saved settings, and no default prayer settings are invented.
+
 First run follows location → calculation → timetable review → Finish setup.
 The optional HTTPS helper precedes manual coordinates. Helper proposals require
 ready preview; manual setup can finish while waiting for valid time with a warning.
@@ -35,7 +44,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **76 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **96 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -43,6 +52,12 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   draft retention, location handoff, stale previews, setup clock gates, capability
   visibility, coordinate precision, device-local time, update regressions and nonce
   expiry without a second Chromium sign-in prompt.
+- The 20 added review regression checks cover preference conflict Retry/Use saved
+  values with a ready prayer preview, delayed Skip/Restore responses and readbacks
+  after Stop, initial unreadable prayer storage, fault/recovery draft retention,
+  uncertain save readback during a storage fault and a preview arriving during
+  that fault. Independent time-format saves and Stop remain usable where the
+  authoritative device state allows them.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -78,13 +93,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,262,128 | +5,984 | 310,736 |
-| isolated | 1,257,904 | 1,263,904 | +6,000 | 308,960 |
-| qualification | 1,263,280 | 1,269,280 | +6,000 | 303,584 |
-| rollback | 1,263,280 | 1,269,280 | +6,000 | 303,584 |
+| reference | 1,256,144 | 1,262,448 | +6,304 | 310,416 |
+| isolated | 1,257,904 | 1,264,240 | +6,336 | 308,624 |
+| qualification | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
+| rollback | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
 
-Reference slot free space is 835,024 bytes;
-the largest affected image leaves 827,872
+Reference slot free space is 834,704 bytes;
+the largest affected image leaves 827,536
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -93,19 +108,33 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,389 | +836 |
-| `app.js` | 8,048 | 11,665 | +3,617 |
+| `app.js` | 8,048 | 11,988 | +3,940 |
 | `style.css` | 1,524 | 2,989 | +1,465 |
 
 Total compressed UI assets grow from 12,125
-to 18,043 bytes. No frontend framework, font,
+to 18,366 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `c59464169625820246fbdbd9a95e788e676e51d78dd517dac4882679e37ee2ee` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `6896f7b98e1d83e0b5b864ff2985cf03840463ccb4d16946cf113aacceb91fb2` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `56a614a276472f6c7a2bc20943379419b2d2b1d157f040b3113df8373240b07d` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `a0da02510df506a713c0209edbf3bb3abf733ac99aaeff79641d656f9f4d1f8e` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `8be9eadbbb5b57d4ece9cf376a5bdc796bb22d141b35d2b1f57555eaad16c55f` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `cd5c2bc8984c89359b969b6d3ac97ab398e4f23e41fd4a1281e62676b608f725` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `d355d72c8f8fa883ee2621dcbeb46f6d42d4d042563c3380e1b0e85e6852035f` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `1863cc54a027e01adf4f40bb7bd55a3c48c2374536d7e7d16b0c1f10045ccb74` |
+
+The 2026-10-06 review fixes were also measured against reviewed PR head
+`d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
+directories and configurations, with prior images/logs archived before rebuilding.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Review-fix delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,262,128 | 1,262,448 | +320 |
+| isolated | 1,263,904 | 1,264,240 | +336 |
+| qualification | 1,269,280 | 1,269,616 | +336 |
+| rollback | 1,269,280 | 1,269,616 | +336 |
+
+These UI-only corrections leave static RAM unchanged and add no device request
+polling or runtime dependencies. All four capacity checks pass.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

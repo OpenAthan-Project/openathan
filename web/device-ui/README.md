@@ -25,6 +25,13 @@ Automatic preference writes start from confirmed settings, retaining coordinate
 precision and excluding calculation drafts. Writes are serialized, with Stop
 available independently; uncertain outcomes require readback before more writes
 in their revision domain. Failed/conflicting edits remain available for recovery.
+Recovery compares newly confirmed calculation settings before replacing the saved
+snapshot, invalidating a prayer preview when another client changed calculations.
+Delayed Skip/Restore replies and readbacks preserve playback status confirmed by a
+newer Stop. A successful status response reporting unreadable prayer storage is a
+device fault, not a lost connection: prayer edits and previews are disabled,
+drafts are retained, and independent preferences and reported playback Stop remain
+available. No prayer defaults are substituted for unavailable saved settings.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.

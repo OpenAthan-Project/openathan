@@ -27,6 +27,8 @@ async function request(path,body){
  if(!response.ok){const error=new Error(data.error||"Device request failed");error.status=response.status;throw error;}return data;
 }
 function calculation(value){const out=clone(value);delete out.volume;delete out.enabled;return out;}
+function settingsFault(state=snapshot){return state?.setup==="storage_fault"||["storage_fault","save_failed"].includes(state?.application);}
+function preservePlayback(state,started){return started!==playbackVersion&&snapshot?{...state,playing:snapshot.playing}:state;}
 function fillDraft(value,fresh=false){
  draft=calculation(value);if(fresh){draft.latitude="";draft.longitude="";draft.timezone="";draft.method="";}
  for(const [id,key] of Object.entries({latitude:"latitude",longitude:"longitude",timezone:"timezone",method:"method",asr:"asr_method","high-latitude":"high_latitude"}))$(id).value=draft[key];
@@ -49,16 +51,22 @@ function acceptDomain(key,state,ack=false){
  d.snapshot=next;
 }
 function acceptStatus(state,ack){
- if(!state?.settings||!Number.isInteger(state.revision))throw new Error("Device status is incomplete");
- if(snapshot&&state.revision<snapshot.revision)return;
+ if(!Number.isInteger(state?.revision)||!state.settings&&!settingsFault(state))throw new Error("Device status is incomplete");
+ if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)return;
  if(stopAwaiting&&state.playing===false)stoppedFeedback();
- const initial=!snapshot;connected=true;if(actionUncertain){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;timeSnapshot=state.time_format;
+ const initial=!snapshot,recovered=settingsFault()&&!settingsFault(state);connected=true;if(actionUncertain){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;timeSnapshot=state.time_format;
  for(const key of Object.keys(specs))acceptDomain(key,key==="settings"?state:state[key],ack===key);
  firstRun=state.setup==="incomplete";
- if(initial){fillDraft(state.settings,firstRun&&state.revision===1);status("prayer",firstRun?"Setup not finished · choose your location":"Saved prayer settings",firstRun?"":"success");showView(firstRun?"settings":"today",false);}
- if(state.setup==="active"&&!draftDirty&&initial===false&&draft===undefined)fillDraft(state.settings);
+ if(initial){if(state.settings)fillDraft(state.settings,firstRun&&state.revision===1);status("prayer",firstRun?"Setup not finished · choose your location":"Saved prayer settings",firstRun?"":"success");showView(firstRun?"settings":"today",false);}
+ if(state.settings&&!draft)fillDraft(state.settings);
+ if(recovered)status("prayer",draftDirty?"Saved storage recovered. Your draft is kept; preview before saving.":"Saved prayer settings",draftDirty?"warning":"success");
+ if(settingsFault(state)){preview=undefined;status("prayer","Saved prayer storage is unavailable. Your draft is kept; restart and check saved state.","error");}
  if(state.firmware)renderFirmware(state.firmware);
  render();applyPendingLocation();
+}
+function acceptSavedState(key,raw){
+ if(key==="settings")acceptStatus(raw,key);
+ else{acceptDomain(key,raw,true);if(snapshot)snapshot[key]=raw;if(key==="time_format")timeSnapshot=raw;}
 }
 function savedMessage(key){
  const app=domains[key].snapshot.application;
@@ -79,18 +87,22 @@ function renderPreferences(){
  else{$("lights-enabled").disabled=true;if(snapshot?.lights?.supported)status("lights","Saved light preferences are unavailable. Restart the speaker and check saved state.","error");}
  if(current("time_format"))$("time-format").value=current("time_format").hours;
  for(const [key,d] of Object.entries(domains)){
-  const fault=["storage_fault","save_failed"].includes(d.snapshot.application);
+  const fault=["storage_fault","save_failed"].includes(d.snapshot.application)||key==="settings"&&settingsFault();
   if(!d.busy&&!d.blocked&&!Object.keys(d.desired).length)notify(key,...savedMessage(key));
   const elements=key==="settings"?["volume","settings-volume",...prayers.map(p=>"enabled-"+p)]:key==="display"?["screen-brightness"]:key==="lights"?["lights-enabled","lights-brightness"]:["time-format"];
   elements.forEach(id=>$(id).disabled=fault||firstRun);
  }
+ if(settingsFault()){
+  notify("settings","Saved prayer storage is unavailable. Your edits are kept; restart and check saved state.","error");
+  for(const group of ["volume","preferences","prayer"])$(group+"-recovery").querySelectorAll("button").forEach(b=>b.disabled=true);
+ }else for(const group of ["volume","preferences","prayer"])$(group+"-recovery").querySelectorAll("button").forEach(b=>b.disabled=false);
  $("hardware-group").hidden=!snapshot?.display?.supported&&!snapshot?.lights?.supported;
  $("screen-controls").hidden=!snapshot?.display?.supported;$("light-controls").hidden=!snapshot?.lights?.supported;
  $("format-group").hidden=!snapshot?.time_format;
 }
 function renderTimes(id,schedule,settings,isPreview=false){
  const next=snapshot?.clock_ready&&snapshot?.setup==="active"?snapshot.next:null;
- const signature=stable([schedule,settings?.enabled,isPreview?null:next,isPreview?null:snapshot?.skip,timeSnapshot?.hours]);
+ const signature=stable([schedule,settings?.enabled,isPreview?null:next,isPreview?null:snapshot?.skip,timeSnapshot?.hours,isPreview?false:settingsFault()]);
  if(renderKeys.get(id)===signature)return;renderKeys.set(id,signature);
  const rows=(schedule?.times||[]).map(item=>{
   const p=item.name?.toLowerCase(),row=document.createElement("div"),dt=document.createElement("dt"),dd=document.createElement("dd"),small=document.createElement("small");
@@ -102,7 +114,7 @@ function renderTimes(id,schedule,settings,isPreview=false){
   row.append(dt,dd);return row;
  });
  $(id).replaceChildren(...rows);
- if(!rows.length){const p=document.createElement("p");p.className="hint";p.textContent=schedule?.state==="waiting_for_time"?"A timetable will appear after the speaker’s clock is ready.":schedule?.state==="invalid_schedule"?"These settings cannot produce a valid timetable. Review prayer settings.":"Finish setup to see your timetable.";$(id).append(p);}
+ if(!rows.length){const p=document.createElement("p");p.className="hint";p.textContent=!isPreview&&settingsFault()?"The timetable is unavailable while saved prayer storage needs attention.":schedule?.state==="waiting_for_time"?"A timetable will appear after the speaker’s clock is ready.":schedule?.state==="invalid_schedule"?"These settings cannot produce a valid timetable. Review prayer settings.":"Finish setup to see your timetable.";$(id).append(p);}
 }
 function render(){
  const state=snapshot,next=state?.clock_ready&&state?.setup==="active"?state.next:null,skipped=isSkipped(next,state?.skip);
@@ -114,16 +126,16 @@ function render(){
  let nextDate=$("next-date");if(!nextDate){nextDate=document.createElement("p");nextDate.id="next-date";nextDate.className="next-date";$("next-time").after(nextDate);}
  const onTable=next&&state.schedule?.times?.some(t=>Number.isFinite(t.utc)&&t.utc===next.utc&&t.name?.toLowerCase()===prayers[next.prayer]);
  text("next-date",next&&!onTable?dateLabel(next.local?.slice(0,10)):"");nextDate.hidden=!nextDate.textContent;
- const readiness=!state?"Connecting to speaker":!connected?"Connection lost · stale":state.playing?"Playing":state.application==="volume_failed"?"Automatic playback paused":state.application==="volume_pending"?"Applying volume":!state.clock_ready?"Waiting for time":firstRun?"Finish setup to enable Athan":state.setup==="storage_fault"||state.application==="storage_fault"?"Saved storage unavailable":skipped?"Athan skipped"+(state.local_date&&next.local?.slice(0,10)!==state.local_date?" on "+next.local.slice(0,10):" today"):state.automatic_ready?"Ready to play":"Waiting for device readiness";
+ const readiness=!state?"Connecting to speaker":!connected?"Connection lost · stale":state.playing?"Playing":settingsFault()?"Saved storage unavailable":state.application==="volume_failed"?"Automatic playback paused":state.application==="volume_pending"?"Applying volume":!state.clock_ready?"Waiting for time":firstRun?"Finish setup to enable Athan":skipped?"Athan skipped"+(state.local_date&&next.local?.slice(0,10)!==state.local_date?" on "+next.local.slice(0,10):" today"):state.automatic_ready?"Ready to play":"Waiting for device readiness";
  text("readiness-text",readiness);$("readiness").style.color=state?.automatic_ready&&connected&&!skipped?"var(--good)":"var(--amber)";
- const detail=!connected&&state?"Last observed: "+(state.playing?"playing":"idle")+". Playback may still be active.":state?.playing?"Playback is active on the speaker.":state?.application==="volume_failed"?"Volume could not be applied. Check the speaker and saved volume.":state&&!state.clock_ready?"Announcements will wait until the device clock is valid.":state?.scheduler_fault&&state.scheduler_fault!=="none"?"Device needs attention: "+state.scheduler_fault+". Check the speaker and prayer settings.":"";
+ const detail=!connected&&state?"Last observed: "+(state.playing?"playing":"idle")+". Playback may still be active.":settingsFault()?(state.playing?"Playback is active. ":"")+"Saved prayer storage is unavailable. Restart the speaker and check saved state.":state?.playing?"Playback is active on the speaker.":state?.application==="volume_failed"?"Volume could not be applied. Check the speaker and saved volume.":state&&!state.clock_ready?"Announcements will wait until the device clock is valid.":state?.scheduler_fault&&state.scheduler_fault!=="none"?"Device needs attention: "+state.scheduler_fault+". Check the speaker and prayer settings.":"";
  text("state-detail",detail);$("state-detail").hidden=!detail;
  for(const id of ["stop","settings-stop"]){$(id).hidden=!state?.playing;$(id).disabled=!connected||stopBusy;}
  $("settings-playing").hidden=!state?.playing;$("settings-playing").querySelector(".hint").textContent=connected?"Playback is active on the speaker.":"Last observed playing · connection lost.";
  const skipKey=state?.skip,skipName=skipKey?title(prayers[skipKey.prayer]):next?.name;
  const actionDate=next&&state.local_date&&next.local?.slice(0,10)!==state.local_date?" on "+next.local.slice(0,10):" today";
  text("skip",skipKey?"Restore "+skipName+(sameKey(skipKey,next)?actionDate:""):next?"Skip "+skipName+actionDate:"No Athan to skip");
- $("skip").classList.toggle("primary",!state?.playing);$("skip").disabled=!connected||actionBusy||actionUncertain||!domains.settings||!!domains.settings.blocked||(!skipKey&&(!next||firstRun));
+ $("skip").classList.toggle("primary",!state?.playing);$("skip").disabled=!connected||settingsFault()||actionBusy||actionUncertain||!domains.settings||!!domains.settings.blocked||(!skipKey&&(!next||firstRun));
  renderPreferences();if(state)renderTimes("times",state.schedule,state.settings);
  text("timezone-note",state?.settings?"Times on the speaker · "+state.settings.timezone:"");text("conflicts",(state?.schedule?.conflicts||[]).join(" "));
  if(preview)renderTimes("preview-times",preview,merge(domains.settings.snapshot.value,draft),true);
@@ -133,7 +145,7 @@ function render(){
 function showView(view,focus=true){if(firstRun)view="settings";$("today-view").hidden=view!=="today";$("settings-view").hidden=view!=="settings";document.querySelectorAll("[data-view]").forEach(b=>{if(b.dataset.view===view)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});if(focus){$("main").focus();scrollTo(0,0);}}
 function focusStep(){const id=setupStep===0?"location-heading":setupStep===1?"calculation-heading":"review-heading";$(id).focus();$(id).scrollIntoView({block:"start"});}
 function renderDraftControls(){
- const d=domains.settings,blocked=!d||["storage_fault","save_failed"].includes(d?.snapshot.application)||snapshot?.setup==="storage_fault";
+ const d=domains.settings,blocked=!d||["storage_fault","save_failed"].includes(d?.snapshot.application)||settingsFault();
  document.querySelector(".navigation").hidden=firstRun;document.querySelector(".settings-simple").hidden=firstRun;
  text("settings-intro",firstRun?"Choose a location, review prayer times, then finish setup.":"Everyday preferences save automatically.");
  $("settings-heading").textContent=firstRun?"Welcome to OpenAthan":"Settings";$("prayer-heading").textContent=firstRun?"Set up your speaker":"Prayer times";
@@ -150,7 +162,7 @@ function renderDraftControls(){
  $("discard").hidden=!draftDirty||firstRun;
 }
 function enqueue(key,patch,meta=null){
- const d=domains[key];if(!d)return;
+ const d=domains[key];if(!d||key==="settings"&&settingsFault())return;
  d.desired=merge(d.desired,patch);d.pending=merge(d.pending,patch);
  if(meta){d.meta=meta;d.groups.add("prayer");}
  specs[key].groups.forEach(g=>d.groups.add(g));
@@ -160,6 +172,7 @@ function enqueue(key,patch,meta=null){
 }
 function bodyFor(key,before,candidate,meta){const base={schema:1,expected_revision:before.revision};return key==="settings"?{...base,settings:candidate,refresh_timezone:!!meta?.refreshTimezone}:key==="lights"?{...base,settings:candidate}:{...base,...candidate};}
 function matches(key,actual,expected,before,meta){
+ if(!valueFrom(key,actual)||!Number.isInteger(actual.revision))return false;
  const value=clone(valueFrom(key,actual)),wanted=clone(expected);
  if(key==="settings"&&(wanted.timezone!==before.value.timezone||meta?.refreshTimezone)){delete value.timezone_rules;delete wanted.timezone_rules;}
  return stable(value)===stable(wanted)&&actual.revision>=before.revision&&!(meta?.activate&&actual.setup!=="active")&&!["storage_fault","save_failed"].includes(actual.application);
@@ -172,10 +185,10 @@ function acknowledge(patch,desired){
  }
 }
 function finishSaved(key,patch,meta,raw,verified=false,playbackAtStart=playbackVersion){
- if(key==="settings"&&playbackAtStart!==playbackVersion&&snapshot)raw={...raw,playing:snapshot.playing};
- const d=domains[key];d.snapshot=domainState(key,raw);
+ if(key==="settings")raw=preservePlayback(raw,playbackAtStart);
+ const d=domains[key];
  acknowledge(patch,d.desired);
- if(key==="settings")acceptStatus(raw,key);else {if(snapshot)snapshot[key]=raw;if(key==="time_format")timeSnapshot=raw;}
+ acceptSavedState(key,raw);
  if(meta&&meta.version===draftVersion){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);if(meta.activate){firstRun=raw.setup==="incomplete";if(!firstRun)showView("today");}}
  if(meta&&meta.version!==draftVersion)status("prayer","Reviewed settings saved · your newer edits remain a draft","warning");
  else if(meta)status("prayer","Prayer settings saved","success");
@@ -184,8 +197,8 @@ function finishSaved(key,patch,meta,raw,verified=false,playbackAtStart=playbackV
 }
 async function pump(){
  if(writeBusy||firmwareBusy||actionUncertain)return;
- if(pendingAction){if(domains.settings?.busy||domains.settings?.blocked)return;const pending=pendingAction;pendingAction=null;writeBusy=true;await runAction(pending);writeBusy=false;pump();return;}
- const key=Object.keys(specs).find(k=>domains[k]&&!domains[k].blocked&&!domains[k].busy&&Object.keys(domains[k].pending).length);
+ if(pendingAction){if(settingsFault()||domains.settings?.busy||domains.settings?.blocked)return;const pending=pendingAction;pendingAction=null;writeBusy=true;await runAction(pending);writeBusy=false;pump();return;}
+ const key=Object.keys(specs).find(k=>domains[k]&&!(k==="settings"&&settingsFault())&&!domains[k].blocked&&!domains[k].busy&&Object.keys(domains[k].pending).length);
  if(!key||!connected)return;
  const d=domains[key],patch=clone(d.pending),meta=d.meta,before=clone(d.snapshot),candidate=merge(before.value,patch),groups=[...d.groups],playbackAtStart=playbackVersion;
  d.pending={};d.meta=null;d.groups.clear();d.busy=true;writeBusy=true;++generation;if(firmwareState)renderFirmware(firmwareState);notify(key,"Saving…","",groups);renderDraftControls();
@@ -203,7 +216,7 @@ async function pump(){
     if(d.meta===meta)d.meta=null;
     finishSaved(key,patch,meta,raw,true,playbackAtStart);
    }else{
-    d.snapshot=domainState(key,raw);if(key==="settings")acceptStatus(raw,key);
+    acceptSavedState(key,key==="settings"?preservePlayback(raw,playbackAtStart):raw);
     d.blocked=error.status===409?"conflict":"failure";
     notify(key,error.status===409?"Changed on another client. Your edits are kept; choose which values to use.":"Couldn’t save. Your edits are kept; retry or use the saved values.","error",groups);
     if(meta)status("prayer","Prayer changes were not confirmed. Your draft is kept.","error");
@@ -226,11 +239,11 @@ function recovery(key){
  });
 }
 async function resolve(key,useSaved){
- const d=domains[key];if(d.busy)return;d.busy=true;notify(key,"Checking saved state…");renderDraftControls();
+ const d=domains[key];if(d.busy)return;const playbackAtStart=playbackVersion;d.busy=true;notify(key,"Checking saved state…");renderDraftControls();
  try{
-  const raw=await request(specs[key].read),before=clone(d.snapshot),candidate=merge(before.value,d.desired);
-  const persisted=matches(key,raw,candidate,before,d.meta);d.snapshot=domainState(key,raw);
-  if(key==="settings")acceptStatus(raw,key);else if(snapshot)snapshot[key]=raw;
+  let raw=await request(specs[key].read);if(key==="settings")raw=preservePlayback(raw,playbackAtStart);const before=clone(d.snapshot),candidate=merge(before.value,d.desired);
+  const persisted=matches(key,raw,candidate,before,d.meta);acceptSavedState(key,raw);
+  if(key==="settings"&&settingsFault()){d.blocked="failure";recovery(key);return;}
   if(persisted){const patch=clone(d.desired),meta=d.meta;d.pending={};d.meta=null;finishSaved(key,patch,meta,raw,true);d.blocked=null;}
   else if(d.blocked==="uncertain"){d.blocked="failure";notify(key,"Saved state checked. Your edits are kept; choose which values to use.","warning");recovery(key);}
   else{d.blocked=null;if(!useSaved&&d.meta){d.pending=Object.fromEntries(Object.entries(d.pending).filter(([k])=>["volume","enabled"].includes(k)));d.desired=Object.fromEntries(Object.entries(d.desired).filter(([k])=>["volume","enabled"].includes(k)));d.meta=null;preview=undefined;status("prayer","Your draft is kept. Preview again before confirming.","warning");}if(useSaved){const discardPrayer=!!d.meta;d.desired={};d.pending={};d.meta=null;if(key==="settings"&&discardPrayer){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);status("prayer","Saved prayer settings restored","success");}}}
@@ -244,12 +257,12 @@ async function refresh(){
  catch{if(started===generation){connected=false;render();}return false;}finally{loading=false;attempted=true;if(!connected)render();}
 }
 async function previewDraft(){
- if(!draft||!connected||domains.settings.busy)return;
+ if(!draft||!connected||settingsFault()||domains.settings.busy)return;
  if(!$("prayer-form").reportValidity())return;readDraft();const version=draftVersion,before=clone(domains.settings.snapshot);
  status("prayer","Preparing timetable preview…");$("preview").disabled=true;
  try{
   const data=await request("/api/preview",bodyFor("settings",before,merge(before.value,draft),{refreshTimezone:$("refresh-timezone").checked}));
-  if(version!==draftVersion||stable(calculation(before.value))!==stable(calculation(domains.settings.snapshot.value)))return;
+  if(settingsFault()||version!==draftVersion||stable(calculation(before.value))!==stable(calculation(domains.settings.snapshot.value)))return;
   preview={...data,version};if(firstRun)setupStep=2;
   renderTimes("preview-times",data,merge(domains.settings.snapshot.value,draft),true);
   text("preview-warning",data.state==="waiting_for_time"?helperDraft?"Waiting for time. Preview again after the clock is ready before saving this suggestion.":"You can finish setup now; announcements will wait for a valid clock.":data.state==="invalid_schedule"?"These settings cannot produce a valid schedule. Review location, conventions and offsets.":(data.conflicts||[]).join(" "));
@@ -259,10 +272,10 @@ async function previewDraft(){
  }catch(error){status("prayer",error.message+". Your draft is kept; try preview again.","error");}finally{renderDraftControls();}
 }
 async function runAction(action){
- ++generation;
- try{acceptStatus(await request(action.restore?"/api/cancel-skip":"/api/skip",{expected_revision:domains.settings.snapshot.revision,occurrence:action.occurrence}));status("action",action.name+(action.restore?" restored":" will be skipped"),"success");}
+ ++generation;const playbackAtStart=playbackVersion;
+ try{acceptStatus(preservePlayback(await request(action.restore?"/api/cancel-skip":"/api/skip",{expected_revision:domains.settings.snapshot.revision,occurrence:action.occurrence}),playbackAtStart));status("action",action.name+(action.restore?" restored":" will be skipped"),"success");}
  catch(error){
-  try{const state=await request("/api/status");acceptStatus(state);status("action",error.status===409?"The prayer or settings changed. Check the current prayer before trying again.":"Skip state checked · "+(isSkipped(action.occurrence,state.skip)?"Athan is skipped":"Athan is on"),error.status===409?"warning":"");}
+  try{const state=preservePlayback(await request("/api/status"),playbackAtStart);acceptStatus(state);status("action",error.status===409?"The prayer or settings changed. Check the current prayer before trying again.":"Skip state checked · "+(isSkipped(action.occurrence,state.skip)?"Athan is skipped":"Athan is on"),error.status===409?"warning":"");}
   catch{connected=false;actionUncertain=true;status("action",(action.restore?"Restore":"Skip")+" unconfirmed · reconnect to check","warning");}
  }finally{actionBusy=false;$("action-feedback").hidden=false;render();}
 }
@@ -342,7 +355,7 @@ function applyLocationProposal(proposal) {
   locationMessage("Location suggested. Review it and preview the timetable before saving.");
 }
 function applyPendingLocation() {
-  if(!draft || !timezonesReady || !proposedLocation)return;
+  if(!draft || settingsFault() || !timezonesReady || !proposedLocation)return;
   const proposal=proposedLocation;proposedLocation=null;
   applyLocationProposal(proposal);
 }

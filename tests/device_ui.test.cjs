@@ -103,7 +103,7 @@ async function open(f,name,options={}){
  const browser=await ({chromium,webkit}[name]).launch({headless:true});
  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'},...options});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(f.url);
- await page.waitForFunction(()=>document.querySelector('#latitude').value!==''||document.querySelector('#setup-progress').hidden===false);
+ await page.waitForFunction(()=>document.querySelector('#latitude').value!==''||document.querySelector('#setup-progress').hidden===false||document.querySelector('#readiness-text').textContent==='Saved storage unavailable');
  return {browser,page,errors,close:async()=>{assert.deepEqual(errors,[]);await browser.close();await f.close();}};
 }
 async function settings(page){await page.locator('[data-view="settings"]').click();}
@@ -476,6 +476,67 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await page.locator('#prayer-recovery button').first().click();await page.waitForFunction(()=>document.querySelector('#confirm').hidden);assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'45.2');assert.equal(f.state.mutations,0);
    let dismissed=false;page.once('dialog',async d=>{dismissed=d.type()==='beforeunload';await d.dismiss();});await page.goto('about:blank',{timeout:3000}).catch(()=>{});assert.ok(dismissed);assert.ok(page.url().startsWith(f.url));
   }finally{await o.close();}
+ });
+ for(const useSaved of [false,true]){
+  test(`${browserName}: preference conflict recovery ${useSaved?'discards':'retries'} edits and invalidates a stale prayer preview`,async()=>{
+   const f=await fixture(),o=await open(f,browserName),{page}=o;
+   try{
+    await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);
+    f.state.device.settings.method='north_america';f.state.device.revision++;
+    await slide(page,'settings-volume',25);await page.waitForFunction(()=>document.querySelector('#preferences-feedback').textContent.includes('another client'));
+    await page.locator('#preferences-recovery button').nth(useSaved?1:0).click();await page.waitForFunction(()=>document.querySelector('#preferences-recovery').hidden);
+    assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.device.settings.method,'north_america');assert.equal(f.state.device.settings.volume,useSaved?70:25);
+    await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);await page.locator('#confirm').click();await page.waitForFunction(()=>document.querySelector('#prayer-feedback').textContent==='Prayer settings saved');assert.equal(f.state.device.settings.latitude,44.4);
+   }finally{await o.close();}
+  });
+ }
+ for(const restore of [false,true])for(const readback of [false,true]){
+  test(`${browserName}: delayed ${restore?'Restore':'Skip'} ${readback?'readback':'response'} cannot reverse a confirmed Stop`,async()=>{
+   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};
+   const o=await open(f,browserName),{page}=o;let release,requested,oldState,actionStarted=false;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+   try{
+    if(readback)await page.route('**/api/status',async route=>{if(!actionStarted){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    await page.route(restore?'**/api/cancel-skip':'**/api/skip',async route=>{
+     if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};oldState=structuredClone(f.state.device);actionStarted=true;
+     if(readback){await route.fulfill({status:200,body:'{'});return;}requested();await gate;await route.fulfill({status:200,json:oldState});
+    });
+    await page.locator('#skip').click();await started;await page.locator('#stop').click();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent==='Playback stopped');assert.equal(f.state.device.playing,false);release();
+    await page.waitForFunction(()=>!document.querySelector('#skip').disabled);assert.ok(await page.locator('#stop').isHidden());assert.notEqual(await page.locator('#readiness-text').textContent(),'Playing');assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');
+    await settings(page);assert.ok(await page.locator('#settings-stop').isHidden());
+   }finally{release();await o.close();}
+  });
+ }
+ test(`${browserName}: initial unreadable prayer storage is a connected device fault with independent preferences`,async()=>{
+  const f=await fixture();delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.device.clock_ready=false;f.state.device.automatic_ready=false;f.state.device.scheduler_fault='durable_state_unavailable';f.state.device.schedule={state:'setup_required'};
+  const o=await open(f,browserName),{page}=o;
+  try{
+   assert.ok(await page.locator('#connection-banner').isHidden());assert.equal(await page.locator('#readiness-text').textContent(),'Saved storage unavailable');assert.match(await page.locator('#times').textContent(),/storage/i);assert.ok(await page.locator('#volume').isDisabled());assert.equal(await page.locator('#volume-value').textContent(),'—');assert.ok(await page.locator('#skip').isDisabled());
+   await settings(page);assert.ok(await page.locator('#latitude').isDisabled());assert.ok(await page.locator('#enabled-asr').isDisabled());assert.match(await page.locator('#prayer-feedback').textContent(),/storage/i);assert.ok(await page.locator('#time-format').isEnabled());await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(f.state.device.time_format.hours,12);assert.equal(f.state.mutations,0);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: prayer storage loss preserves drafts and Stop until saved state recovers`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);const confirmed=structuredClone(f.state.device);
+   delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.device.automatic_ready=false;f.state.device.schedule={state:'setup_required'};
+   await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#latitude').matches(':disabled'),{},{timeout:3000});assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.ok(await page.locator('#settings-volume').isDisabled());assert.ok(await page.locator('#enabled-asr').isDisabled());assert.ok(await page.locator('#settings-stop').isEnabled());await page.locator('#settings-stop').click();await page.waitForFunction(()=>document.querySelector('#settings-stop').hidden);
+   f.state.device={...confirmed,playing:false,revision:confirmed.revision+1};f.state.device.settings.method='north_america';await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#latitude').matches(':disabled'));assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.ok(await page.locator('#confirm').isHidden());await slide(page,'settings-volume',25);await saved(page,'preferences');assert.equal(f.state.device.settings.method,'north_america');assert.equal(f.state.device.settings.latitude,confirmed.settings.latitude);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: unavailable settings during save readback retain edits without another write`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');f.state.drop=true;f.state.failRead=true;await slide(page,'settings-volume',25);await page.waitForFunction(()=>document.querySelector('#preferences-feedback').textContent.includes('before another write'));
+   const confirmed=structuredClone(f.state.device);delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.failRead=false;
+   await page.locator('#preferences-recovery button').first().click();await page.waitForFunction(()=>document.querySelector('#settings-volume').disabled,{},{timeout:3000});assert.ok(await page.locator('#connection-banner').isHidden());assert.match(await page.locator('#preferences-feedback').textContent(),/storage/i);assert.equal(await page.locator('#settings-volume-value').textContent(),'25%');assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.mutations,1);
+   f.state.device=confirmed;await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#settings-volume').disabled);await page.locator('#preferences-recovery button').first().click();await page.waitForFunction(()=>document.querySelector('#preferences-recovery').hidden);assert.equal(f.state.mutations,1);assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: a preview arriving during prayer storage loss cannot be confirmed`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;let release,requested;f.state.previewWait=new Promise(r=>release=r);const started=new Promise(r=>requested=r);f.state.previewRequested=requested;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await started;delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#latitude').matches(':disabled'),{},{timeout:3000});release();await page.waitForTimeout(100);assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.mutations,0);
+  }finally{release();await o.close();}
  });
  test(`${browserName}: text and controls meet the contrast requirements`,async()=>{
   const f=await fixture(),o=await open(f,browserName),{page}=o;
