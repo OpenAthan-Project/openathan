@@ -119,8 +119,9 @@ capabilities; absence does not block prayer scheduling or local setup.
 
 Slider output follows input immediately; pointer release or coalesced keyboard
 changes enqueue the preference write. Writes are serialized while each domain
-retains its own confirmed snapshot, desired/pending edits, revision and recovery
-state. Preference saves merge into confirmed settings and never include the
+retains its own confirmed values, versioned field edits, captured operation and
+recovery state. Both volume controls share one field and one keyboard timer.
+Preference saves merge into confirmed settings and never include the
 separate unconfirmed location/calculation/offset draft. Save feedback distinguishes
 stored values, pending application, unavailable output and storage/application
 failure. Status refreshes keep unsaved edits; conflicts keep them for an explicit
@@ -131,7 +132,9 @@ preference edits preserves an independent prayer draft.
 
 Location, timezone, calculation/Asr/high-latitude conventions and offsets remain
 a versioned prayer draft. A matching ready preview enables explicit confirmation;
-new edits or authoritative calculation changes invalidate the old preview.
+new edits or authoritative calculation changes invalidate the old preview. Back
+and Discard also invalidate pending results and errors; duplicate pending previews
+are prevented.
 Preview never activates setup or changes durable state. Coordinate fields retain
 their supplied precision. Both 12-hour and 24-hour views use the saved device
 preference for Today and preview values.
@@ -150,21 +153,19 @@ update controls remain in Settings with their original safety/state contract.
 
 ## Validation and evidence
 
-The [dated validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
-records 76 passing Chromium/WebKit checks, 103 Python tests without skips, 16
-CTest tests, production/isolated actual API adapters, nine configuration checks
-and four matched pinned firmware builds. Browser checks cover 320px, 390px and
-desktop, enlarged text, keyboard/focus, practical targets, contrast, 12/24-hour
-formatting and live text without polling chatter. They inspect semantics and DOM
-behavior; actual assistive-technology speech is unmeasured.
+The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
+retains the initial integration and dated review evidence. The
+[holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)
+records the current controller, invariant-to-test matrix, full automated checks
+and matched pinned OTA measurements. Browser checks cover 320px, 390px and desktop,
+enlarged text, keyboard/focus, touch targets, contrast, 12/24-hour formatting and
+live text without polling chatter. They inspect semantics and DOM behavior;
+actual assistive-technology speech is unmeasured.
 
-Each final OTA contains the exact current gzip assets and passes the existing
-1,572,864-byte application budget and partition/capacity contract. Reference OTA
-growth is 5,936 bytes; isolated, qualification and rollback growth is 5,968 bytes
-each. Exact before/after sizes, remaining budgets and source/toolchain details
-belong to the dated report. Static RAM is unchanged; heap, fragmentation, PSRAM,
-concurrent playback/network headroom and response latency remain unmeasured for
-this revision. No physical results are implied by source, browser or build checks.
+Each final OTA must contain the exact current gzip assets and pass the existing
+1,572,864-byte application budget and partition/capacity contract. Exact sizes and
+runtime evidence belong to the dated reports. Source, browser and build checks do
+not imply physical-device or runtime heap/PSRAM results.
 
 ## Approved integration scope
 

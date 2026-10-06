@@ -10,70 +10,52 @@ last observed information and marks it stale; it does not assert playback stoppe
 Stop stays reachable from Today and Settings while playback is reported active.
 
 Settings groups Athan preferences, prayer calculations, optional screen/lights,
-time format and updates. The markup follows that phone section order so keyboard
-and screen-reader navigation reach prayer settings directly after preferences.
-Desktop grid placement retains the two columns. First run keeps preference and
-update controls hidden until setup finishes. Volume, enabled prayers, screen/light
-preferences and 12/24-hour format save automatically. Sliders display input
-immediately, save on release and coalesce keyboard adjustments. Save feedback and recovery actions
-appear beside the affected group. Time format, lights and display have independent
-revision domains; prayer preferences share the existing settings revision.
+time format and updates. Markup follows the phone section order for keyboard and
+screen-reader navigation; desktop placement retains two columns. First run hides
+everyday preferences and updates until setup finishes.
 
-Location, timezone, calculation conventions, high-latitude rules and offsets stay
-in a draft until **Preview timetable → Confirm prayer changes**. First run guides
-location → calculation → review → Finish setup. Manual setup can finish while
-waiting for a valid clock, with an explicit warning. Drafts survive Today/Settings
-navigation and refreshes. If storage recovery reveals incomplete setup, the page
-opens the setup view; fresh revision-one configuration requires choosing a
-location, while existing drafts are kept. Repeated incomplete-state polls retain
-the current setup focus. Recovery into active configuration keeps the current view.
-Browser navigation warns before discarding prayer edits.
-Automatic preference writes start from confirmed settings, retaining coordinate
-precision and excluding calculation drafts. Writes are serialized, with Stop
-available independently; uncertain outcomes require readback before more writes
-in their revision domain. Failed/conflicting edits remain available for recovery.
-Recovery compares newly confirmed calculation settings before replacing the saved
-snapshot, invalidating a prayer preview when another client changed calculations.
-Delayed Skip/Restore replies and readbacks preserve playback status confirmed by a
-newer Stop. A successful status response reporting unreadable prayer storage is a
-device fault, not a lost connection: prayer edits and previews are disabled,
-drafts are retained, and independent preferences and reported playback Stop remain
-available. No prayer defaults are substituted for unavailable saved settings.
-Discard cancels a reviewed prayer change while it is queued and unsent, preserving
-automatic preference edits. After transmission, Discard waits for confirmation or
-an explicit recovery choice; it cannot cancel a write already received by the speaker.
-A delayed Stop reply or readback preserves newer observed Skip/Restore and
-playback state. Complete status responses also retain newer independently saved
-screen, light and time-format revisions and newer firmware-check results.
-A Skip queued behind conflicted or faulty prayer settings waits for that domain's
-recovery while healthy independent preferences continue saving. Later optional
-storage faults retain confirmed values and pending edits, disable only the
-affected controls/recovery actions, and show nearby storage feedback. Unreadable
-stores with no confirmed values do not substitute defaults. A delayed save reply
-cannot clear a newer storage fault or discard its edits before fresh readback.
-This ordering guard also covers prayer settings, including delayed save readback
-and Skip responses after a newer Stop observation. Rejected stale confirmations
-retain pending preferences and reviewed prayer drafts without reporting connection
-loss. Recovery checks fresh saved state before confirming an already committed write.
-At the same prayer-settings revision, older complete replies retain the newer
-observed occurrence, timetable, device date, readiness and Skip state. Action
-feedback follows that accepted state when the prayer changes during a request.
-Stale screen, light and time-format readbacks also keep the observed connection
-and active Stop controls available while requiring fresh saved-state recovery.
-Save acknowledgments in all four revision domains also protect newer healthy
-snapshots and application feedback. Stale replies/readbacks retain edits and
-require fresh readback before confirmation; newer conflicting revisions offer
-Retry or Use saved values. The confirmed time format remains in use while an edit
-is unresolved. New calculation observations invalidate a preview even during a
-preference save, retaining the prayer draft for fresh review.
+Volume, enabled prayers, screen/light preferences and time format save automatically.
+Both volume controls edit the same value: later input in either view cancels an
+older keyboard timer. Sliders display input immediately, save on release and
+coalesce keyboard changes for 350 ms. Idle focused sliders follow confirmed values;
+an ongoing drag retains its edited value. Feedback and recovery stay beside the
+affected group, distinguishing unsaved input, saving, confirmed storage, applying,
+unavailable output and failure.
 
-Recovery resolves the edits present when its readback starts. Later slider,
-prayer-toggle, light-toggle and time-format edits are retained; released changes
-save with the freshly confirmed revision, while an unfinished drag waits for
-release and stays labeled unsaved. Choosing saved prayer settings retains a
-draft edited during the readback for a new preview. Focused sliders follow the
-latest confirmed value when idle, so the next keyboard adjustment starts from
-that value; ongoing input keeps its edited value across status polling.
+Location, timezone, calculation conventions, high-latitude rules and offsets remain
+a separate draft until **Preview timetable → Confirm prayer changes**. First run
+follows location → calculation → review → Finish setup. Manual setup may finish
+while waiting for a valid clock, with an explicit warning; helper proposals require
+a ready preview. Drafts survive Today/Settings navigation and device-status refreshes; browser navigation
+warns before discarding prayer edits. Back, Discard, draft changes and changed saved
+calculations invalidate pending previews, including late errors. Only one current
+preview can be submitted. Storage recovery into incomplete setup opens the setup
+view without replacing drafts; repeated polls retain focus. Fresh revision-one
+configuration requires choosing a location. Recovery into active setup keeps the view.
+
+Preference writes merge into confirmed settings, preserving coordinate precision
+and excluding calculation drafts. Settings, display, lights and time format keep
+their existing independent revision contracts. The write scheduler serializes
+writes; Stop remains independent, and a blocked domain does not prevent healthy
+independent preferences from saving. Uncertain writes require readback before
+another write in that domain. Recovery offers Check saved state, Retry with my
+edits or Use saved values. Recovery updates only its own groups. It resolves
+captured edits while preserving later edits,
+including changes returning to the same value and unreleased drags. Calculation
+conflicts require fresh preview/confirmation. Discard cancels an unsent reviewed
+prayer change while keeping automatic preferences; sent changes require confirmed
+outcomes or an explicit recovery choice.
+
+All response paths use the same acceptance rules. Durable values follow their
+revisions; playback, timetable, readiness, application feedback and update status
+also preserve newer observations. Older responses cannot clear newer storage
+faults, overwrite newer healthy values or acknowledge edits prematurely. Stale
+confirmations retain edits and require fresh saved-state recovery. An older update
+poll cannot hide a newer available update. A readable storage fault stays connected,
+retains last confirmed values and disables only affected controls. Unreadable stores
+without confirmed values show unknown values. Prayer drafts survive faults, and
+confirmed time format stays in use during unresolved edits. No settings defaults,
+playback identity or stopped playback are inferred from missing information.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
@@ -129,5 +111,7 @@ credential-recovery tool. Quran/adhkar and owner-facing audio replacement remain
 future work.
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
-records automated browser/API coverage, matched OTA sizes and runtime limitations.
+retains integration evidence. The [holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)
+records current browser/API coverage, the finding-to-test matrix, matched OTA sizes
+and runtime limitations.
 Browser fixtures are simulated; they do not establish physical-device behavior.

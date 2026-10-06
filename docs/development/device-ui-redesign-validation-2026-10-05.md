@@ -1,5 +1,10 @@
 # Device UI redesign validation — 2026-10-05
 
+This report preserves integration and individual review evidence through PR head
+`d8b0042bcc882cd662643b46c20840cc0a914b5e`. Its final tables describe that head.
+The [2026-10-06 holistic review](device-ui-holistic-review-2026-10-06.md) records
+the subsequent controller simplification, current checks and matched OTA sizes.
+
 Unreleased development implementation. The user approved the revised browser
 mockups and authorized embedded integration. This report covers production UI
 assets, automated host/browser checks and matched compile-only firmware images.

@@ -172,6 +172,9 @@ records the independent finish review and its listed-fix verdict, automated
 API/browser validation and matched firmware capacity measurements. Historical
 prototype reviews remain evidence of the earlier approved browser work, with
 their original simulation-only scope.
+The [holistic review report](docs/development/device-ui-holistic-review-2026-10-06.md)
+records the subsequent shared preference ownership and preview/response lifecycle
+validation; the approved visual composition remains unchanged.
 
 Representative captures show the real production assets with simulated APIs:
 [phone Today](docs/development/device-ui-redesign/today-phone.png),
