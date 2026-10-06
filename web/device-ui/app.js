@@ -110,7 +110,7 @@ function savedMessage(key){
 function renderPreferences(){
  for(const [key,ids] of Object.entries({settings:["volume","settings-volume"],display:["screen-brightness"],lights:["lights-brightness"],time_format:[]})){
   const value=current(key);if(!value){for(const id of ids){$(id).disabled=true;$(id+"-value").value="—";}continue;}
-  for(const id of ids){const v=key==="settings"?value.volume:value.brightness_percent;if(document.activeElement!==$(id))$(id).value=v;$(id+"-value").value=v+"%";}
+  for(const id of ids){const v=key==="settings"?value.volume:value.brightness_percent;$(id).value=v;$(id+"-value").value=v+"%";}
  }
  const s=current("settings");if(s)prayers.forEach(p=>$("enabled-"+p).checked=s.enabled[p]);
  $("lights-enabled").indeterminate=!current("lights");
@@ -120,6 +120,7 @@ function renderPreferences(){
  for(const [key,d] of Object.entries(domains)){
   const fault=["storage_fault","save_failed"].includes(d.snapshot.application)||key==="settings"&&settingsFault();
   if(fault&&key!=="settings"||!d.busy&&!d.blocked&&!Object.keys(d.desired).length&&!(key==="settings"&&settingsFault()))notify(key,...savedMessage(key));
+  else if(!fault&&!d.busy&&!d.blocked)notify(key,Object.keys(d.pending).length?"Waiting to save…":"Unsaved · release to save","warning");
   if(key!=="settings")for(const group of specs[key].groups)$(group+"-recovery").querySelectorAll("button").forEach(b=>b.disabled=fault);
   const elements=key==="settings"?["volume","settings-volume",...prayers.map(p=>"enabled-"+p)]:key==="display"?["screen-brightness"]:key==="lights"?["lights-enabled","lights-brightness"]:["time-format"];
   elements.forEach(id=>$(id).disabled=fault||firstRun);
@@ -199,9 +200,10 @@ function discardDraft(){
  if(d.meta){d.desired=preferencePatch(d.desired);d.pending=preferencePatch(d.pending);d.meta=null;d.groups.delete("prayer");$("prayer-recovery").hidden=true;}
  draftDirty=false;++draftVersion;helperDraft=false;preview=undefined;fillDraft(d.snapshot.value);status("prayer","Saved prayer settings restored","success");render();pump();
 }
+function editPreference(key,patch){const d=domains[key];d.desired=merge(d.desired,patch);if(d.recovery)d.recovery.desired=merge(d.recovery.desired,patch);}
 function enqueue(key,patch,meta=null){
  const d=domains[key];if(!d||key==="settings"&&settingsFault())return;
- d.desired=merge(d.desired,patch);d.pending=merge(d.pending,patch);
+ editPreference(key,patch);d.pending=merge(d.pending,patch);if(d.recovery)d.recovery.pending=merge(d.recovery.pending,patch);
  if(meta){d.meta=meta;d.groups.add("prayer");}
  specs[key].groups.forEach(g=>d.groups.add(g));
  if(!connected){d.blocked="uncertain";notify(key,"Not saved · connection lost. Your edits are kept.","warning",[...d.groups]);recovery(key);}
@@ -278,17 +280,20 @@ function recovery(key){
  });
 }
 async function resolve(key,useSaved){
- const d=domains[key];if(d.busy)return;const playbackAtStart=playbackVersion;d.busy=true;notify(key,"Checking saved state…");renderDraftControls();
+ const d=domains[key];if(d.busy)return;
+ for(const [id,edit] of sliderTimers)if(edit.key===key){clearTimeout(edit.timer);sliderTimers.delete(id);d.pending=merge(d.pending,{[edit.field]:edit.value});}
+ const playbackAtStart=playbackVersion,before=clone(d.snapshot),edits=clone(d.desired),meta=d.meta,version=draftVersion,candidate=merge(before.value,edits),later={desired:{},pending:{}};d.recovery=later;d.busy=true;notify(key,"Checking saved state…");renderDraftControls();
  try{
-  let raw=await request(specs[key].read);if(key==="settings")raw=preservePlayback(raw,playbackAtStart);const before=clone(d.snapshot),candidate=merge(before.value,d.desired);
-  const persisted=matches(key,raw,candidate,before,d.meta);acceptSavedState(key,raw);
+  let raw=await request(specs[key].read);if(key==="settings")raw=preservePlayback(raw,playbackAtStart);
+  const persisted=matches(key,raw,candidate,before,meta);acceptSavedState(key,raw);
   if(key==="settings"&&settingsFault()||settingsFault(raw)){d.blocked="failure";recovery(key);return;}
-  if(persisted){const patch=clone(d.desired),meta=d.meta;d.pending={};d.meta=null;finishSaved(key,patch,meta,raw,true);d.blocked=null;}
+  if(persisted){d.pending=later.pending;d.meta=null;finishSaved(key,edits,meta,raw,true);d.blocked=null;}
   else if(d.blocked==="uncertain"){d.blocked="failure";notify(key,"Saved state checked. Your edits are kept; choose which values to use.","warning");recovery(key);}
-  else{d.blocked=null;if(!useSaved&&d.meta){d.pending=Object.fromEntries(Object.entries(d.pending).filter(([k])=>["volume","enabled"].includes(k)));d.desired=Object.fromEntries(Object.entries(d.desired).filter(([k])=>["volume","enabled"].includes(k)));d.meta=null;preview=undefined;status("prayer","Your draft is kept. Preview again before confirming.","warning");}if(useSaved){const discardPrayer=!!d.meta;d.desired={};d.pending={};d.meta=null;if(key==="settings"&&discardPrayer){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);status("prayer","Saved prayer settings restored","success");}}}
+  else{d.blocked=null;if(!useSaved&&d.meta){d.pending=preferencePatch(d.pending);d.desired=preferencePatch(d.desired);d.meta=null;preview=undefined;status("prayer","Your draft is kept. Preview again before confirming.","warning");}if(useSaved){d.desired=later.desired;d.pending=later.pending;d.meta=null;if(key==="settings"&&meta){preview=undefined;if(version===draftVersion){draftDirty=false;helperDraft=false;fillDraft(raw.settings);status("prayer","Saved prayer settings restored","success");}else status("prayer","Your newer draft is kept. Preview again before confirming.","warning");}}}
+  if(!d.meta)d.groups.delete("prayer");
   if(!d.blocked)for(const group of [...specs[key].groups,"prayer"]){const el=$(group+"-recovery");if(el)el.hidden=true;}
  }catch(error){d.blocked="uncertain";if(!error.stale)connected=false;notify(key,"Saved state unavailable. Your edits are kept; reconnect to check.","warning");recovery(key);}
- finally{d.busy=false;render();await refresh();pump();}
+ finally{d.recovery=null;d.busy=false;render();await refresh();pump();}
 }
 async function refresh(){
  if(loading||writeBusy)return false;loading=true;const started=generation;
@@ -334,8 +339,8 @@ async function stopPlayback(){
 }
 function slider(id,key,field){
  const input=$(id);
- input.addEventListener("input",()=>{const d=domains[key];if(!d)return;d.desired=merge(d.desired,{[field]:Number(input.value)});$(id+"-value").value=input.value+"%";if(key==="settings"){const other=id==="volume"?"settings-volume":"volume";$(other).value=input.value;$(other+"-value").value=input.value+"%";}notify(key,"Unsaved · release to save","warning");});
- input.addEventListener("change",()=>{clearTimeout(sliderTimers.get(id));const submit=()=>enqueue(key,{[field]:Number(input.value)});if(document.activeElement===input&&!input.matches(":active"))sliderTimers.set(id,setTimeout(submit,350));else submit();});
+ input.addEventListener("input",()=>{const d=domains[key];if(!d)return;clearTimeout(sliderTimers.get(id)?.timer);sliderTimers.delete(id);editPreference(key,{[field]:Number(input.value)});$(id+"-value").value=input.value+"%";if(key==="settings"){const other=id==="volume"?"settings-volume":"volume";$(other).value=input.value;$(other+"-value").value=input.value+"%";}notify(key,"Unsaved · release to save","warning");});
+ input.addEventListener("change",()=>{clearTimeout(sliderTimers.get(id)?.timer);sliderTimers.delete(id);const value=Number(input.value),submit=()=>{sliderTimers.delete(id);enqueue(key,{[field]:value});};if(document.activeElement===input&&!input.matches(":active"))sliderTimers.set(id,{timer:setTimeout(submit,350),key,field,value});else submit();});
 }
 for(const [id,key,field] of [["volume","settings","volume"],["settings-volume","settings","volume"],["screen-brightness","display","brightness_percent"],["lights-brightness","lights","brightness_percent"]])slider(id,key,field);
 for(const p of prayers){const label=document.createElement("label"),input=document.createElement("input");label.className="check";input.type="checkbox";input.id="enabled-"+p;input.disabled=true;input.addEventListener("change",()=>enqueue("settings",{enabled:{[p]:input.checked}}));label.append(input,document.createTextNode(title(p)));$("enabled-prayers").append(label);}

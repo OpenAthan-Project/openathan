@@ -67,6 +67,14 @@ Retry or Use saved values. The confirmed time format remains in use while an edi
 is unresolved. New calculation observations invalidate a preview even during a
 preference save, retaining the prayer draft for fresh review.
 
+Recovery resolves the edits present when its readback starts. Later slider,
+prayer-toggle, light-toggle and time-format edits are retained; released changes
+save with the freshly confirmed revision, while an unfinished drag waits for
+release and stays labeled unsaved. Choosing saved prayer settings retains a
+draft edited during the readback for a new preview. Focused sliders follow the
+latest confirmed value when idle, so the next keyboard adjustment starts from
+that value; ongoing input keeps its edited value across status polling.
+
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
 An optional **Find my location** link opens the public HTTPS helper in a new tab.

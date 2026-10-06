@@ -25,6 +25,15 @@ uncertain outcomes require readback before further writes in their revision doma
 Discarding preference edits does not discard a separate prayer draft. Drafts
 survive in-page navigation and warn before browser navigation.
 
+Recovery captures the outstanding edits before starting its readback. Retry,
+Use saved values and committed-write verification preserve preferences entered
+while that request is pending, including nested toggles and edits returning to
+the same value. Released changes save with the confirmed revision; unreleased
+slider input waits for release and remains labeled unsaved. Use saved values
+also retains a prayer draft changed during readback for fresh preview/confirmation.
+Focused sliders now follow confirmed values while idle, so a keyboard adjustment
+uses the latest value. Ongoing drags retain their edited value across polling.
+
 Review corrections on 2026-10-06 invalidate ready previews when conflict recovery
 reads changed calculation settings, before replacing the confirmed snapshot.
 Delayed Skip/Restore responses and uncertain-action readbacks preserve playback
@@ -98,7 +107,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **260 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **316 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -169,6 +178,16 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   waiting for a valid clock, and activation writes use the confirmed revision.
   Drafts, visible Stop and existing Settings focus survive; repeated polls neither
   redirect the setup view nor change its live feedback. All ten pass in Chromium/WebKit.
+- Another 56 checks cover edits during Retry, Use saved values and committed-write
+  recovery in all four revision domains, including nested toggles, exact coordinate
+  precision, same-value edits, unreleased sliders and a prayer draft edited during
+  recovery. Coalesced keyboard edits pending before recovery are resolved with
+  the original edits; their timers cannot reapply discarded values or submit a
+  newer unreleased drag. Native pointer drags and focused keyboard adjustments are checked for
+  both volume controls, screen brightness and light brightness across the actual
+  five-second polling timer. Both reported reproducers failed on the reviewed head
+  in Chromium/WebKit before the correction. New edits remain separate from the
+  recovery decision, and no unsaved drag is reported saved or sent before release.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -204,13 +223,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,263,376 | +7,232 | 309,488 |
-| isolated | 1,257,904 | 1,265,168 | +7,264 | 307,696 |
-| qualification | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
-| rollback | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
+| reference | 1,256,144 | 1,263,520 | +7,376 | 309,344 |
+| isolated | 1,257,904 | 1,265,296 | +7,392 | 307,568 |
+| qualification | 1,263,280 | 1,270,688 | +7,408 | 302,176 |
+| rollback | 1,263,280 | 1,270,688 | +7,408 | 302,176 |
 
-Reference slot free space is 833,776 bytes;
-the largest affected image leaves 826,608
+Reference slot free space is 833,632 bytes;
+the largest affected image leaves 826,464
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -219,19 +238,19 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,392 | +839 |
-| `app.js` | 8,048 | 12,942 | +4,894 |
+| `app.js` | 8,048 | 13,090 | +5,042 |
 | `style.css` | 1,524 | 2,963 | +1,439 |
 
 Total compressed UI assets grow from 12,125
-to 19,297 bytes. No frontend framework, font,
+to 19,445 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `2aab524397260168c1c6fc1da81b2a9eb18e242c8f356c5bc18a718bc792a327` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `7d3de27b4245f2bbe089e39455f0b3eaad2f45dc92ded64e4e7c33efde933842` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `40ad5e1769e39bf1c8562c799ab9e269e3e94d67e95bd2c15b211c03d97e07e6` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `92373c96bda9ca458fdf90d508624dda3a542da79233cc0c66ef841eada23b30` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -357,11 +376,28 @@ JavaScript in the same pinned configurations.
 | qualification | 1,270,528 | 1,270,544 | +16 |
 | rollback | 1,270,528 | 1,270,544 | +16 |
 
-All four current capacity checks pass. Each OTA contains the exact final gzip
-assets, and at least 302,320 bytes remain under the application budget.
+All four setup-recovery capacity checks passed. Each OTA contained the exact gzip
+assets for that change, and at least 302,320 bytes remained under the application budget.
 Static RAM, partitions, dependencies and polling cadence remain unchanged.
-The runtime change is limited to browser view selection and draft initialization;
+That runtime change was limited to browser view selection and draft initialization;
 physical playback and runtime memory were not measured.
+
+The recovery/edit and focused-slider correction was also measured against
+reviewed head `d12192570d07a9455948019c2485eaf9f08c8646`, using the same pinned
+configurations. Its verified OTA images and logs were archived before rebuilding.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Recovery/edit review delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,263,376 | 1,263,520 | +144 |
+| isolated | 1,265,168 | 1,265,296 | +128 |
+| qualification | 1,270,544 | 1,270,688 | +144 |
+| rollback | 1,270,544 | 1,270,688 | +144 |
+
+All four current capacity checks pass with exact final gzip assets in every OTA.
+At least 302,176 bytes remain under the application budget. Static RAM, partitions,
+dependencies and polling cadence remain unchanged. The extra recovery state is
+bounded to the preference fields and lives in the browser; no device runtime
+heap, fragmentation, PSRAM or physical playback measurements were performed.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 
