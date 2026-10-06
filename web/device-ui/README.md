@@ -44,6 +44,10 @@ storage faults retain confirmed values and pending edits, disable only the
 affected controls/recovery actions, and show nearby storage feedback. Unreadable
 stores with no confirmed values do not substitute defaults. A delayed save reply
 cannot clear a newer storage fault or discard its edits before fresh readback.
+This ordering guard also covers prayer settings, including delayed save readback
+and Skip responses after a newer Stop observation. Rejected stale confirmations
+retain pending preferences and reviewed prayer drafts without reporting connection
+loss. Recovery checks fresh saved state before confirming an already committed write.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.

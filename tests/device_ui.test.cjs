@@ -700,6 +700,35 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    for(const id of ['screen-brightness','lights-enabled','lights-brightness','time-format'])assert.ok(await page.locator('#'+id).isDisabled());for(const group of ['screen','lights','format'])assert.match(await page.locator('#'+group+'-feedback').textContent(),/storage/i);assert.equal(await page.locator('#time-format').inputValue(),'12');assert.equal(await page.locator('#settings-volume-value').textContent(),'35%');assert.ok(await page.locator('#settings-volume').isEnabled());assert.equal(f.state.device.playing,false);
   }finally{release();await o.close();}
  });
+ for(const missing of [false,true]){
+  test(`${browserName}: an older prayer save reply cannot clear newer ${missing?'unreadable':'faulted'} storage`,async()=>{
+   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested,committed;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);let attempts=0;
+   try{
+    await page.route('**/api/settings',async route=>{attempts++;f.state.device.settings=route.request().postDataJSON().settings;f.state.device.revision++;committed=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:committed});});await slide(page,'volume',35);await started;
+    f.state.device.application='storage_fault';f.state.device.automatic_ready=false;if(missing){delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.schedule={state:'setup_required'};}await page.locator('#stop').click();await page.waitForFunction(()=>document.getElementById('stop').hidden);release();await page.waitForFunction(()=>!writeBusy,{},{timeout:3000});
+    assert.ok(await page.locator('#volume').isDisabled());assert.match(await page.locator('#volume-feedback').textContent(),/storage/i);assert.equal(await page.locator('#volume-value').textContent(),'35%');assert.ok(await page.locator('#connection-banner').isHidden());await settings(page);assert.ok(await page.locator('#enabled-asr').isDisabled());assert.ok(await page.locator('#preview').isDisabled());await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(attempts,1);
+    f.state.device={...committed,playing:false,time_format:f.state.device.time_format};await page.locator('#refresh').click();await page.waitForFunction(()=>!document.getElementById('settings-volume').disabled);await page.locator('#preferences-recovery button').first().click();await page.waitForFunction(()=>document.getElementById('preferences-recovery').hidden);assert.equal(attempts,1);assert.equal(await page.locator('#settings-volume-value').textContent(),'35%');
+   }finally{release();await o.close();}
+  });
+ }
+ for(const prayerDraft of [false,true]){
+  test(`${browserName}: an older prayer ${prayerDraft?'confirmation':'preference'} readback retains edits after a newer storage fault`,async()=>{
+   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested,committed;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);let attempts=0,reads=0;
+   try{
+    await settings(page);await page.route('**/api/settings',async route=>{attempts++;f.state.device.settings=route.request().postDataJSON().settings;f.state.device.revision++;committed=structuredClone(f.state.device);await route.fulfill({status:200,contentType:'application/json',body:'{'});});await page.route('**/api/status',async route=>{if(++reads!==1){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    if(prayerDraft){await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);await page.locator('#confirm').click();}else await slide(page,'settings-volume',35);await started;
+    f.state.device.application='storage_fault';f.state.device.automatic_ready=false;await page.locator('#settings-stop').click();await page.waitForFunction(()=>document.getElementById('settings-stop').hidden);release();await page.waitForFunction(()=>!writeBusy,{},{timeout:3000});assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#settings-volume').isDisabled());assert.match(await page.locator('#preferences-feedback').textContent(),/storage/i);assert.ok(await page.locator('#confirm').isHidden());
+    if(prayerDraft){assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.ok(await page.locator('#discard').isDisabled());}else assert.equal(await page.locator('#settings-volume-value').textContent(),'35%');await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(attempts,1);
+    f.state.device={...committed,playing:false,time_format:f.state.device.time_format};await page.locator('#refresh').click();await page.waitForFunction(()=>!document.getElementById('settings-volume').disabled);await page.locator('#preferences-recovery button').first().click();await page.waitForFunction(()=>document.getElementById('preferences-recovery').hidden);assert.equal(attempts,1);if(prayerDraft){assert.equal(await page.locator('#prayer-feedback').textContent(),'Prayer settings saved');assert.equal(await page.locator('#latitude').inputValue(),'44.4');}
+   }finally{release();await o.close();}
+  });
+ }
+ test(`${browserName}: an older Skip reply retains newer prayer storage and Stop observations`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+  try{
+   await page.route('**/api/skip',async route=>{const occurrence=route.request().postDataJSON().occurrence;f.state.device.skip={day:occurrence.day,prayer:occurrence.prayer};const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#skip').click();await started;f.state.device.application='storage_fault';f.state.device.automatic_ready=false;await page.locator('#stop').click();await page.waitForFunction(()=>document.getElementById('stop').hidden);release();await page.waitForFunction(()=>!writeBusy,{},{timeout:3000});assert.ok(await page.locator('#volume').isDisabled());assert.match(await page.locator('#volume-feedback').textContent(),/storage/i);assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#stop').isHidden());assert.equal(f.state.device.playing,false);
+  }finally{release();await o.close();}
+ });
  test(`${browserName}: text and controls meet the contrast requirements`,async()=>{
   const f=await fixture(),o=await open(f,browserName),{page}=o;
   try{

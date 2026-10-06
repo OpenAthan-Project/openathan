@@ -59,6 +59,10 @@ function acceptDomain(key,state,ack=false){
 }
 function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
  if(!Number.isInteger(state?.revision)||!state.settings&&!settingsFault(state))throw new Error("Device status is incomplete");
+ if(settingsFault()&&!settingsFault(state)&&order<statusOrder){
+  if(ack==="settings"){const error=new Error("A newer prayer storage fault requires saved-state readback");error.stale=true;throw error;}
+  return;
+ }
  if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)return;
  for(const key of ["display","lights","time_format"]){
   const known=snapshot?.[key],next=state[key],older=(responseOrders.get(next)||order)<(responseOrders.get(known)||0);
@@ -236,9 +240,9 @@ async function pump(){
   try{
    const raw=await request(specs[key].read);
    if(matches(key,raw,candidate,before,meta)){
+    finishSaved(key,patch,meta,raw,true,playbackAtStart);
     acknowledge(patch,d.pending);
     if(d.meta===meta)d.meta=null;
-    finishSaved(key,patch,meta,raw,true,playbackAtStart);
    }else{
     acceptSavedState(key,key==="settings"?preservePlayback(raw,playbackAtStart):raw);
     d.blocked=error.status===409?"conflict":"failure";
@@ -246,8 +250,8 @@ async function pump(){
     if(meta)status("prayer","Prayer changes were not confirmed. Your draft is kept.","error");
     recovery(key);
    }
-  }catch{
-   connected=false;d.blocked="uncertain";notify(key,"Save unconfirmed · reconnect and check saved state before another write.","warning",groups);
+  }catch(readbackError){
+   if(!readbackError.stale)connected=false;d.blocked="uncertain";notify(key,"Save unconfirmed · reconnect and check saved state before another write.","warning",groups);
    if(meta)status("prayer","Prayer save unconfirmed. Your draft is kept.","warning");
    recovery(key);
   }
@@ -272,7 +276,7 @@ async function resolve(key,useSaved){
   else if(d.blocked==="uncertain"){d.blocked="failure";notify(key,"Saved state checked. Your edits are kept; choose which values to use.","warning");recovery(key);}
   else{d.blocked=null;if(!useSaved&&d.meta){d.pending=Object.fromEntries(Object.entries(d.pending).filter(([k])=>["volume","enabled"].includes(k)));d.desired=Object.fromEntries(Object.entries(d.desired).filter(([k])=>["volume","enabled"].includes(k)));d.meta=null;preview=undefined;status("prayer","Your draft is kept. Preview again before confirming.","warning");}if(useSaved){const discardPrayer=!!d.meta;d.desired={};d.pending={};d.meta=null;if(key==="settings"&&discardPrayer){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);status("prayer","Saved prayer settings restored","success");}}}
   if(!d.blocked)for(const group of [...specs[key].groups,"prayer"]){const el=$(group+"-recovery");if(el)el.hidden=true;}
- }catch{d.blocked="uncertain";connected=false;notify(key,"Saved state unavailable. Your edits are kept; reconnect to check.","warning");recovery(key);}
+ }catch(error){d.blocked="uncertain";if(!error.stale)connected=false;notify(key,"Saved state unavailable. Your edits are kept; reconnect to check.","warning");recovery(key);}
  finally{d.busy=false;render();await refresh();pump();}
 }
 async function refresh(){
