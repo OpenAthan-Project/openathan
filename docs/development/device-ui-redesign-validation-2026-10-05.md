@@ -44,9 +44,9 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   visibility, coordinate precision, device-local time, update regressions and nonce
   expiry without a second Chromium sign-in prompt.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
-  Today and Settings have no horizontal overflow. The first Linux CI run exposed
-  a wide-font time overflow; the corrected hero scale and native-select reflow
-  retain the approved ordinary-size composition. Buttons/ranges/selects meet 44px dimensions;
+  Today and Settings have no horizontal overflow. Linux CI exposed wide-font
+  time and native dropdown overflow. The corrected hero scale and bounded native
+  fields retain the approved composition and a visible outer focus ring. Buttons/ranges/selects meet 44px dimensions;
   checkbox labels provide 48px targets. Native Chromium Tab and macOS Safari
   Option-Tab traversal are checked. Text pairs meet 4.5:1 and control boundaries
   3:1; unchanged status polls do not mutate the readiness live text.
@@ -78,13 +78,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,262,112 | +5,968 | 310,752 |
-| isolated | 1,257,904 | 1,263,888 | +5,984 | 308,976 |
-| qualification | 1,263,280 | 1,269,264 | +5,984 | 303,600 |
-| rollback | 1,263,280 | 1,269,264 | +5,984 | 303,600 |
+| reference | 1,256,144 | 1,262,128 | +5,984 | 310,736 |
+| isolated | 1,257,904 | 1,263,904 | +6,000 | 308,960 |
+| qualification | 1,263,280 | 1,269,280 | +6,000 | 303,584 |
+| rollback | 1,263,280 | 1,269,280 | +6,000 | 303,584 |
 
-Reference slot free space is 835,040 bytes;
-the largest affected image leaves 827,888
+Reference slot free space is 835,024 bytes;
+the largest affected image leaves 827,872
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -92,20 +92,20 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
-| `index.html` | 2,553 | 3,395 | +842 |
+| `index.html` | 2,553 | 3,389 | +836 |
 | `app.js` | 8,048 | 11,665 | +3,617 |
-| `style.css` | 1,524 | 2,967 | +1,443 |
+| `style.css` | 1,524 | 2,989 | +1,465 |
 
 Total compressed UI assets grow from 12,125
-to 18,027 bytes. No frontend framework, font,
+to 18,043 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `82ca1d836a992490bd1d8490095f29992bc0e1e4f9872b197a6e3ec8a2d09c21` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `3b1a0655ce3f63aab55e4a5beca60ab3de0eb2c56de059b2f2248e183d05b803` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `148dc0ebbeafb49dc7f7808f0d6855ed7de5ba0d30b1b4c8a21c6d92c4f90005` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `8d20e392e1bfaef800f8bedeecc19bbea06f04bb77163ee74cbb2d02a6967b19` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `c59464169625820246fbdbd9a95e788e676e51d78dd517dac4882679e37ee2ee` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `6896f7b98e1d83e0b5b864ff2985cf03840463ccb4d16946cf113aacceb91fb2` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `56a614a276472f6c7a2bc20943379419b2d2b1d157f040b3113df8373240b07d` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `a0da02510df506a713c0209edbf3bb3abf733ac99aaeff79641d656f9f4d1f8e` |
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

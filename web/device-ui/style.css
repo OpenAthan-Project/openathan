@@ -15,3 +15,4 @@ html{scroll-padding-bottom:8rem}button,input,select,summary{scroll-margin-bottom
 
 .helper-link{display:inline-flex;align-items:center;min-height:44px;padding:9px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-weight:600}#firmware-section p{margin-bottom:12px}#firmware-section .actions{margin-top:12px}.next-date{font-size:.875rem;color:var(--muted);margin-bottom:8px}.prayer-actions button:disabled{opacity:.55}
 select{overflow:hidden;text-overflow:ellipsis}.time-row dt{overflow-wrap:anywhere}
+label:has(>select){overflow:hidden}label:has(>select:focus){outline:3px solid var(--amber);outline-offset:3px}

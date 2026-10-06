@@ -265,7 +265,8 @@ enlarged text can wrap and extend the document. The checkbox grid adapts to its
 content width; coordinate fields stack at the compact breakpoint. Phone hero times
 cap their scale to the viewport to keep each time legible with wider system fonts
 and enlarged text. Prayer names can wrap within the timetable column; native
-selects ellipsize the closed value while their options remain available.
+selects constrain the closed value while their options remain available. Their
+labels retain an outer keyboard focus ring when native widget text is clipped.
 
 ## Elevation & Depth
 

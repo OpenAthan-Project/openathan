@@ -344,7 +344,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    const ids={settings:'preferences',display:'screen',lights:'lights',time_format:'format'},drops={settings:'drop',display:'screenDrop',lights:'lightDrop',time_format:'timeDrop'},fails={settings:'failRead',display:'screenFailRead',lights:'lightFailRead',time_format:'timeFailRead'};
    const change=async v=>key==='time_format'?page.locator('#time-format').selectOption(String(v)):slide(page,{settings:'settings-volume',display:'screen-brightness',lights:'lights-brightness'}[key],v);
    try{
-    await settings(page);f.state[drops[key]]=true;f.state[fails[key]]=true;await change(key==='time_format'?12:30);await page.waitForFunction(id=>document.querySelector('#'+id+'-feedback').textContent.includes('unconfirmed'),ids[key]);
+    await settings(page);f.state[drops[key]]=true;f.state[fails[key]]=true;await change(key==='time_format'?12:30);await page.waitForFunction(id=>document.querySelector('#'+id+'-feedback').textContent.includes('before another write'),ids[key]);
     if(key==='settings')assert.ok(await page.locator('#skip').isDisabled());
     const writes=f.state.posts.filter(p=>p.url===({settings:'/api/settings',display:'/api/display',lights:'/api/lights',time_format:'/api/time-format'}[key])).length;
     await change(key==='time_format'?24:31);assert.equal(f.state.posts.filter(p=>p.url===({settings:'/api/settings',display:'/api/display',lights:'/api/lights',time_format:'/api/time-format'}[key])).length,writes);
@@ -425,6 +425,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
      for(const view of ['today','settings']){
       await page.locator('[data-view="'+view+'"]').click();const layout=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,elements:Array.from(document.querySelectorAll('main *')).filter(el=>{const r=el.getBoundingClientRect();return r.width&&((r.right>innerWidth+1)||(r.left< -1)||el.scrollWidth>el.clientWidth+1);}).map(el=>el.id||el.className||el.tagName+':'+el.textContent.trim().slice(0,30))}));assert.equal(layout.overflow,false,`${width}px ${scale}x ${view} ${hours}h ${font||'system'}: ${layout.elements.join(', ')}`);
       const small=await page.locator('button:visible,input[type="range"]:visible,select:visible').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect();return r.height<44||r.width<44;}).map(el=>el.id||el.textContent));assert.deepEqual(small,[]);
+      if(view==='settings'){await page.keyboard.press('Tab');await page.locator('#time-format').focus();const ring=await page.locator('#time-format').evaluate(el=>{const s=getComputedStyle(el.parentElement);return {width:s.outlineWidth,style:s.outlineStyle};});assert.deepEqual(ring,{width:'3px',style:'solid'});}
      }
     }
    }
