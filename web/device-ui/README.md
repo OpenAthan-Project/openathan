@@ -23,7 +23,9 @@ affected group, distinguishing unsaved input, saving, confirmed storage, applyin
 unavailable output and failure.
 
 Location, timezone, calculation conventions, high-latitude rules and offsets remain
-a separate draft until **Preview timetable → Confirm prayer changes**. First run
+a separate draft until **Preview timetable → Confirm prayer changes**. Timezone
+rules come from confirmed settings; same-zone saves preserve the current rules
+unless the owner explicitly requests a refresh. First run
 follows location → calculation → review → Finish setup. Manual setup may finish
 while waiting for a valid clock, with an explicit warning; helper proposals require
 a ready preview. Drafts survive Today/Settings navigation and device-status refreshes; browser navigation
@@ -43,8 +45,10 @@ edits or Use saved values. Recovery updates only its own groups. It resolves
 captured edits while preserving later edits,
 including changes returning to the same value and unreleased drags. Calculation
 conflicts require fresh preview/confirmation. Discard cancels an unsent reviewed
-prayer change while keeping automatic preferences; sent changes require confirmed
-outcomes or an explicit recovery choice.
+prayer change while keeping automatic preferences. With no preference edits or
+settings operation remaining, it releases the canceled review's block and restores
+Preview and Skip. Remaining preference edits keep their recovery controls. Sent
+changes require confirmed outcomes or an explicit recovery choice.
 
 All response paths use the same acceptance rules. Durable values follow their
 revisions; playback, timetable, readiness, application feedback and update status

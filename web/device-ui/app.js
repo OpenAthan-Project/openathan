@@ -218,6 +218,8 @@ function invalidatePreview() {
 }
 function fillDraft(value, fresh = false) {
   draft = calculation(value);
+  // Timezone rules belong to confirmed settings; drafts edit only the zone name.
+  delete draft.timezone_rules;
   if (fresh) {
     draft.latitude = "";
     draft.longitude = "";
@@ -809,6 +811,10 @@ function discardDraft() {
   const d = domains.settings;
   if (!d?.confirmed || d.review?.sent) return;
   d.review = null;
+  if (!d.edits.size && !d.operation) {
+    d.blocked = null;
+    for (const group of specs.settings.groups) $(group + "-recovery").hidden = true;
+  }
   $("prayer-recovery").hidden = true;
   draftDirty = false;
   ++draftVersion;

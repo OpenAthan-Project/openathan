@@ -44,7 +44,7 @@ async function fixture(){
       send(200,state.device);return;
     }
     let body='';for await(const data of req)body+=data;
-    const payload=JSON.parse(body);state.posts.push({url:req.url,payload,origin:req.headers.origin});
+    const payload=JSON.parse(body);state.posts.push({url:req.url,payload:structuredClone(payload),origin:req.headers.origin});
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
     if(req.url.startsWith('/api/firmware/')){
       const firmware=state.device.firmware;
@@ -81,6 +81,7 @@ async function fixture(){
     }
     if(['/api/settings','/api/activate'].includes(req.url)){
       if(payload.expected_revision!==state.device.revision){send(409,{error:'Settings changed on another client; reload before saving'});return;}
+      if(payload.settings.timezone===state.device.settings.timezone&&!payload.refresh_timezone)payload.settings.timezone_rules=structuredClone(state.device.settings.timezone_rules);
       state.mutations++;state.device.settings=payload.settings;state.device.revision++;
       if(req.url==='/api/activate'){state.device.setup='active';state.device.automatic_ready=state.device.clock_ready;}
       if(state.writeWait){state.writeRequested?.();await state.writeWait;}
@@ -126,6 +127,43 @@ async function saved(page,id){await page.waitForFunction(id=>/Saved/.test(docume
 async function refresh(page){await settings(page);await page.locator('#refresh').click();await page.locator('[data-view="today"]').click();}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const zone of ['UTC','America/Toronto'])for(const lostReply of [false,true])test(`${browserName}: concurrent ${zone} draft uses confirmed timezone rules after a ${lostReply?'lost':'successful'} save reply`,async()=>{
+  const f=await fixture(),toronto={...structuredClone(rules),standard_offset:-18000,daylight_offset:-14400};
+  f.state.device.settings.timezone=zone==='UTC'?'America/Toronto':'UTC';f.state.device.settings.timezone_rules=zone==='UTC'?toronto:structuredClone(rules);
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await settled(page);await page.clock.install();await settings(page);await page.locator('#timezone').fill(zone);await page.locator('#latitude').fill('44.123456789');
+   f.state.device.settings.timezone=zone;f.state.device.settings.timezone_rules=zone==='UTC'?structuredClone(rules):toronto;f.state.device.revision++;
+   await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('prayer-feedback').textContent.includes('preview again'));
+   await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);f.state.drop=lostReply;
+   await page.locator('#confirm').click();await settled(page);
+   assert.equal(await page.locator('#prayer-feedback').textContent(),'Prayer settings saved');assert.ok(await page.locator('#prayer-recovery').isHidden());assert.ok(await page.locator('#confirm').isHidden());assert.equal(f.state.mutations,1);assert.equal(f.state.device.revision,3);assert.equal(f.state.device.settings.latitude,44.123456789);
+   const body=f.state.posts.find(post=>post.url==='/api/settings').payload;assert.equal(body.expected_revision,2);assert.deepEqual(body.settings.timezone_rules,zone==='UTC'?rules:toronto);assert.equal(body.refresh_timezone,false);
+  }finally{await o.close();}
+ });
+ for(const preference of ['none','released','drag'])test(`${browserName}: Discard after a queued review conflict ${preference==='none'?'restores controls':`preserves ${preference} preference recovery`}`,async()=>{
+  const f=await fixture();f.state.device.playing=true;
+  const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await settled(page);await page.clock.install();await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);
+   await page.route('**/api/time-format',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}started.resolve();await gate.promise;await route.continue();});
+   await page.locator('#time-format').selectOption('12');await started.promise;
+   if(preference==='released')await page.locator('#enabled-asr').uncheck();
+   if(preference==='drag')await page.locator('#settings-volume').evaluate(el=>{el.value='35';el.dispatchEvent(new Event('input',{bubbles:true}));});
+   await page.locator('#confirm').click();f.state.device.settings.latitude=45.123456789;f.state.device.revision++;
+   await page.locator('#settings-stop').click();await page.waitForFunction(()=>!document.getElementById('prayer-recovery').hidden);await page.locator('#discard').click();
+   assert.equal(await page.locator('#latitude').inputValue(),'45.123456789');assert.equal(await page.locator('#prayer-feedback').textContent(),'Saved prayer settings restored');assert.ok(await page.locator('#prayer-recovery').isHidden());assert.ok(await page.locator('#confirm').isHidden());
+   if(preference==='none'){assert.ok(await page.locator('#preview').isEnabled());assert.ok(await page.locator('#preferences-recovery').isHidden());}
+   else{assert.ok(await page.locator('#preview').isDisabled());assert.ok(await page.locator('#preferences-recovery').isVisible());}
+   gate.resolve();await settled(page);assert.equal(f.state.mutations,0);
+   if(preference!=='none'){
+    await page.locator('#preferences-recovery button').first().click();await settled(page);assert.ok(await page.locator('#preferences-recovery').isHidden());assert.ok(await page.locator('#preview').isEnabled());
+    if(preference==='released'){assert.equal(f.state.device.settings.enabled.asr,false);assert.equal(f.state.mutations,1);}
+    else{assert.equal(await page.locator('#settings-volume').inputValue(),'35');assert.equal(f.state.device.settings.volume,70);assert.equal(f.state.mutations,0);await page.locator('#settings-volume').evaluate(el=>el.dispatchEvent(new Event('change',{bubbles:true})));await saved(page,'volume');assert.equal(f.state.device.settings.volume,35);assert.equal(f.state.mutations,1);}
+   }
+   assert.equal(f.state.device.settings.latitude,45.123456789);await page.locator('[data-view="today"]').click();assert.ok(await page.locator('#skip').isEnabled());await page.locator('#skip').click();await settled(page);assert.deepEqual(f.state.device.skip,{day:f.state.device.next.day,prayer:f.state.device.next.prayer});
+  }finally{gate.resolve();await o.close();}
+ });
  for(const failure of ['http','network'])test(`${browserName}: shared acceptance ignores an older ${failure} refresh failure after newer contact`,async()=>{
   const f=await fixture();f.state.device.playing=true;f.state.stopStillPlaying=true;
   const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
