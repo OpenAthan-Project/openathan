@@ -415,6 +415,30 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);f.state.device.revision++;f.state.device.settings.method='north_america';await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#confirm').hidden);assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.mutations,0);
   }finally{release();await o.close();}
  });
+ for(const width of [320,390,1280])for(const scale of [1,2])for(const hardware of [false,true]){
+  test(`${browserName}: Settings keyboard order at ${width}px ${scale}x with ${hardware?'supported':'absent'} hardware`,async()=>{
+   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'current',result:'',error:''};
+   if(hardware){f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',settings:{enabled:true,brightness_percent:20}};}
+   const o=await open(f,browserName,{viewport:{width,height:900}}),{page}=o,tabKey=browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab';
+   try{
+    await settings(page);await page.evaluate(scale=>document.documentElement.style.fontSize=16*scale+'px',scale);
+    const headings=['preferences-heading','prayer-heading',...(hardware?['hardware-heading']:[]),'format-heading','firmware-title'];
+    const boxes=await page.evaluate(()=>Array.from(document.querySelectorAll('.settings-grid .setting-group')).filter(el=>el.getBoundingClientRect().height).map(el=>({heading:el.getAttribute('aria-labelledby'),...Object.fromEntries(['x','y','bottom'].map(key=>[key,el.getBoundingClientRect()[key]]))})));
+    if(width<768)assert.deepEqual([...boxes].sort((a,b)=>a.y-b.y).map(box=>box.heading),headings);
+    else{const prefs=boxes.find(box=>box.heading==='preferences-heading'),prayer=boxes.find(box=>box.heading==='prayer-heading'),extras=boxes.filter(box=>!['preferences-heading','prayer-heading'].includes(box.heading));assert.ok(prayer.x>prefs.x);assert.equal(prayer.y,prefs.y);assert.ok(extras.every(box=>box.x===prefs.x));assert.ok(Math.abs(extras[0].y-prefs.bottom)<1,'Desktop preferences stay adjacent to the next group');}
+    const controls=['#enabled-dhuhr','#enabled-asr','#enabled-maghrib','#enabled-isha','#settings-volume','#find-location','#latitude','#longitude','#timezone','#method','#asr','#calculation-fields summary','#preview',...(hardware?['#screen-brightness','#lights-enabled','#lights-brightness']:[]),'#time-format','#firmware-check','#refresh'];
+    await page.locator('#enabled-fajr').focus();
+    for(const selector of controls){await page.keyboard.press(tabKey);assert.ok(await page.locator(selector).evaluate(el=>el===document.activeElement),`Next keyboard stop should be ${selector}; got ${await page.evaluate(()=>document.activeElement.id||document.activeElement.tagName)}`);}
+    if(process.env.OPENATHAN_UI_KEYBOARD_CAPTURE&&browserName==='chromium'&&hardware&&(scale===1||width===320)){await page.evaluate(()=>{document.activeElement.blur();scrollTo(0,0);});await page.screenshot({path:join(process.env.OPENATHAN_UI_KEYBOARD_CAPTURE,`settings-${width}-${scale}x.png`),fullPage:true});}
+    f.state.device.setup='incomplete';f.state.device.automatic_ready=false;await page.locator('#refresh').click();await page.waitForFunction(()=>!document.getElementById('setup-progress').hidden);
+    for(const id of ['preferences-heading','hardware-group','format-group','firmware-section'])assert.ok(await page.locator('#'+id).isHidden(),id+' stays outside first run');
+    assert.ok(await page.locator('#find-location').isVisible());
+    f.state.device.setup='active';f.state.device.automatic_ready=true;await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('setup-progress').hidden);
+    for(const id of ['preferences-heading','format-group','firmware-section',...(hardware?['hardware-group']:[])])assert.ok(await page.locator('#'+id).isVisible(),id+' returns after setup');
+    assert.equal(f.state.mutations,0);
+   }finally{await o.close();}
+  });
+ }
  test(`${browserName}: narrow, desktop, enlarged-text and keyboard layouts preserve controls`,async()=>{
   const f=await fixture(),o=await open(f,browserName),{page}=o;
   try{

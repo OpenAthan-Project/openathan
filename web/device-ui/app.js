@@ -177,7 +177,7 @@ function showView(view,focus=true){if(firstRun)view="settings";$("today-view").h
 function focusStep(){const id=setupStep===0?"location-heading":setupStep===1?"calculation-heading":"review-heading";$(id).focus();$(id).scrollIntoView({block:"start"});}
 function renderDraftControls(){
  const d=domains.settings,blocked=!d||["storage_fault","save_failed"].includes(d?.snapshot.application)||settingsFault();
- document.querySelector(".navigation").hidden=firstRun;document.querySelector(".settings-simple").hidden=firstRun;
+ document.querySelector(".navigation").hidden=firstRun;document.querySelectorAll(".settings-simple").forEach(el=>el.hidden=firstRun);
  text("settings-intro",firstRun?"Choose a location, review prayer times, then finish setup.":"Everyday preferences save automatically.");
  $("settings-heading").textContent=firstRun?"Welcome to OpenAthan":"Settings";$("prayer-heading").textContent=firstRun?"Set up your speaker":"Prayer times";
  $("setup-progress").hidden=!firstRun;$("setup-progress").querySelectorAll("li").forEach((li,i)=>{if(i===setupStep)li.setAttribute("aria-current","step");else li.removeAttribute("aria-current");});

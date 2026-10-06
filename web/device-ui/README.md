@@ -10,9 +10,12 @@ last observed information and marks it stale; it does not assert playback stoppe
 Stop stays reachable from Today and Settings while playback is reported active.
 
 Settings groups Athan preferences, prayer calculations, optional screen/lights,
-time format and updates. Volume, enabled prayers, screen/light preferences and
-12/24-hour format save automatically. Sliders display input immediately, save
-on release and coalesce keyboard adjustments. Save feedback and recovery actions
+time format and updates. The markup follows that phone section order so keyboard
+and screen-reader navigation reach prayer settings directly after preferences.
+Desktop grid placement retains the two columns. First run keeps preference and
+update controls hidden until setup finishes. Volume, enabled prayers, screen/light
+preferences and 12/24-hour format save automatically. Sliders display input
+immediately, save on release and coalesce keyboard adjustments. Save feedback and recovery actions
 appear beside the affected group. Time format, lights and display have independent
 revision domains; prayer preferences share the existing settings revision.
 

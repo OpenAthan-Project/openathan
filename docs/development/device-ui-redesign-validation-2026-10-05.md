@@ -93,7 +93,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **226 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **250 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -149,6 +149,13 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   preview/confirmation before writing. All 32 failed on the reviewed head and
   passed after the corrections in Chromium/WebKit. Stop and connected state remain
   available, and stale acknowledgments cannot clear the pending edits.
+- Another 24 regression checks follow native sequential keyboard navigation
+  through Settings at 320px, 390px and 1280px, with ordinary/200% text and optional
+  hardware present/absent. All 24 reproduced the reviewed-head jump from Volume
+  to hardware/time format instead of Prayer times, then passed with markup in the
+  phone section order. Desktop grid placement preserves the columns and adjacent
+  left-hand groups. The checks also verify that first run hides preference/update
+  controls and that they return when setup becomes active.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -184,13 +191,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,263,376 | +7,232 | 309,488 |
-| isolated | 1,257,904 | 1,265,168 | +7,264 | 307,696 |
-| qualification | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
-| rollback | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
+| reference | 1,256,144 | 1,263,360 | +7,216 | 309,504 |
+| isolated | 1,257,904 | 1,265,152 | +7,248 | 307,712 |
+| qualification | 1,263,280 | 1,270,528 | +7,248 | 302,336 |
+| rollback | 1,263,280 | 1,270,528 | +7,248 | 302,336 |
 
-Reference slot free space is 833,776 bytes;
-the largest affected image leaves 826,608
+Reference slot free space is 833,792 bytes;
+the largest affected image leaves 826,624
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -198,20 +205,20 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
-| `index.html` | 2,553 | 3,389 | +836 |
-| `app.js` | 8,048 | 12,917 | +4,869 |
-| `style.css` | 1,524 | 2,989 | +1,465 |
+| `index.html` | 2,553 | 3,392 | +839 |
+| `app.js` | 8,048 | 12,924 | +4,876 |
+| `style.css` | 1,524 | 2,963 | +1,439 |
 
 Total compressed UI assets grow from 12,125
-to 19,295 bytes. No frontend framework, font,
+to 19,279 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `3aa3b75a502b3e1c0133a2cfbbe2abf17dc3f8c6af864a5f39c006d037fe1245` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `af0f4150ad2c1fd2bef464a8c5a1986f1a4b1185bf3820b0d8b5319318394323` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `51f91109c4e125f84bff0372bfdeb4d3a1d2e620461fdd9d4efa8fcd5567875a` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `e848843ecab665e539e8cb186e769f2a7ddc4311286cf761891fc52502fd9a08` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `2ec9978d05f8563a914b8c9933fbcba23454d348b588dbdad13f62d88dc148f6` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `31d27b47e4055cbbe3f1044bc94e8591929cb4e5f63154d008f46786d2b5adea` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `0529fa49ecc858d8b35e69dfca03fed6167fdac530f8a22bdbb3c0ca96ede804` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `0d3430a9e159bcfda822392b640ba90bc6fc17092a91e5413674b95a52546181` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -302,10 +309,28 @@ assets in the same pinned configurations.
 | qualification | 1,270,448 | 1,270,544 | +96 |
 | rollback | 1,270,448 | 1,270,544 | +96 |
 
-All four current capacity checks pass. Every current OTA includes the exact final
-gzip assets, and at least 302,320 bytes remain under the application budget.
+All four capacity checks passed with the then-current gzip assets, leaving at
+least 302,320 bytes under the application budget. Static RAM, partitions,
+dependencies and polling cadence remained unchanged. The guard reuses the existing
+uncertain-save readback/recovery flow.
+
+The Settings keyboard-order correction uses reviewed head
+`e09f2f65a5e69b1ca0113008f251ab130dbdda50` as its matched baseline. Exact
+images, measurements and logs were archived before compiling the corrected
+markup/CSS/JavaScript in the same pinned configurations.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Keyboard-order review delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,263,376 | 1,263,360 | -16 |
+| isolated | 1,265,168 | 1,265,152 | -16 |
+| qualification | 1,270,544 | 1,270,528 | -16 |
+| rollback | 1,270,544 | 1,270,528 | -16 |
+
+All four current capacity checks pass. Each OTA contains the exact final gzip
+assets, and at least 302,336 bytes remain under the application budget.
 Static RAM, partitions, dependencies and polling cadence remain unchanged.
-The guard reuses the existing uncertain-save readback/recovery flow.
+The runtime change is limited to browser markup/grid placement and first-run
+visibility; physical playback and runtime memory were not measured.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 
