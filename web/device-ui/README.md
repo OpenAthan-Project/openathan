@@ -38,6 +38,12 @@ an explicit recovery choice; it cannot cancel a write already received by the sp
 A delayed Stop reply or readback preserves newer observed Skip/Restore and
 playback state. Complete status responses also retain newer independently saved
 screen, light and time-format revisions and newer firmware-check results.
+A Skip queued behind conflicted or faulty prayer settings waits for that domain's
+recovery while healthy independent preferences continue saving. Later optional
+storage faults retain confirmed values and pending edits, disable only the
+affected controls/recovery actions, and show nearby storage feedback. Unreadable
+stores with no confirmed values do not substitute defaults. A delayed save reply
+cannot clear a newer storage fault or discard its edits before fresh readback.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.

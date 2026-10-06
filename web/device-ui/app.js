@@ -15,7 +15,7 @@ function stable(v){return JSON.stringify(v,(_,value)=>value&&typeof value==="obj
 function text(id,value){if($(id).textContent!==value)$(id).textContent=value;}
 function status(group,value,type=""){text(group+"-feedback",value);$(group+"-feedback").className="feedback"+(type?" "+type:"");}
 function notify(key,value,type="",groups=specs[key].groups){groups.forEach(g=>status(g,value,type));}
-function current(key){const d=domains[key];return d?merge(d.snapshot.value,d.desired):null;}
+function current(key){const d=domains[key];return d?.snapshot.value?merge(d.snapshot.value,d.desired):null;}
 function valueFrom(key,state){return key==="settings"||key==="lights"?state.settings:key==="display"?{brightness_percent:state.brightness_percent}:{hours:state.hours};}
 function domainState(key,state){return {revision:state.revision,value:clone(valueFrom(key,state)),application:state.application};}
 function sameKey(a,b){return !!a&&!!b&&a.day===b.day&&a.prayer===b.prayer;}
@@ -43,10 +43,12 @@ function fillDraft(value,fresh=false){
 function readDraft(){for(const [id,key] of Object.entries({latitude:"latitude",longitude:"longitude",timezone:"timezone",method:"method",asr:"asr_method","high-latitude":"high_latitude"}))draft[key]=["latitude","longitude"].includes(id)?$(id).value===""?"":Number($(id).value):$(id).value.trim();draft.offsets=Object.fromEntries(events.map(p=>[p,Number($("offset-"+p).value)]));}
 function markDraft(){readDraft();draftDirty=true;++draftVersion;preview=undefined;status("prayer","Draft · preview before saving","warning");renderDraftControls();}
 function acceptDomain(key,state,ack=false){
- if(!state||!Number.isInteger(state.revision)||!valueFrom(key,state))return;
- const next=domainState(key,state);let d=domains[key];
+ if(!state||!Number.isInteger(state.revision))return;
+ const fault=key!=="settings"&&settingsFault(state);let d=domains[key];
+ if(!fault&&!valueFrom(key,state))return;
+ const next=fault?{revision:d?.snapshot.revision??state.revision,value:d?.snapshot.value??(state.revision>0&&valueFrom(key,state)?clone(valueFrom(key,state)):null),application:state.application}:domainState(key,state);
  if(!d){d=domains[key]={snapshot:next,desired:{},pending:{},busy:false,blocked:null,groups:new Set(),meta:null};return;}
- if(next.revision<d.snapshot.revision||d.busy&&!ack)return;
+ if(next.revision<d.snapshot.revision&&!settingsFault(d.snapshot)||d.busy&&!ack&&!fault)return;
  const changed=next.revision!==d.snapshot.revision;
  if(changed&&key==="settings"&&stable(calculation(next.value))!==stable(calculation(d.snapshot.value))){
   preview=undefined;if(draftDirty)status("prayer","Saved prayer settings changed. Your draft is kept; preview again.","warning");
@@ -60,12 +62,12 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
  if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)return;
  for(const key of ["display","lights","time_format"]){
   const known=snapshot?.[key],next=state[key],older=(responseOrders.get(next)||order)<(responseOrders.get(known)||0);
-  if(known&&next&&(next.revision<known.revision&&!settingsFault(next)||older&&(next.revision===known.revision||settingsFault(next))))state={...state,[key]:known};
+  if(known&&next&&(next.revision<known.revision&&!settingsFault(next)||older&&(next.revision===known.revision||settingsFault(next)||settingsFault(known))))state={...state,[key]:known};
  }
  if(state.firmware&&firmwareState&&(responseOrders.get(state.firmware)||order)<(responseOrders.get(firmwareState)||0))state={...state,firmware:firmwareState};
  statusOrder=Math.max(statusOrder,order);
  if(stopAwaiting&&state.playing===false)stoppedFeedback();
- const initial=!snapshot,recovered=settingsFault()&&!settingsFault(state);connected=true;if(actionUncertain&&order>=actionOrder){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;timeSnapshot=state.time_format;
+ const initial=!snapshot,recovered=settingsFault()&&!settingsFault(state);connected=true;if(actionUncertain&&order>=actionOrder){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;if(!settingsFault(state.time_format))timeSnapshot=state.time_format;
  for(const key of Object.keys(specs))acceptDomain(key,key==="settings"?state:state[key],ack===key);
  firstRun=state.setup==="incomplete";
  if(initial){if(state.settings)fillDraft(state.settings,firstRun&&state.revision===1);status("prayer",firstRun?"Setup not finished · choose your location":"Saved prayer settings",firstRun?"":"success");showView(firstRun?"settings":"today",false);}
@@ -77,7 +79,10 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
 }
 function acceptSavedState(key,raw){
  if(key==="settings")acceptStatus(raw,key);
- else{acceptDomain(key,raw,true);if(snapshot)snapshot[key]=raw;if(key==="time_format")timeSnapshot=raw;}
+ else{
+  const known=snapshot?.[key];if(settingsFault(known)&&(responseOrders.get(raw)||0)<(responseOrders.get(known)||0))throw new Error("A newer storage fault requires saved-state readback");
+  acceptDomain(key,raw,true);if(snapshot)snapshot[key]=raw;if(key==="time_format"&&!settingsFault(raw))timeSnapshot=raw;
+ }
 }
 function savedMessage(key){
  const app=domains[key].snapshot.application;
@@ -95,11 +100,12 @@ function renderPreferences(){
  const s=current("settings");if(s)prayers.forEach(p=>$("enabled-"+p).checked=s.enabled[p]);
  $("lights-enabled").indeterminate=!current("lights");
  if(current("lights"))$("lights-enabled").checked=current("lights").enabled;
- else{$("lights-enabled").disabled=true;if(snapshot?.lights?.supported)status("lights","Saved light preferences are unavailable. Restart the speaker and check saved state.","error");}
- if(current("time_format"))$("time-format").value=current("time_format").hours;
+ else{$("lights-enabled").disabled=true;if(snapshot?.lights?.supported&&!domains.lights)status("lights","Saved light preferences are unavailable. Restart the speaker and check saved state.","error");}
+ $("time-format").value=current("time_format")?.hours??"";
  for(const [key,d] of Object.entries(domains)){
   const fault=["storage_fault","save_failed"].includes(d.snapshot.application)||key==="settings"&&settingsFault();
-  if(!d.busy&&!d.blocked&&!Object.keys(d.desired).length&&!(key==="settings"&&settingsFault()))notify(key,...savedMessage(key));
+  if(fault&&key!=="settings"||!d.busy&&!d.blocked&&!Object.keys(d.desired).length&&!(key==="settings"&&settingsFault()))notify(key,...savedMessage(key));
+  if(key!=="settings")for(const group of specs[key].groups)$(group+"-recovery").querySelectorAll("button").forEach(b=>b.disabled=fault);
   const elements=key==="settings"?["volume","settings-volume",...prayers.map(p=>"enabled-"+p)]:key==="display"?["screen-brightness"]:key==="lights"?["lights-enabled","lights-brightness"]:["time-format"];
   elements.forEach(id=>$(id).disabled=fault||firstRun);
  }
@@ -204,8 +210,8 @@ function acknowledge(patch,desired){
 function finishSaved(key,patch,meta,raw,verified=false,playbackAtStart=playbackVersion){
  if(key==="settings")raw=preservePlayback(raw,playbackAtStart);
  const d=domains[key];
- acknowledge(patch,d.desired);
  acceptSavedState(key,raw);
+ acknowledge(patch,d.desired);
  if(meta&&meta.version===draftVersion){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);if(meta.activate){firstRun=raw.setup==="incomplete";if(!firstRun)showView("today");}}
  if(meta&&meta.version!==draftVersion)status("prayer","Reviewed settings saved · your newer edits remain a draft","warning");
  else if(meta)status("prayer","Prayer settings saved","success");
@@ -214,8 +220,8 @@ function finishSaved(key,patch,meta,raw,verified=false,playbackAtStart=playbackV
 }
 async function pump(){
  if(writeBusy||firmwareBusy||actionUncertain)return;
- if(pendingAction){if(settingsFault()||domains.settings?.busy||domains.settings?.blocked)return;const pending=pendingAction;pendingAction=null;writeBusy=true;await runAction(pending);writeBusy=false;pump();return;}
- const key=Object.keys(specs).find(k=>domains[k]&&!(k==="settings"&&settingsFault())&&!domains[k].blocked&&!domains[k].busy&&Object.keys(domains[k].pending).length);
+ if(pendingAction&&!settingsFault()&&!domains.settings?.busy&&!domains.settings?.blocked){const pending=pendingAction;pendingAction=null;writeBusy=true;await runAction(pending);writeBusy=false;pump();return;}
+ const key=Object.keys(specs).find(k=>domains[k]&&!(k==="settings"&&settingsFault())&&!settingsFault(domains[k].snapshot)&&!domains[k].blocked&&!domains[k].busy&&Object.keys(domains[k].pending).length);
  if(!key||!connected)return;
  const d=domains[key],patch=clone(d.pending),meta=d.meta,before=clone(d.snapshot),candidate=merge(before.value,patch),groups=[...d.groups],playbackAtStart=playbackVersion;
  if(meta){meta.sent=true;d.prayerSaving=true;}
@@ -261,7 +267,7 @@ async function resolve(key,useSaved){
  try{
   let raw=await request(specs[key].read);if(key==="settings")raw=preservePlayback(raw,playbackAtStart);const before=clone(d.snapshot),candidate=merge(before.value,d.desired);
   const persisted=matches(key,raw,candidate,before,d.meta);acceptSavedState(key,raw);
-  if(key==="settings"&&settingsFault()){d.blocked="failure";recovery(key);return;}
+  if(key==="settings"&&settingsFault()||settingsFault(raw)){d.blocked="failure";recovery(key);return;}
   if(persisted){const patch=clone(d.desired),meta=d.meta;d.pending={};d.meta=null;finishSaved(key,patch,meta,raw,true);d.blocked=null;}
   else if(d.blocked==="uncertain"){d.blocked="failure";notify(key,"Saved state checked. Your edits are kept; choose which values to use.","warning");recovery(key);}
   else{d.blocked=null;if(!useSaved&&d.meta){d.pending=Object.fromEntries(Object.entries(d.pending).filter(([k])=>["volume","enabled"].includes(k)));d.desired=Object.fromEntries(Object.entries(d.desired).filter(([k])=>["volume","enabled"].includes(k)));d.meta=null;preview=undefined;status("prayer","Your draft is kept. Preview again before confirming.","warning");}if(useSaved){const discardPrayer=!!d.meta;d.desired={};d.pending={};d.meta=null;if(key==="settings"&&discardPrayer){draftDirty=false;helperDraft=false;preview=undefined;fillDraft(raw.settings);status("prayer","Saved prayer settings restored","success");}}}
