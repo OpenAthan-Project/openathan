@@ -538,6 +538,40 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await settings(page);assert.ok(await page.locator('#latitude').isDisabled());assert.ok(await page.locator('#enabled-asr').isDisabled());assert.match(await page.locator('#prayer-feedback').textContent(),/storage/i);assert.ok(await page.locator('#time-format').isEnabled());await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(f.state.device.time_format.hours,12);assert.equal(f.state.mutations,0);
   }finally{await o.close();}
  });
+ for(const helper of [false,true]){
+  test(`${browserName}: storage recovery opens setup and ${helper?'keeps helper confirmation gated':'allows manual completion while waiting'}`,async()=>{
+   const f=await fixture(),restored=initial();restored.setup='incomplete';restored.automatic_ready=false;restored.clock_ready=false;restored.schedule={state:'waiting_for_time'};
+   delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.device.automatic_ready=false;f.state.device.schedule={state:'setup_required'};
+   const o=await open(f,browserName),{page}=o;
+   try{
+    assert.ok(await page.locator('#today-view').isVisible());await page.locator('[data-view="today"]').focus();
+    if(helper){await page.evaluate(()=>location.hash='v=1&latitude=43.65&longitude=-79.38&source=browser&timezone=America%2FToronto');await page.waitForFunction(()=>location.hash==='');}
+    const poll=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);f.state.device=restored;await poll;await page.waitForFunction(()=>firstRun);
+    assert.ok(await page.locator('#settings-view').isVisible());assert.ok(await page.locator('#today-view').isHidden());assert.ok(await page.locator('.navigation').isHidden());assert.equal(await page.evaluate(()=>document.activeElement.id),'main');assert.equal(f.state.mutations,0);
+    if(helper)await page.waitForFunction(()=>document.getElementById('latitude').value==='43.65');else{for(const id of ['latitude','longitude','timezone','method'])assert.equal(await page.locator('#'+id).inputValue(),'');await page.locator('#latitude').fill('43.65');await page.locator('#longitude').fill('-79.38');await page.locator('#timezone').fill('America/Toronto');}
+    await page.locator('#setup-next').click();await page.locator('#method').selectOption('north_america');await page.locator('#setup-next').click();await page.waitForFunction(()=>!document.getElementById('prayer-preview').hidden);
+    if(helper){assert.ok(await page.locator('#confirm').isDisabled());const ready=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);f.state.device.clock_ready=true;f.state.device.schedule=initial().schedule;await ready;await page.waitForFunction(()=>snapshot.clock_ready);await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').disabled);}else{assert.match(await page.locator('#preview-warning').textContent(),/announcements will wait/);assert.ok(await page.locator('#confirm').isEnabled());}
+    assert.equal(f.state.mutations,0);await page.locator('#confirm').click();await page.waitForFunction(()=>document.getElementById('settings-view').hidden);assert.ok(await page.locator('.navigation').isVisible());assert.equal(f.state.mutations,1);const writes=f.state.posts.filter(p=>p.url==='/api/activate');assert.equal(writes.length,1);assert.equal(writes[0].payload.expected_revision,1);assert.equal(f.state.device.settings.latitude,43.65);
+   }finally{await o.close();}
+  });
+ }
+ for(const view of ['today','settings']){
+  test(`${browserName}: late incomplete-setup recovery from ${view} preserves drafts, focus and Stop without repeated poll navigation`,async()=>{
+   const f=await fixture();f.state.device.playing=true;const restored=structuredClone(f.state.device);restored.setup='incomplete';restored.automatic_ready=false;const o=await open(f,browserName),{page}=o;
+   try{
+    await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);if(view==='today'){await page.locator('[data-view="today"]').click();await page.locator('#stop').focus();}else await page.locator('#find-location').focus();
+    let poll=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.device.automatic_ready=false;f.state.device.schedule={state:'setup_required'};await poll;await page.waitForFunction(()=>snapshot.setup==='storage_fault');
+    poll=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);f.state.device=restored;await poll;await page.waitForFunction(()=>firstRun);
+    assert.ok(await page.locator('#settings-view').isVisible());assert.ok(await page.locator('.navigation').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.evaluate(()=>document.activeElement.id),view==='today'?'main':'find-location');assert.ok(await page.locator('#settings-stop').isEnabled());
+    await page.locator('#settings-stop').click();await page.waitForFunction(()=>document.getElementById('settings-stop').hidden);await page.locator('#latitude').fill('44.6');await page.evaluate(()=>{window.setupFeedbackChanges=0;new MutationObserver(m=>window.setupFeedbackChanges+=m.length).observe(document.getElementById('prayer-feedback'),{subtree:true,childList:true,characterData:true});});
+    poll=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);await poll;await page.waitForFunction(()=>!loading);assert.equal(await page.evaluate(()=>document.activeElement.id),'latitude');assert.equal(await page.locator('#latitude').inputValue(),'44.6');assert.equal(await page.evaluate(()=>window.setupFeedbackChanges),0);assert.equal(f.state.mutations,0);
+   }finally{await o.close();}
+  });
+ }
+ test(`${browserName}: storage recovery into active setup retains Today and navigation`,async()=>{
+  const f=await fixture(),restored=initial();delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';f.state.device.automatic_ready=false;f.state.device.schedule={state:'setup_required'};const o=await open(f,browserName),{page}=o;
+  try{const poll=page.waitForResponse(r=>r.url().endsWith('/api/status')&&r.request().method()==='GET'&&r.status()===200);f.state.device=restored;await poll;await page.waitForFunction(()=>snapshot.setup==='active');assert.ok(await page.locator('#today-view').isVisible());assert.ok(await page.locator('#settings-view').isHidden());assert.ok(await page.locator('.navigation').isVisible());assert.equal(f.state.mutations,0);}finally{await o.close();}
+ });
  test(`${browserName}: prayer storage loss preserves drafts and Stop until saved state recovers`,async()=>{
   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;
   try{

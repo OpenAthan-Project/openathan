@@ -86,6 +86,11 @@ discard that draft or bypass fresh preview/confirmation after another client's e
 First run follows location → calculation → timetable review → Finish setup.
 The optional HTTPS helper precedes manual coordinates. Helper proposals require
 ready preview; manual setup can finish while waiting for valid time with a warning.
+Storage recovery into incomplete configuration now opens the setup view when it
+was hidden, with focus on the visible main content. Fresh revision-one recovery
+uses the same required location fields as initial setup; existing drafts survive.
+Repeated incomplete-state polls preserve setup focus and feedback, and recovery
+into active configuration retains the current view.
 Settings expose screen/lights only when supported and retain independent display,
 lights and time-format persistence. Existing request payloads/revisions are retained.
 The only additive API field is read-only `local_date` on valid-clock status,
@@ -93,7 +98,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **250 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **260 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -156,6 +161,14 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   phone section order. Desktop grid placement preserves the columns and adjacent
   left-hand groups. The checks also verify that first run hides preference/update
   controls and that they return when setup becomes active.
+- Another 10 regression checks exercise the actual five-second status polling
+  timer for initial storage recovery into incomplete/active configuration and
+  later faults with drafts in Today or Settings. The manual recovery reproducer
+  failed on the reviewed head in both browsers; it now opens and completes setup.
+  Helper proposals remain gated on ready preview, manual completion still permits
+  waiting for a valid clock, and activation writes use the confirmed revision.
+  Drafts, visible Stop and existing Settings focus survive; repeated polls neither
+  redirect the setup view nor change its live feedback. All ten pass in Chromium/WebKit.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -191,13 +204,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,263,360 | +7,216 | 309,504 |
-| isolated | 1,257,904 | 1,265,152 | +7,248 | 307,712 |
-| qualification | 1,263,280 | 1,270,528 | +7,248 | 302,336 |
-| rollback | 1,263,280 | 1,270,528 | +7,248 | 302,336 |
+| reference | 1,256,144 | 1,263,376 | +7,232 | 309,488 |
+| isolated | 1,257,904 | 1,265,168 | +7,264 | 307,696 |
+| qualification | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
+| rollback | 1,263,280 | 1,270,544 | +7,264 | 302,320 |
 
-Reference slot free space is 833,792 bytes;
-the largest affected image leaves 826,624
+Reference slot free space is 833,776 bytes;
+the largest affected image leaves 826,608
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -206,19 +219,19 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,392 | +839 |
-| `app.js` | 8,048 | 12,924 | +4,876 |
+| `app.js` | 8,048 | 12,942 | +4,894 |
 | `style.css` | 1,524 | 2,963 | +1,439 |
 
 Total compressed UI assets grow from 12,125
-to 19,279 bytes. No frontend framework, font,
+to 19,297 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `2ec9978d05f8563a914b8c9933fbcba23454d348b588dbdad13f62d88dc148f6` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `31d27b47e4055cbbe3f1044bc94e8591929cb4e5f63154d008f46786d2b5adea` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `0529fa49ecc858d8b35e69dfca03fed6167fdac530f8a22bdbb3c0ca96ede804` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `0d3430a9e159bcfda822392b640ba90bc6fc17092a91e5413674b95a52546181` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `2aab524397260168c1c6fc1da81b2a9eb18e242c8f356c5bc18a718bc792a327` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `7d3de27b4245f2bbe089e39455f0b3eaad2f45dc92ded64e4e7c33efde933842` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `40ad5e1769e39bf1c8562c799ab9e269e3e94d67e95bd2c15b211c03d97e07e6` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `92373c96bda9ca458fdf90d508624dda3a542da79233cc0c66ef841eada23b30` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -326,11 +339,29 @@ markup/CSS/JavaScript in the same pinned configurations.
 | qualification | 1,270,544 | 1,270,528 | -16 |
 | rollback | 1,270,544 | 1,270,528 | -16 |
 
+All four capacity checks passed with the then-current gzip assets, leaving at
+least 302,336 bytes under the application budget. Static RAM, partitions,
+dependencies and polling cadence remained unchanged. The runtime change was
+limited to browser markup/grid placement and first-run visibility; physical
+playback and runtime memory were not measured.
+
+The incomplete-setup recovery correction uses reviewed head
+`a033511944172d11c208a8b0543866079f722c87` as its matched baseline. Exact
+images, measurements and logs were archived before compiling the corrected
+JavaScript in the same pinned configurations.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Setup-recovery review delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,263,360 | 1,263,376 | +16 |
+| isolated | 1,265,152 | 1,265,168 | +16 |
+| qualification | 1,270,528 | 1,270,544 | +16 |
+| rollback | 1,270,528 | 1,270,544 | +16 |
+
 All four current capacity checks pass. Each OTA contains the exact final gzip
-assets, and at least 302,336 bytes remain under the application budget.
+assets, and at least 302,320 bytes remain under the application budget.
 Static RAM, partitions, dependencies and polling cadence remain unchanged.
-The runtime change is limited to browser markup/grid placement and first-run
-visibility; physical playback and runtime memory were not measured.
+The runtime change is limited to browser view selection and draft initialization;
+physical playback and runtime memory were not measured.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

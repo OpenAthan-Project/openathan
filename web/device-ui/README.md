@@ -23,7 +23,11 @@ Location, timezone, calculation conventions, high-latitude rules and offsets sta
 in a draft until **Preview timetable → Confirm prayer changes**. First run guides
 location → calculation → review → Finish setup. Manual setup can finish while
 waiting for a valid clock, with an explicit warning. Drafts survive Today/Settings
-navigation and refreshes; browser navigation warns before discarding prayer edits.
+navigation and refreshes. If storage recovery reveals incomplete setup, the page
+opens the setup view; fresh revision-one configuration requires choosing a
+location, while existing drafts are kept. Repeated incomplete-state polls retain
+the current setup focus. Recovery into active configuration keeps the current view.
+Browser navigation warns before discarding prayer edits.
 Automatic preference writes start from confirmed settings, retaining coordinate
 precision and excluding calculation drafts. Writes are serialized, with Stop
 available independently; uncertain outcomes require readback before more writes

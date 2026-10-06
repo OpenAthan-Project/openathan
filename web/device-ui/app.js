@@ -81,7 +81,8 @@ function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
  for(const key of Object.keys(specs))acceptDomain(key,key==="settings"?state:state[key],ack===key);
  firstRun=state.setup==="incomplete";
  if(initial){if(state.settings)fillDraft(state.settings,firstRun&&state.revision===1);status("prayer",firstRun?"Setup not finished · choose your location":"Saved prayer settings",firstRun?"":"success");showView(firstRun?"settings":"today",false);}
- if(state.settings&&!draft)fillDraft(state.settings);
+ if(firstRun&&$("settings-view").hidden)showView("settings");
+ if(state.settings&&!draft)fillDraft(state.settings,firstRun&&state.revision===1);
  if(recovered)status("prayer",draftDirty?"Saved storage recovered. Your draft is kept; preview before saving.":"Saved prayer settings",draftDirty?"warning":"success");
  if(settingsFault(state)){preview=undefined;status("prayer","Saved prayer storage is unavailable. Your draft is kept; restart and check saved state.","error");}
  if(state.firmware)renderFirmware(state.firmware);
