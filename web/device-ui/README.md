@@ -32,6 +32,12 @@ newer Stop. A successful status response reporting unreadable prayer storage is 
 device fault, not a lost connection: prayer edits and previews are disabled,
 drafts are retained, and independent preferences and reported playback Stop remain
 available. No prayer defaults are substituted for unavailable saved settings.
+Discard cancels a reviewed prayer change while it is queued and unsent, preserving
+automatic preference edits. After transmission, Discard waits for confirmation or
+an explicit recovery choice; it cannot cancel a write already received by the speaker.
+A delayed Stop reply or readback preserves newer observed Skip/Restore and
+playback state. Complete status responses also retain newer independently saved
+screen, light and time-format revisions and newer firmware-check results.
 
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.

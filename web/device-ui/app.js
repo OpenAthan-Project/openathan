@@ -3,6 +3,7 @@ const $=id=>document.getElementById(id),clone=v=>structuredClone(v);
 const prayers=["fajr","dhuhr","asr","maghrib","isha"],events=["fajr","sunrise","dhuhr","asr","maghrib","isha"];
 const title=s=>s[0].toUpperCase()+s.slice(1);
 const domains={};
+const responseOrders=new WeakMap();let requestOrder=0,statusOrder=0,actionOrder=0;
 const specs={settings:{path:"/api/settings",read:"/api/status",groups:["volume","preferences"]},display:{path:"/api/display",read:"/api/display",groups:["screen"]},lights:{path:"/api/lights",read:"/api/lights",groups:["lights"]},time_format:{path:"/api/time-format",read:"/api/time-format",groups:["format"]}};
 let snapshot,timeSnapshot,connected=false,loading=false,attempted=false,writeBusy=false,generation=0;
 let draft,draftDirty=false,draftVersion=0,preview,helperDraft=false,firstRun=false,setupStep=0;
@@ -22,13 +23,17 @@ function isSkipped(next,skip){return sameKey(next,skip)||sameKey(next?.shared_wi
 function dateLabel(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value||""))return "";return new Intl.DateTimeFormat(undefined,{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"}).format(new Date(value+"T12:00:00Z"));}
 function localTime(value){const m=/^(\d{4}-\d{2}-\d{2}) ([0-2]\d):([0-5]\d)$/.exec(value||"");if(!m||+m[2]>23)return "Unavailable";return timeSnapshot?.hours===12?(+m[2]%12||12)+":"+m[3]+(+m[2]<12?" AM":" PM"):m[2]+":"+m[3];}
 async function request(path,body){
+ const order=++requestOrder;
+ if(["/api/skip","/api/cancel-skip"].includes(path))actionOrder=order;
  const response=await fetch(path,{method:body===undefined?"GET":"POST",credentials:"same-origin",cache:"no-store",headers:body===undefined?{}:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
  let data;try{data=await response.json();}catch{throw new Error("The response could not be confirmed");}
- if(!response.ok){const error=new Error(data.error||"Device request failed");error.status=response.status;throw error;}return data;
+ if(!response.ok){const error=new Error(data.error||"Device request failed");error.status=response.status;throw error;}
+ if(data&&typeof data==="object"){responseOrders.set(data,order);for(const key of ["display","lights","time_format","firmware"])if(data[key]&&typeof data[key]==="object")responseOrders.set(data[key],order);}return data;
 }
 function calculation(value){const out=clone(value);delete out.volume;delete out.enabled;return out;}
 function settingsFault(state=snapshot){return state?.setup==="storage_fault"||["storage_fault","save_failed"].includes(state?.application);}
-function preservePlayback(state,started){return started!==playbackVersion&&snapshot?{...state,playing:snapshot.playing}:state;}
+function preservePlayback(state,started){if(started===playbackVersion||!snapshot)return state;const next={...state,playing:snapshot.playing};responseOrders.set(next,responseOrders.get(state)||statusOrder);return next;}
+function preferencePatch(patch){return Object.fromEntries(Object.entries(patch).filter(([key])=>["volume","enabled"].includes(key)));}
 function fillDraft(value,fresh=false){
  draft=calculation(value);if(fresh){draft.latitude="";draft.longitude="";draft.timezone="";draft.method="";}
  for(const [id,key] of Object.entries({latitude:"latitude",longitude:"longitude",timezone:"timezone",method:"method",asr:"asr_method","high-latitude":"high_latitude"}))$(id).value=draft[key];
@@ -50,11 +55,17 @@ function acceptDomain(key,state,ack=false){
  if(changed&&!ack&&Object.keys(d.desired).length){d.blocked="conflict";notify(key,"Changed on another client. Your edits are kept; choose which values to use.","error");recovery(key);}
  d.snapshot=next;
 }
-function acceptStatus(state,ack){
+function acceptStatus(state,ack,order=responseOrders.get(state)||statusOrder){
  if(!Number.isInteger(state?.revision)||!state.settings&&!settingsFault(state))throw new Error("Device status is incomplete");
  if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)return;
+ for(const key of ["display","lights","time_format"]){
+  const known=snapshot?.[key],next=state[key],older=(responseOrders.get(next)||order)<(responseOrders.get(known)||0);
+  if(known&&next&&(next.revision<known.revision&&!settingsFault(next)||older&&(next.revision===known.revision||settingsFault(next))))state={...state,[key]:known};
+ }
+ if(state.firmware&&firmwareState&&(responseOrders.get(state.firmware)||order)<(responseOrders.get(firmwareState)||0))state={...state,firmware:firmwareState};
+ statusOrder=Math.max(statusOrder,order);
  if(stopAwaiting&&state.playing===false)stoppedFeedback();
- const initial=!snapshot,recovered=settingsFault()&&!settingsFault(state);connected=true;if(actionUncertain){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;timeSnapshot=state.time_format;
+ const initial=!snapshot,recovered=settingsFault()&&!settingsFault(state);connected=true;if(actionUncertain&&order>=actionOrder){actionUncertain=false;status("action","Skip state checked · review the current prayer");queueMicrotask(pump);}snapshot=state;timeSnapshot=state.time_format;
  for(const key of Object.keys(specs))acceptDomain(key,key==="settings"?state:state[key],ack===key);
  firstRun=state.setup==="incomplete";
  if(initial){if(state.settings)fillDraft(state.settings,firstRun&&state.revision===1);status("prayer",firstRun?"Setup not finished · choose your location":"Saved prayer settings",firstRun?"":"success");showView(firstRun?"settings":"today",false);}
@@ -126,7 +137,7 @@ function render(){
  let nextDate=$("next-date");if(!nextDate){nextDate=document.createElement("p");nextDate.id="next-date";nextDate.className="next-date";$("next-time").after(nextDate);}
  const onTable=next&&state.schedule?.times?.some(t=>Number.isFinite(t.utc)&&t.utc===next.utc&&t.name?.toLowerCase()===prayers[next.prayer]);
  text("next-date",next&&!onTable?dateLabel(next.local?.slice(0,10)):"");nextDate.hidden=!nextDate.textContent;
- const readiness=!state?"Connecting to speaker":!connected?"Connection lost · stale":state.playing?"Playing":settingsFault()?"Saved storage unavailable":state.application==="volume_failed"?"Automatic playback paused":state.application==="volume_pending"?"Applying volume":!state.clock_ready?"Waiting for time":firstRun?"Finish setup to enable Athan":skipped?"Athan skipped"+(state.local_date&&next.local?.slice(0,10)!==state.local_date?" on "+next.local.slice(0,10):" today"):state.automatic_ready?"Ready to play":"Waiting for device readiness";
+ const readiness=!state?"Connecting to speaker":!connected?"Connection lost · stale":state.playing?"Playing":settingsFault()?"Saved storage unavailable":actionUncertain?"Skip state unconfirmed":state.application==="volume_failed"?"Automatic playback paused":state.application==="volume_pending"?"Applying volume":!state.clock_ready?"Waiting for time":firstRun?"Finish setup to enable Athan":skipped?"Athan skipped"+(state.local_date&&next.local?.slice(0,10)!==state.local_date?" on "+next.local.slice(0,10):" today"):state.automatic_ready?"Ready to play":"Waiting for device readiness";
  text("readiness-text",readiness);$("readiness").style.color=state?.automatic_ready&&connected&&!skipped?"var(--good)":"var(--amber)";
  const detail=!connected&&state?"Last observed: "+(state.playing?"playing":"idle")+". Playback may still be active.":settingsFault()?(state.playing?"Playback is active. ":"")+"Saved prayer storage is unavailable. Restart the speaker and check saved state.":state?.playing?"Playback is active on the speaker.":state?.application==="volume_failed"?"Volume could not be applied. Check the speaker and saved volume.":state&&!state.clock_ready?"Announcements will wait until the device clock is valid.":state?.scheduler_fault&&state.scheduler_fault!=="none"?"Device needs attention: "+state.scheduler_fault+". Check the speaker and prayer settings.":"";
  text("state-detail",detail);$("state-detail").hidden=!detail;
@@ -160,6 +171,12 @@ function renderDraftControls(){
  $("confirm").disabled=blocked||!connected||!ready||preview?.version!==draftVersion||!!d?.busy||!!d?.blocked;
  $("confirm").textContent=firstRun?"Finish setup":"Confirm prayer changes";
  $("discard").hidden=!draftDirty||firstRun;
+ $("discard").disabled=!!d?.prayerSaving||!!d?.meta?.sent;
+}
+function discardDraft(){
+ const d=domains.settings;if(!d||d.prayerSaving||d.meta?.sent)return;
+ if(d.meta){d.desired=preferencePatch(d.desired);d.pending=preferencePatch(d.pending);d.meta=null;d.groups.delete("prayer");$("prayer-recovery").hidden=true;}
+ draftDirty=false;++draftVersion;helperDraft=false;preview=undefined;fillDraft(d.snapshot.value);status("prayer","Saved prayer settings restored","success");render();pump();
 }
 function enqueue(key,patch,meta=null){
  const d=domains[key];if(!d||key==="settings"&&settingsFault())return;
@@ -201,6 +218,7 @@ async function pump(){
  const key=Object.keys(specs).find(k=>domains[k]&&!(k==="settings"&&settingsFault())&&!domains[k].blocked&&!domains[k].busy&&Object.keys(domains[k].pending).length);
  if(!key||!connected)return;
  const d=domains[key],patch=clone(d.pending),meta=d.meta,before=clone(d.snapshot),candidate=merge(before.value,patch),groups=[...d.groups],playbackAtStart=playbackVersion;
+ if(meta){meta.sent=true;d.prayerSaving=true;}
  d.pending={};d.meta=null;d.groups.clear();d.busy=true;writeBusy=true;++generation;if(firmwareState)renderFirmware(firmwareState);notify(key,"Saving…","",groups);renderDraftControls();
  try{
   const raw=await request(meta?.activate?"/api/activate":specs[key].path,bodyFor(key,before,candidate,meta));
@@ -227,7 +245,7 @@ async function pump(){
    if(meta)status("prayer","Prayer save unconfirmed. Your draft is kept.","warning");
    recovery(key);
   }
- }finally{d.busy=false;writeBusy=false;render();pump();}
+ }finally{d.prayerSaving=false;d.busy=false;writeBusy=false;render();pump();}
 }
 function recovery(key){
  const groups=[...new Set([...specs[key].groups,...(domains[key].meta?["prayer"]:[])])];
@@ -279,11 +297,18 @@ async function runAction(action){
   catch{connected=false;actionUncertain=true;status("action",(action.restore?"Restore":"Skip")+" unconfirmed · reconnect to check","warning");}
  }finally{actionBusy=false;$("action-feedback").hidden=false;render();}
 }
-function stoppedFeedback(){stopAwaiting=false;status("action","Playback stopped","success");text("settings-playback-feedback","Playback stopped");}
+function stoppedFeedback(){stopAwaiting=false;status("action","Playback stopped"+(actionUncertain?" · Skip state unconfirmed; refresh to check.":""),actionUncertain?"warning":"success");text("settings-playback-feedback","Playback stopped");}
+function acceptStopStatus(state){
+ if(typeof state?.playing!=="boolean"||!Number.isInteger(state.revision)||!state.settings&&!settingsFault(state))throw new Error("Stop status is incomplete");
+ const order=responseOrders.get(state)||statusOrder;
+ if(snapshot&&order<statusOrder)state=snapshot;
+ else if(snapshot?.settings&&state.settings&&state.revision<snapshot.revision)state={...snapshot,playing:state.playing};
+ acceptStatus(state,undefined,order);return snapshot;
+}
 async function stopPlayback(){
  if(stopBusy||!connected)return;stopBusy=true;stopAwaiting=true;++generation;++playbackVersion;status("action","Requesting Stop…");text("settings-playback-feedback","Requesting Stop…");$("action-feedback").hidden=false;$("settings-playback-feedback").hidden=false;render();
- try{const state=await request("/api/stop",{});acceptStatus(state);if(state.playing){stopAwaiting=true;status("action","Stop requested · waiting for playback to stop","warning");text("settings-playback-feedback","Stop requested · waiting for playback to stop");}else stoppedFeedback();}
- catch{try{acceptStatus(await request("/api/status"));const message=snapshot.playing?"Playback is still active. Try Stop again.":"Playback stopped · confirmed after readback";status("action",message,snapshot.playing?"warning":"success");text("settings-playback-feedback",message);}catch{connected=false;const message="Stop unconfirmed · reconnect to check. Playback may still be active.";status("action",message,"warning");text("settings-playback-feedback",message);}}
+ try{const state=acceptStopStatus(await request("/api/stop",{}));if(state.playing){stopAwaiting=true;status("action","Stop requested · waiting for playback to stop","warning");text("settings-playback-feedback","Stop requested · waiting for playback to stop");}else stoppedFeedback();}
+ catch{try{acceptStopStatus(await request("/api/status"));const message=snapshot.playing?"Playback is still active. Try Stop again.":"Playback stopped · confirmed after readback";status("action",message,snapshot.playing?"warning":"success");text("settings-playback-feedback",message);}catch{connected=false;const message="Stop unconfirmed · reconnect to check. Playback may still be active.";status("action",message,"warning");text("settings-playback-feedback",message);}}
  finally{stopBusy=false;$("action-feedback").hidden=false;$("settings-playback-feedback").hidden=false;render();}
 }
 function slider(id,key,field){
@@ -298,7 +323,7 @@ document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener
 $("prayer-form").addEventListener("input",markDraft);
 $("prayer-form").addEventListener("submit",e=>{e.preventDefault();if(!$("confirm").disabled&&preview&&preview.version===draftVersion)enqueue("settings",clone(draft),{version:draftVersion,refreshTimezone:$("refresh-timezone").checked,activate:firstRun});});
 $("preview").addEventListener("click",previewDraft);
-$("discard").addEventListener("click",()=>{draftDirty=false;helperDraft=false;preview=undefined;fillDraft(domains.settings.snapshot.value);status("prayer","Saved prayer settings restored","success");renderDraftControls();});
+$("discard").addEventListener("click",discardDraft);
 $("setup-next").addEventListener("click",()=>{if(setupStep===0){if(!["latitude","longitude","timezone"].every(id=>$(id).reportValidity()))return;setupStep=1;renderDraftControls();focusStep();}else previewDraft();});
 $("setup-back").addEventListener("click",()=>{setupStep=Math.max(0,setupStep-1);preview=undefined;renderDraftControls();focusStep();});
 $("lights-enabled").addEventListener("change",()=>enqueue("lights",{enabled:$("lights-enabled").checked}));

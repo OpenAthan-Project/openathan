@@ -34,6 +34,18 @@ Prayer controls and confirmation are disabled; drafts and pending edits survive,
 with independent preferences and reported playback Stop still available. Recovery
 requires confirmed saved settings, and no default prayer settings are invented.
 
+A subsequent review on 2026-10-06 corrects queued confirmation cancellation and
+response order in the opposite direction. Discard removes an unsent prayer patch
+while retaining automatic preference patches, and invalidates an in-flight
+preview. Once a prayer request is sent, Discard waits for confirmation or an
+explicit recovery choice.
+Delayed Stop replies and readbacks preserve newer prayer-action and playback
+observations; older complete snapshots cannot regress independently saved
+preferences or firmware-check results. A newer playback observation remains
+stoppable rather than being hidden by an earlier Stop reply. An older Stop
+snapshot cannot confirm a newer Skip request whose response was lost; Skip stays
+disabled and visibly unconfirmed until fresh authoritative state arrives.
+
 First run follows location → calculation → timetable review → Finish setup.
 The optional HTTPS helper precedes manual coordinates. Helper proposals require
 ready preview; manual setup can finish while waiting for valid time with a warning.
@@ -44,7 +56,7 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
 
 ## Automated checks
 
-- **96 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
+- **134 Chromium/WebKit checks passed, zero failures or skips.** They exercise the real production HTML/CSS/JavaScript and C++
   Digest verifier against simulated settings endpoints. The final suite covers
   automatic saves, rapid/nested edits, domain conflicts, dropped committed replies,
   failed readback, applying/storage/output failures, Stop during saves and delayed
@@ -60,6 +72,14 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   authoritative device state allows them. Unchanged storage-fault polls do not
   mutate the live feedback text; preview-arrival checks await the response body
   and browser rendering rather than a fixed delay.
+- A further 38 review regression checks cover queued prayer cancellation with and
+  without automatic preference edits, sent/unconfirmed writes, discarded pending
+  previews, delayed Stop replies/readbacks after Skip/Restore, all four persistence
+  domains and firmware-check results. Both orders of older preference and newer
+  Stop replies are checked, along with a later authoritative playback observation.
+  Screen/light application status remains current even when a newer confirmed
+  response has the same preference revision. Older Stop replies cannot clear a
+  newer uncertain Skip outcome; fresh readback confirms it before another action.
 - Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
   Today and Settings have no horizontal overflow. Linux CI exposed wide-font
   time and native dropdown overflow. The corrected hero scale and bounded native
@@ -95,13 +115,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,262,464 | +6,320 | 310,400 |
-| isolated | 1,257,904 | 1,264,240 | +6,336 | 308,624 |
-| qualification | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
-| rollback | 1,263,280 | 1,269,616 | +6,336 | 303,248 |
+| reference | 1,256,144 | 1,262,976 | +6,832 | 309,888 |
+| isolated | 1,257,904 | 1,264,752 | +6,848 | 308,112 |
+| qualification | 1,263,280 | 1,270,144 | +6,864 | 302,720 |
+| rollback | 1,263,280 | 1,270,144 | +6,864 | 302,720 |
 
-Reference slot free space is 834,688 bytes;
-the largest affected image leaves 827,536
+Reference slot free space is 834,176 bytes;
+the largest affected image leaves 827,008
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -110,19 +130,19 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | Asset | Before gzip bytes | After gzip bytes | Delta |
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,389 | +836 |
-| `app.js` | 8,048 | 11,995 | +3,947 |
+| `app.js` | 8,048 | 12,524 | +4,476 |
 | `style.css` | 1,524 | 2,989 | +1,465 |
 
 Total compressed UI assets grow from 12,125
-to 18,373 bytes. No frontend framework, font,
+to 18,902 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `84b5c708f211af03a703bacbc2c0fed612252fcf5694c512b0e10c07d6b37928` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `c2f4409159c43508e7c4d647c8716a0739758f86f5eafce23f451090fe98ed0b` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `8e58bdd700af4be8f8dcd00d7b3ee3dec3614b5c6fa00891a7bcfb3d50dbd7d1` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `566b0f660de13ba1b76da2c4a3cbc99e5b50d632a9af4d65d3051f7c65744ed1` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `200041b6b2a676d9a4b0216c9f47d220f2183a04ef78d1c3dafd649a21d2581d` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `23e4309fde6a4fd217ef517a0ed222d0b5f94c978685fab5a7102e70f0385e6f` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `0c13b89446573d778a4ed1622c1c7413217da7eea06c1103214d9401715e2d2e` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `6b74a203d06c122ad16e642a81611d6cb832d2f9dbd239052c7520e7e4295af9` |
 
 The 2026-10-06 review fixes were also measured against reviewed PR head
 `d6d3a1054c894cd8f1bb9e2e7bb6833a0d339313`, using those same pinned
@@ -137,6 +157,21 @@ directories and configurations, with prior images/logs archived before rebuildin
 
 These UI-only corrections leave static RAM unchanged and add no device request
 polling or runtime dependencies. All four capacity checks pass.
+
+The subsequent cancellation/Stop-order corrections use reviewed head
+`6a3ac40608bc33210894f0696ab1016f2275180e` as a further matched baseline.
+Its images and logs were retained before replacing the same candidate source.
+
+| Variant | Reviewed OTA bytes | Corrected OTA bytes | Subsequent review delta |
+| --- | ---: | ---: | ---: |
+| reference | 1,262,464 | 1,262,976 | +512 |
+| isolated | 1,264,240 | 1,264,752 | +512 |
+| qualification | 1,269,616 | 1,270,144 | +528 |
+| rollback | 1,269,616 | 1,270,144 | +528 |
+
+All four new capacity checks pass and each image contains the exact current gzip
+assets. Request-order metadata and cancellation tracking are browser-only state;
+they add no polling or device runtime dependencies. Static RAM remains unchanged.
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

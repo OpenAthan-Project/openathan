@@ -484,7 +484,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);
     f.state.device.settings.method='north_america';f.state.device.revision++;
     await slide(page,'settings-volume',25);await page.waitForFunction(()=>document.querySelector('#preferences-feedback').textContent.includes('another client'));
-    await page.locator('#preferences-recovery button').nth(useSaved?1:0).click();await page.waitForFunction(()=>document.querySelector('#preferences-recovery').hidden);
+    await page.locator('#preferences-recovery button').nth(useSaved?1:0).click();await page.waitForFunction(()=>document.querySelector('#preferences-recovery').hidden);await saved(page,'preferences');
     assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.device.settings.method,'north_america');assert.equal(f.state.device.settings.volume,useSaved?70:25);
     await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);await page.locator('#confirm').click();await page.waitForFunction(()=>document.querySelector('#prayer-feedback').textContent==='Prayer settings saved');assert.equal(f.state.device.settings.latitude,44.4);
    }finally{await o.close();}
@@ -539,6 +539,102 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   const f=await fixture(),o=await open(f,browserName),{page}=o;let release,requested;f.state.previewWait=new Promise(r=>release=r);const started=new Promise(r=>requested=r);f.state.previewRequested=requested;
   try{
    await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await started;delete f.state.device.settings;f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#latitude').matches(':disabled'),{},{timeout:3000});const response=page.waitForResponse(r=>r.url().endsWith('/api/preview'));release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.mutations,0);
+  }finally{release();await o.close();}
+ });
+ for(const keepPreference of [false,true]){
+  test(`${browserName}: Discard cancels an unsent prayer confirmation ${keepPreference?'and keeps a prayer preference':'behind an independent save'}`,async()=>{
+   const f=await fixture(),o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+   try{
+    await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);
+    await page.route('**/api/time-format',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}requested();await gate;await route.continue();});
+    await page.locator('#time-format').selectOption('12');await started;if(keepPreference)await page.locator('#enabled-asr').uncheck();await page.locator('#confirm').click();assert.equal(f.state.mutations,0);assert.ok(await page.locator('#discard').isEnabled());await page.locator('#discard').click();assert.equal(await page.locator('#latitude').inputValue(),'0');release();
+    await page.waitForFunction(()=>document.querySelector('#format-feedback').textContent==='Saved to speaker'&&document.querySelector('#preferences-feedback').textContent==='Saved to speaker');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(f.state.device.settings.latitude,0);assert.equal(f.state.device.settings.enabled.asr,!keepPreference);assert.equal(f.state.mutations,keepPreference?1:0);assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#prayer-feedback').textContent(),'Saved prayer settings restored');
+   }finally{release();await o.close();}
+  });
+ }
+ test(`${browserName}: Discard waits for a sent prayer save, then restores the confirmed settings`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;let release,requested;f.state.writeWait=new Promise(r=>release=r);const started=new Promise(r=>requested=r);f.state.writeRequested=requested;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);await page.locator('#confirm').click();await started;assert.ok(await page.locator('#discard').isDisabled());
+   await page.locator('#latitude').fill('45.2');release();await page.waitForFunction(()=>document.querySelector('#prayer-feedback').textContent.includes('newer edits'));assert.equal(f.state.device.settings.latitude,44.4);assert.equal(await page.locator('#latitude').inputValue(),'45.2');assert.ok(await page.locator('#discard').isEnabled());await page.locator('#discard').click();assert.equal(await page.locator('#latitude').inputValue(),'44.4');assert.equal(f.state.mutations,1);
+  }finally{release();await o.close();}
+ });
+ test(`${browserName}: unconfirmed sent prayer changes require readback before Discard`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await page.waitForFunction(()=>!document.querySelector('#confirm').hidden);f.state.drop=true;f.state.failRead=true;await page.locator('#confirm').click();await page.waitForFunction(()=>document.querySelector('#prayer-feedback').textContent.includes('unconfirmed'));assert.ok(await page.locator('#discard').isDisabled());assert.equal(await page.locator('#latitude').inputValue(),'44.4');
+   f.state.failRead=false;await page.locator('#prayer-recovery button').first().click();await page.waitForFunction(()=>document.querySelector('#prayer-feedback').textContent==='Prayer settings saved');assert.equal(f.state.mutations,1);assert.ok(await page.locator('#discard').isHidden());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Discard invalidates an in-flight timetable preview`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;let release,requested;f.state.previewWait=new Promise(r=>release=r);const started=new Promise(r=>requested=r);f.state.previewRequested=requested;
+  try{
+   await settings(page);await page.locator('#latitude').fill('44.4');await page.locator('#preview').click();await started;await page.locator('#discard').click();const response=page.waitForResponse(r=>r.url().endsWith('/api/preview'));release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.ok(await page.locator('#confirm').isHidden());assert.equal(await page.locator('#latitude').inputValue(),'0');assert.equal(f.state.mutations,0);
+  }finally{release();await o.close();}
+ });
+ for(const restore of [false,true])for(const readback of [false,true]){
+  test(`${browserName}: delayed Stop ${readback?'readback':'response'} retains newer ${restore?'Restore':'Skip'} state`,async()=>{
+   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};const o=await open(f,browserName),{page}=o;
+   let release,requested,stopStarted=false;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+   try{
+    if(readback)await page.route('**/api/status',async route=>{if(!stopStarted){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);stopStarted=true;if(readback){await route.fulfill({status:200,body:'{'});return;}requested();await gate;await route.fulfill({status:200,json:raw});});
+    await page.locator('#stop').click();await started;await page.locator('#skip').click();await page.waitForFunction(restore=>document.querySelector('#skip').textContent===(restore?'Skip Asr today':'Restore Asr today')&&!document.querySelector('#skip').disabled,restore);release();
+    await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.startsWith('Playback stopped'));assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');assert.equal(await page.locator('#readiness-text').textContent(),restore?'Ready to play':'Athan skipped today');assert.equal(await page.locator('.time-row[aria-current]').count(),1);assert.equal(await page.locator('.time-row[aria-current] small').textContent(),restore?'Athan on':'Skipped');assert.ok(await page.locator('#stop').isHidden());
+   }finally{release();await o.close();}
+  });
+ }
+ for(const key of ['settings','time_format','display','lights']){
+  test(`${browserName}: delayed Stop retains newer confirmed ${key} preferences`,async()=>{
+   const f=await fixture();f.state.device.playing=true;f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',settings:{enabled:true,brightness_percent:20}};const o=await open(f,browserName),{page}=o;
+   let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+   try{
+    await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    await page.locator('#stop').click();await started;await settings(page);if(key==='time_format')await page.locator('#time-format').selectOption('12');else await slide(page,{settings:'settings-volume',display:'screen-brightness',lights:'lights-brightness'}[key],35);await saved(page,{settings:'preferences',time_format:'format',display:'screen',lights:'lights'}[key]);release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent==='Playback stopped');assert.ok(await page.locator('#settings-stop').isHidden());
+    if(key==='time_format'){assert.equal(await page.locator('#time-format').inputValue(),'12');await page.locator('[data-view="today"]').click();assert.equal(await page.locator('#next-time').textContent(),'3:45 PM');assert.equal(await page.locator('[data-prayer="asr"] dd').textContent(),'3:45 PM');}
+    else assert.equal(await page.locator({settings:'#settings-volume-value',display:'#screen-brightness-value',lights:'#lights-brightness-value'}[key]).textContent(),'35%');
+   }finally{release();await o.close();}
+  });
+ }
+ test(`${browserName}: delayed Stop retains newer firmware check results`,async()=>{
+  const f=await fixture();f.state.device.playing=true;f.state.device.firmware={version:'v0.2.0',state:'current',result:'',error:''};const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+  try{
+   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#stop').click();await started;await settings(page);await page.locator('#firmware-check').click();await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('available'));release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent==='Playback stopped');assert.match(await page.locator('#firmware-status').textContent(),/available/);assert.ok(await page.locator('#settings-stop').isHidden());
+  }finally{release();await o.close();}
+ });
+ test(`${browserName}: delayed Stop cannot hide a newer authoritative playback observation`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+  try{
+   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#stop').click();await started;
+   f.state.device.playing=true;await page.locator('#skip').click();await page.waitForFunction(()=>document.querySelector('#skip').textContent==='Restore Asr today'&&!document.querySelector('#skip').disabled);release();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.includes('waiting for playback')&&!document.querySelector('#stop').disabled);assert.equal(await page.locator('#readiness-text').textContent(),'Playing');assert.ok(await page.locator('#stop').isVisible());
+   await page.unroute('**/api/stop');await page.locator('#stop').click();await page.waitForFunction(()=>document.querySelector('#stop').hidden);assert.equal(await page.locator('#skip').textContent(),'Restore Asr today');assert.equal(f.state.device.playing,false);
+  }finally{release();await o.close();}
+ });
+ test(`${browserName}: Stop accepts its newer response after an older preference response arrives`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let releaseSave,releaseStop,saving,stopping;const saveGate=new Promise(r=>releaseSave=r),stopGate=new Promise(r=>releaseStop=r),saveStarted=new Promise(r=>saving=r),stopStarted=new Promise(r=>stopping=r);
+  try{
+   await page.route('**/api/settings',async route=>{const body=route.request().postDataJSON();f.state.device.settings=body.settings;f.state.device.revision++;const raw=structuredClone(f.state.device);saving();await saveGate;await route.fulfill({status:200,json:raw});});
+   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);stopping();await stopGate;await route.fulfill({status:200,json:raw});});await slide(page,'volume',35);await saveStarted;await page.locator('#stop').click();await stopStarted;releaseSave();await saved(page,'volume');releaseStop();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent==='Playback stopped');assert.ok(await page.locator('#stop').isHidden());assert.equal(await page.locator('#volume-value').textContent(),'35%');
+  }finally{releaseSave();releaseStop();await o.close();}
+ });
+ for(const key of ['display','lights']){
+  test(`${browserName}: delayed Stop retains ${key} application feedback at the same revision`,async()=>{
+   const f=await fixture();f.state.device.playing=true;f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'output_unavailable'};f.state.device.lights={schema:1,supported:true,revision:1,application:'output_unavailable',settings:{enabled:true,brightness_percent:20}};
+   const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r),group=key==='display'?'screen':'lights';
+   try{
+    await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    await page.route('**/api/'+key,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}f.state.device[key].application='applied';await route.fulfill({status:200,json:structuredClone(f.state.device[key])});});
+    await page.locator('#stop').click();await started;await settings(page);await slide(page,key==='display'?'screen-brightness':'lights-brightness',key==='display'?50:20);await page.waitForFunction(group=>document.querySelector('#'+group+'-feedback').textContent==='Saved to speaker',group);assert.equal(f.state.device[key].revision,1);release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent==='Playback stopped');assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');
+   }finally{release();await o.close();}
+  });
+ }
+ test(`${browserName}: an older Stop reply cannot confirm a newer lost Skip outcome`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
+  try{
+   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#stop').click();await started;f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.includes('unconfirmed'));release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent==='Playback stopped');
+   assert.ok(await page.locator('#skip').isDisabled());assert.equal(await page.locator('#readiness-text').textContent(),'Skip state unconfirmed');assert.match(await page.locator('#action-feedback').textContent(),/Skip state unconfirmed/);assert.deepEqual(f.state.device.skip,{day:f.state.device.next.day,prayer:f.state.device.next.prayer});
+   f.state.failRead=false;await refresh(page);await page.waitForFunction(()=>document.querySelector('#skip').textContent==='Restore Asr today'&&!document.querySelector('#skip').disabled);assert.equal(await page.locator('#readiness-text').textContent(),'Athan skipped today');assert.equal(f.state.posts.filter(p=>p.url==='/api/skip').length,1);
   }finally{release();await o.close();}
  });
  test(`${browserName}: text and controls meet the contrast requirements`,async()=>{
