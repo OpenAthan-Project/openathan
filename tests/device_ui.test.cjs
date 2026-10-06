@@ -418,15 +418,18 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
  test(`${browserName}: narrow, desktop, enlarged-text and keyboard layouts preserve controls`,async()=>{
   const f=await fixture(),o=await open(f,browserName),{page}=o;
   try{
-   for(const width of [320,390,1280])for(const scale of [1,2]){
-    await page.setViewportSize({width,height:950});await page.evaluate(scale=>document.documentElement.style.fontSize=16*scale+'px',scale);
-    for(const view of ['today','settings']){
-     await page.locator('[data-view="'+view+'"]').click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width}px ${scale}x ${view}`);
-     const small=await page.locator('button:visible,input[type="range"]:visible,select:visible').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect();return r.height<44||r.width<44;}).map(el=>el.id||el.textContent));assert.deepEqual(small,[]);
+   for(const hours of [12,24]){
+    f.state.device.time_format.hours=hours;f.state.device.time_format.revision++;await refresh(page);
+    for(const font of ['', 'Verdana, sans-serif'])for(const width of [320,390,1280])for(const scale of [1,2]){
+     await page.setViewportSize({width,height:950});await page.evaluate(({scale,font})=>{document.documentElement.style.fontSize=16*scale+'px';if(font)document.documentElement.style.setProperty('--font',font);else document.documentElement.style.removeProperty('--font');},{scale,font});
+     for(const view of ['today','settings']){
+      await page.locator('[data-view="'+view+'"]').click();const layout=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,elements:Array.from(document.querySelectorAll('main *')).filter(el=>{const r=el.getBoundingClientRect();return r.width&&((r.right>innerWidth+1)||(r.left< -1)||el.scrollWidth>el.clientWidth+1);}).map(el=>el.id||el.className||el.tagName+':'+el.textContent.trim().slice(0,30))}));assert.equal(layout.overflow,false,`${width}px ${scale}x ${view} ${hours}h ${font||'system'}: ${layout.elements.join(', ')}`);
+      const small=await page.locator('button:visible,input[type="range"]:visible,select:visible').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect();return r.height<44||r.width<44;}).map(el=>el.id||el.textContent));assert.deepEqual(small,[]);
+     }
     }
    }
-   await page.evaluate(()=>document.documentElement.style.fontSize='16px');await page.setViewportSize({width:390,height:844});await page.locator('[data-view="today"]').click();await page.locator('#volume').focus();// Safari on macOS uses Option-Tab to include buttons in native keyboard traversal.
-   await page.keyboard.press(browserName==='webkit'?'Alt+Tab':'Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'skip');
+   await page.evaluate(()=>{document.documentElement.style.fontSize='16px';document.documentElement.style.removeProperty('--font');});await page.setViewportSize({width:390,height:844});await page.locator('[data-view="today"]').click();await page.locator('#volume').focus();// Safari on macOS uses Option-Tab to include buttons in native keyboard traversal.
+   await page.keyboard.press(browserName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'skip');
    if(process.env.OPENATHAN_UI_CAPTURE){for(const view of ['today','settings']){await page.locator('[data-view="'+view+'"]').click();await page.screenshot({path:join(process.env.OPENATHAN_UI_CAPTURE,`${view}-390-${browserName}.png`),fullPage:true});}await page.setViewportSize({width:1280,height:900});await page.locator('[data-view="today"]').click();await page.screenshot({path:join(process.env.OPENATHAN_UI_CAPTURE,`today-desktop-${browserName}.png`),fullPage:true});}
   }finally{await o.close();}
  });

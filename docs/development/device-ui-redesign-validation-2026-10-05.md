@@ -43,8 +43,10 @@ derived from saved timezone and omitted while waiting; clients tolerate absence.
   draft retention, location handoff, stale previews, setup clock gates, capability
   visibility, coordinate precision, device-local time, update regressions and nonce
   expiry without a second Chromium sign-in prompt.
-- Layout checks: 320px, 390px and 1280px, ordinary and 200% root text; Today and
-  Settings have no horizontal overflow. Buttons/ranges/selects meet 44px dimensions;
+- Layout checks: 320px, 390px and 1280px, ordinary and 200% root text, both time formats and system/wider native fonts;
+  Today and Settings have no horizontal overflow. The first Linux CI run exposed
+  a wide-font time overflow; the corrected hero scale and native-select reflow
+  retain the approved ordinary-size composition. Buttons/ranges/selects meet 44px dimensions;
   checkbox labels provide 48px targets. Native Chromium Tab and macOS Safari
   Option-Tab traversal are checked. Text pairs meet 4.5:1 and control boundaries
   3:1; unchanged status polls do not mutate the readiness live text.
@@ -76,13 +78,13 @@ with both slots and the separate 3.5 MiB shared audio partition unchanged.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Budget remaining |
 | --- | ---: | ---: | ---: | ---: |
-| reference | 1,256,144 | 1,262,080 | +5,936 | 310,784 |
-| isolated | 1,257,904 | 1,263,872 | +5,968 | 308,992 |
-| qualification | 1,263,280 | 1,269,248 | +5,968 | 303,616 |
-| rollback | 1,263,280 | 1,269,248 | +5,968 | 303,616 |
+| reference | 1,256,144 | 1,262,112 | +5,968 | 310,752 |
+| isolated | 1,257,904 | 1,263,888 | +5,984 | 308,976 |
+| qualification | 1,263,280 | 1,269,264 | +5,984 | 303,600 |
+| rollback | 1,263,280 | 1,269,264 | +5,984 | 303,600 |
 
-Reference slot free space is 835,072 bytes;
-the largest affected image leaves 827,904
+Reference slot free space is 835,040 bytes;
+the largest affected image leaves 827,888
 bytes. All exceed the required 512 KiB slot headroom. Capacity checks verified
 factory/OTA payload equality, reviewed dependencies, unchanged partitions,
 qualification/test-material isolation and absence of audio recordings in apps.
@@ -92,18 +94,18 @@ Every final OTA contains the exact current gzip bytes of all three UI assets.
 | --- | ---: | ---: | ---: |
 | `index.html` | 2,553 | 3,395 | +842 |
 | `app.js` | 8,048 | 11,665 | +3,617 |
-| `style.css` | 1,524 | 2,940 | +1,416 |
+| `style.css` | 1,524 | 2,967 | +1,443 |
 
 Total compressed UI assets grow from 12,125
-to 18,000 bytes. No frontend framework, font,
+to 18,027 bytes. No frontend framework, font,
 image, remote asset or new runtime dependency is bundled. npm remains test tooling.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `2d1303e19bd1ed3bd7908a404f4c4d026cb4b5a639e7f0906962ec8fab6cde6d` |
-| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `aa79d4f63e9da0b2775d28a4a505fc07e8b0a6dfb85cac63d2205305675e71dd` |
-| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `bfaf7c36d517eab3c8a9fb0bc39df2760d74e90d3dd463e42aa6d797734be1fe` |
-| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `98567a622ee42db1864d1e44acd8797df4905b380265fada9eb8eb0ee81fc1ec` |
+| reference | `8af88f13d1ff410315a0dd182470fa7bf3817ba0741977d2cb37696372b1d1e3` | `82ca1d836a992490bd1d8490095f29992bc0e1e4f9872b197a6e3ec8a2d09c21` |
+| isolated | `988a71a075bad4b2780134cdda81676d4d8fda8a4ca0e2e18c2c330314dd7a4e` | `3b1a0655ce3f63aab55e4a5beca60ab3de0eb2c56de059b2f2248e183d05b803` |
+| qualification | `685500c1b2911c00daa6bf2042aebf9b8e4d509a44a90fd327755872f5e3a699` | `148dc0ebbeafb49dc7f7808f0d6855ed7de5ba0d30b1b4c8a21c6d92c4f90005` |
+| rollback | `39b85947a3e86e2b553d1f46bbe998a82df5f17423e552563fdfca59091d38bc` | `8d20e392e1bfaef800f8bedeecc19bbea06f04bb77163ee74cbb2d02a6967b19` |
 
 Use the pinned environment and prepared public CI fixture for reproduction:
 

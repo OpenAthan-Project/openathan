@@ -201,11 +201,11 @@
     "typographyMeta": {
       "display": {
         "displayName": "Phone next-time display",
-        "purpose": "Next time at widths from 351px through 767px; uses tabular figures."
+        "purpose": "Next time at widths from 351px through 767px; uses tabular figures. Capped at 25vw for wider system fonts and enlarged text."
       },
       "display-compact": {
         "displayName": "Compact next-time display",
-        "purpose": "Next time at widths up to 350px; uses tabular figures."
+        "purpose": "Next time at widths up to 350px; uses tabular figures. Capped at 25vw for wider system fonts and enlarged text."
       },
       "display-desktop": {
         "displayName": "Desktop next-time display",
@@ -316,7 +316,7 @@
       "kind": "custom",
       "description": "A definition-list row pairing eligibility and a tabular time. One current-day occurrence retains its highlight when skipped; values shown here are illustrative.",
       "html": "<dl class=\"ds-times\"><div class=\"ds-time-row\"><dt>Fajr<small>Athan off</small></dt><dd>6:02 AM</dd></div><div class=\"ds-time-row\" aria-current=\"time\"><dt>Asr<span class=\"ds-visually-hidden\">, next prayer</span><small>Skipped</small></dt><dd>4:18 PM</dd></div></dl>",
-      "css": ".ds-times{margin:0;font:1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8)}.ds-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;min-height:52px;padding:4px 0;border-top:1px solid var(--rule,#354854);background:transparent}.ds-time-row:last-child{border-bottom:1px solid var(--rule,#354854)}.ds-time-row dt{font-weight:600}.ds-time-row dt small{display:block;font-size:.8125rem;line-height:1.4;font-weight:400;color:var(--muted,#b6c5d1)}.ds-time-row dd{margin:0;font-size:1.125rem;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}@media(min-width:768px){.ds-time-row{min-height:76px;padding:16px 0}.ds-time-row dt{font-size:1.125rem}.ds-time-row dt small{font-size:.875rem}.ds-time-row dd{font-size:1.375rem}}.ds-time-row[aria-current=time]{background:var(--upcoming-bg,#2b2c29);color:var(--amber,#f0bb67);border-radius:8px;padding-left:8px;padding-right:8px;margin-left:-8px;margin-right:-8px}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}",
+      "css": ".ds-times{margin:0;font:1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8)}.ds-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;min-height:52px;padding:4px 0;border-top:1px solid var(--rule,#354854);background:transparent}.ds-time-row:last-child{border-bottom:1px solid var(--rule,#354854)}.ds-time-row dt{font-weight:600;overflow-wrap:anywhere}.ds-time-row dt small{display:block;font-size:.8125rem;line-height:1.4;font-weight:400;color:var(--muted,#b6c5d1)}.ds-time-row dd{margin:0;font-size:1.125rem;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}@media(min-width:768px){.ds-time-row{min-height:76px;padding:16px 0}.ds-time-row dt{font-size:1.125rem}.ds-time-row dt small{font-size:.875rem}.ds-time-row dd{font-size:1.375rem}}.ds-time-row[aria-current=time]{background:var(--upcoming-bg,#2b2c29);color:var(--amber,#f0bb67);border-radius:8px;padding-left:8px;padding-right:8px;margin-left:-8px;margin-right:-8px}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}",
       "refersTo": "timetable-row"
     },
     {

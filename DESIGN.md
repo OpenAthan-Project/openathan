@@ -17,13 +17,13 @@ colors:
 typography:
   display:
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "3.875rem"
+    fontSize: "min(3.875rem, 25vw)"
     fontWeight: 700
     lineHeight: 1.1
     letterSpacing: "-0.03em"
   display-compact:
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "3.5rem"
+    fontSize: "min(3.5rem, 25vw)"
     fontWeight: 700
     lineHeight: 1.1
     letterSpacing: "-0.03em"
@@ -262,7 +262,10 @@ The selected hero/control order and single upcoming-row emphasis belong to the
 Buttons, ranges and disclosure summaries have minimum targets (44px); fields and
 checkbox labels use minimum heights (48px). These are minimums, not fixed boxes:
 enlarged text can wrap and extend the document. The checkbox grid adapts to its
-content width; coordinate fields stack at the compact breakpoint.
+content width; coordinate fields stack at the compact breakpoint. Phone hero times
+cap their scale to the viewport to keep each time legible with wider system fonts
+and enlarged text. Prayer names can wrap within the timetable column; native
+selects ellipsize the closed value while their options remain available.
 
 ## Elevation & Depth
 
