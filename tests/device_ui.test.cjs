@@ -101,7 +101,7 @@ async function fixture(){
   }};
 }
 const apiRequests=new WeakMap();
-async function settled(page){
+async function requestsFinished(page){
  // Wait for the gated request chain and a browser task boundary, including JSON
  // handling/readback. This stays independent of the controller's private state.
  const pending=apiRequests.get(page);
@@ -109,6 +109,9 @@ async function settled(page){
   await Promise.all([...pending.values()].map(item=>item.promise));
   await page.evaluate(()=>new Promise(resolve=>{const channel=new MessageChannel();channel.port1.onmessage=()=>{channel.port1.close();channel.port2.close();resolve();};channel.port2.postMessage(null);}));
  }while(pending.size);
+}
+async function settled(page){
+ await requestsFinished(page);
  await page.waitForFunction(()=>!Array.from(document.querySelectorAll('[id$="-feedback"]')).some(el=>/^(Saving…|Waiting to save…|Checking saved state…|Save unconfirmed · checking saved state…|Sending request…|Requesting Stop…)$/.test(el.textContent)));
 }
 async function open(f,name,options={}){
@@ -127,6 +130,40 @@ async function saved(page,id){await page.waitForFunction(id=>/Saved/.test(docume
 async function refresh(page){await settings(page);await page.locator('#refresh').click();await page.locator('[data-view="today"]').click();}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const restore of ['poll','refresh'])for(const key of ['display','lights','time_format'])for(const released of key==='time_format'?[true]:[true,false])test(`${browserName}: restored contact via ${restore} resumes ${key} ${released?'queued saves':'only after drag release'}`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'current',result:'',error:''};
+  f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};
+  f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',settings:{enabled:true,brightness_percent:20}};
+  const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred(),group=key==='display'?'screen':key==='lights'?'lights':'format',id=key==='display'?'screen-brightness':'lights-brightness';let volumeWrites=0;
+  const value=()=>key==='time_format'?f.state.device.time_format.hours:key==='display'?f.state.device.display.brightness_percent:f.state.device.lights.settings.brightness_percent;
+  try{
+   await settled(page);await page.clock.install();await page.route('**/api/settings',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}volumeWrites++;started.resolve();await gate.promise;await route.fulfill({status:503,json:{error:'Volume save unavailable'}});});
+   await slide(page,'volume',25);await started.promise;await settings(page);
+   if(key==='time_format')await page.locator('#time-format').selectOption('12');else if(released)await slide(page,id,35);else await page.locator('#'+id).evaluate(el=>{el.value='35';el.dispatchEvent(new Event('input',{bubbles:true}));});
+   f.state.failRead=true;gate.resolve();await page.waitForFunction(()=>document.getElementById('preferences-feedback').textContent.includes('before another write'));await requestsFinished(page);
+   assert.ok(await page.locator('#connection-banner').isVisible());assert.equal(value(),key==='time_format'?24:key==='display'?50:20);
+   f.state.failRead=false;if(restore==='poll')await page.clock.runFor(5000);else await page.locator('#refresh').click();
+   await page.waitForFunction(()=>document.getElementById('connection-banner').hidden);await requestsFinished(page);
+   assert.ok(await page.locator('#preferences-recovery').isVisible());assert.match(await page.locator('#preferences-recovery').textContent(),/Check saved state/);assert.equal(await page.locator('#settings-volume').inputValue(),'25');assert.equal(volumeWrites,1);assert.equal(f.state.mutations,0);
+   if(!released){assert.equal(value(),key==='display'?50:20);assert.equal(await page.locator('#'+id).inputValue(),'35');assert.match(await page.locator('#'+group+'-feedback').textContent(),/unsaved.*release/i);await page.locator('#'+id).evaluate(el=>el.dispatchEvent(new Event('change',{bubbles:true})));await settled(page);}
+   assert.equal(value(),key==='time_format'?12:35);assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');assert.ok(await page.locator('#'+group+'-recovery').isHidden());
+   assert.equal(f.state.posts.filter(post=>post.url==='/api/'+key.replace('_','-')).length,1);assert.equal(volumeWrites,1);
+  }finally{gate.resolve();await o.close();}
+ });
+ for(const changed of [false,true])for(const edited of [false,true])test(`${browserName}: remote setup completion ${changed?'with new calculations':'at the same revision'} ${edited?'preserves a local draft':'fills untouched fields'}`,async()=>{
+  const f=await fixture();f.state.device.setup='incomplete';f.state.device.automatic_ready=false;
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await settled(page);await page.clock.install();for(const id of ['latitude','longitude','timezone','method'])assert.equal(await page.locator('#'+id).inputValue(),'');
+   if(edited){await page.locator('#latitude').fill('44.123456789');await page.locator('#longitude').fill('-79.987654321');await page.locator('#timezone').fill('America/Toronto');await page.locator('#setup-next').click();await page.locator('#method').selectOption('north_america');}
+   if(changed){f.state.device.revision++;Object.assign(f.state.device.settings,{latitude:43.123456789,longitude:-80.987654321,timezone:'America/Toronto',method:'egyptian'});}
+   f.state.device.setup='active';f.state.device.automatic_ready=true;await page.clock.runFor(5000);await page.waitForFunction(()=>document.getElementById('setup-progress').hidden);await requestsFinished(page);
+   assert.ok(await page.locator('.navigation').isVisible());for(const [id,value] of Object.entries(edited?{latitude:'44.123456789',longitude:'-79.987654321',timezone:'America/Toronto',method:'north_america'}:changed?{latitude:'43.123456789',longitude:'-80.987654321',timezone:'America/Toronto',method:'egyptian'}:{latitude:'0',longitude:'0',timezone:'UTC',method:'muslim_world_league'}))assert.equal(await page.locator('#'+id).inputValue(),value);
+   assert.ok(await page.locator('#confirm').isHidden());assert.equal(f.state.posts.length,0);
+   if(!edited)assert.equal(await page.locator('#prayer-feedback').textContent(),'Saved prayer settings');
+   if(edited){assert.ok(await page.locator('#discard').isVisible());await page.locator('[data-view="today"]').click();await settings(page);assert.equal(await page.locator('#latitude').inputValue(),'44.123456789');}
+  }finally{await o.close();}
+ });
  for(const zone of ['UTC','America/Toronto'])for(const lostReply of [false,true])test(`${browserName}: concurrent ${zone} draft uses confirmed timezone rules after a ${lostReply?'lost':'successful'} save reply`,async()=>{
   const f=await fixture(),toronto={...structuredClone(rules),standard_offset:-18000,daylight_offset:-14400};
   f.state.device.settings.timezone=zone==='UTC'?'America/Toronto':'UTC';f.state.device.settings.timezone_rules=zone==='UTC'?toronto:structuredClone(rules);

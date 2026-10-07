@@ -60,8 +60,27 @@ and preserves exact posted payloads for assertions.
 
 The matched follow-up OTA delta from `9e380af` is **+48 bytes** for reference and
 **+64 bytes** for isolated, qualification and forced rollback. The current tables
-below include both the refactor and these corrections against the original
+below include the refactor and subsequent corrections against the original
 `d8b0042` baseline.
+
+## Follow-up review of `967d8f7`
+
+Successful reads restored contact without restarting eligible queued saves, and
+form synchronization used the previous setup state when another client completed
+setup. Sixteen new Chromium/WebKit cases failed against `967d8f7`; 12 adjacent
+draft and drag safeguards already passed. The 28 added cases cover polling and
+Refresh, independent display/light/time-format saves, unreleased drags, remote
+setup completion with and without a revision change, and actual local drafts.
+
+Accepted responses now resume the existing scheduler after rendering. Its existing
+serialization, blocked-domain and release guards remain authoritative; reconnecting
+does not retry an uncertain volume write. The accepted incomplete-to-active setup
+transition fills untouched fields from confirmed settings, preserving dirty drafts.
+Four additional assertions reproduced stale "Setup not finished" feedback after
+the initial form correction; that same transition now updates the nearby feedback.
+The controller adds four net lines and removes a duplicate queue-resumption call,
+without another state owner, timer, scheduler or dependency.
+The matched OTA delta from `967d8f7` is **+32 bytes** in each affected variant.
 
 ## State ownership and complexity removed
 
@@ -126,12 +145,15 @@ run in both engines and across applicable persistence domains.
 | Storage recovery hides first-run setup, replaces drafts or moves focus on every poll | Recovery retains interaction: setup recovery cases exercise the actual five-second timer, manual waiting-clock completion and helper ready-preview gating |
 | Successful timezone save repeatedly enters recovery after another client saves the drafted zone | Confirmed rules own normalization: `concurrent … draft uses confirmed timezone rules after a … save reply`; both timezone directions, successful/lost replies, exact payloads and coordinate precision |
 | Discard leaves an obsolete review conflict blocking Preview and Skip | Independent controls remain usable: `Discard after a queued review conflict …`; no edits, released preferences and unfinished drags, followed by successful recovery and Skip |
+| Successful contact leaves healthy queued preferences idle after another domain's failed save/readback | Independent controls remain usable: `restored contact via … resumes …`; polling and Refresh across display, lights and time format; uncertain volume remains blocked and drags wait for release |
+| Setup completed by another client leaves untouched fields blank or old setup feedback visible | Accepted setup transition: `remote setup completion …`; unchanged revision and changed calculations; untouched fields adopt confirmed values while actual drafts survive navigation |
 | Narrow/enlarged layouts reorder controls or repeat live feedback | Discoverability and accessibility: Settings keyboard-order matrix, layout/contrast/target tests and unchanged-poll live-text checks |
 
 ## Automated validation
 
-- **360 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 44 added regressions, including the 14 follow-up cases.
+- **388 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 72 added regressions, including 14 first-follow-up and
+  28 second-follow-up cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
   passed. A separate optional visual-capture case passed in both engines.
@@ -173,34 +195,34 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| reference | 1,263,520 | 1,265,312 | +1,792 | +9,168 | 307,552 |
-| isolated | 1,265,296 | 1,267,104 | +1,808 | +9,200 | 305,760 |
-| qualification | 1,270,688 | 1,272,496 | +1,808 | +9,216 | 300,368 |
-| forced rollback | 1,270,688 | 1,272,496 | +1,808 | +9,216 | 300,368 |
+| reference | 1,263,520 | 1,265,344 | +1,824 | +9,200 | 307,520 |
+| isolated | 1,265,296 | 1,267,136 | +1,840 | +9,232 | 305,728 |
+| qualification | 1,270,688 | 1,272,528 | +1,840 | +9,248 | 300,336 |
+| forced rollback | 1,270,688 | 1,272,528 | +1,840 | +9,248 | 300,336 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,840 bytes; the largest variant leaves 824,656 bytes, exceeding
+free space is 831,808 bytes; the largest variant leaves 824,624 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 14,896 | +1,806 | `935f57433837b2da42cec68c02a4d694677270b266c7e8b6d42776b5b9c4d3c0` |
+| `app.js` | 13,090 | 14,921 | +1,831 | `83bba5cea2cc887c87aed9e06dc6c7c45f372ecc198c2808d3151d5415cd0067` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,251 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,276 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `79e3fe730d9a54c2227ccf29e4dd519924ec0b261c9921d47270a9699bc02a3f` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `2920a2653c819ddc5baa4ef300d9668637bd89d7ec4d4d48c0f49611a906c28f` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `a2f400086c6469e1bc8344e6be51c6230f0dd2ef399cc3dedccfa1fa959521e5` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `cc09b8d43f7c6a2737cbba0940a14a3d5387fe5cc3408c3605291b7406cebbf9` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `210f7c50e5485d5eccc2467bca58c3a90ab1d4d082755990cb8ce206a55a8d3c` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `d1dbc87e636e5c4f49d7618f7ec8c1c3543db25e002024602abac95b4ec86606` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `f0e09bd1a7a346799476b182b45cfc818a0e7fc2fbd327a23ea18d285c9ec02a` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `42eceb377fc9be1f0bcd7de84bc9d4c52fa9e5285ea79771911cfd90b75b18a4` |
 
 ## Runtime and physical evidence
 

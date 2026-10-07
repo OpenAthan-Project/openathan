@@ -378,7 +378,6 @@ function acceptResponse({ data, order }, resource = "status") {
       if (actionUncertain && order >= actionOrder) {
         actionUncertain = false;
         status("action", "Skip state checked · review the current prayer");
-        queueMicrotask(pump);
       }
     }
   } else if (resource !== "firmware") accepted[resource] = acceptDomain(resource, data, order);
@@ -395,6 +394,10 @@ function acceptResponse({ data, order }, resource = "status") {
   projectSnapshot();
   if (snapshot) {
     if (stopAwaiting && snapshot.playing === false) stoppedFeedback();
+    if (firstRun && snapshot.setup === "active" && !draftDirty && snapshot.settings) {
+      fillDraft(snapshot.settings);
+      status("prayer", "Saved prayer settings", "success");
+    }
     firstRun = snapshot.setup === "incomplete";
     if (initial) {
       if (snapshot.settings) fillDraft(snapshot.settings, firstRun && snapshot.revision === 1);
@@ -427,6 +430,7 @@ function acceptResponse({ data, order }, resource = "status") {
   }
   render();
   applyPendingLocation();
+  queueMicrotask(pump);
   return accepted;
 }
 function acceptSavedResponse(key, response) {

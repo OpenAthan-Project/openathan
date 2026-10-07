@@ -34,13 +34,18 @@ calculations invalidate pending previews, including late errors. Only one curren
 preview can be submitted. Storage recovery into incomplete setup opens the setup
 view without replacing drafts; repeated polls retain focus. Fresh revision-one
 configuration requires choosing a location. Recovery into active setup keeps the view.
+When another client completes setup, untouched fields adopt the accepted saved
+configuration, even without a revision change. Actual local drafts are retained.
 
 Preference writes merge into confirmed settings, preserving coordinate precision
 and excluding calculation drafts. Settings, display, lights and time format keep
 their existing independent revision contracts. The write scheduler serializes
 writes; Stop remains independent, and a blocked domain does not prevent healthy
-independent preferences from saving. Uncertain writes require readback before
-another write in that domain. Recovery offers Check saved state, Retry with my
+independent preferences from saving.
+Successful contact resumes eligible queued preferences; blocked domains and
+unreleased drags retain their existing recovery and release requirements.
+Uncertain writes require readback before another write in that domain.
+Recovery offers Check saved state, Retry with my
 edits or Use saved values. Recovery updates only its own groups. It resolves
 captured edits while preserving later edits,
 including changes returning to the same value and unreleased drags. Calculation
