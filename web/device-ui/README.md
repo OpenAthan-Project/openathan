@@ -48,6 +48,9 @@ independent preferences from saving.
 Successful contact resumes eligible queued preferences; blocked domains and
 unreleased drags retain their existing recovery and release requirements.
 Uncertain writes require readback before another write in that domain.
+An unconfirmed Skip or Restore holds further prayer-settings and Skip/Restore
+writes until status readback. Once contact returns, screen, lights and time-format
+saves remain eligible under their own revision, recovery and release rules.
 Recovery offers Check saved state, Retry with my
 edits or Use saved values. Recovery updates only its own groups. It resolves
 captured edits while preserving later edits,

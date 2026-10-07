@@ -114,13 +114,13 @@ async function settled(page){
  await requestsFinished(page);
  await page.waitForFunction(()=>!Array.from(document.querySelectorAll('[id$="-feedback"]')).some(el=>/^(Saving…|Waiting to save…|Checking saved state…|Save unconfirmed · checking saved state…|Sending request…|Requesting Stop…)$/.test(el.textContent)));
 }
-async function open(f,name,options={}){
+async function open(f,name,options={},controlledClock=false){
  const browser=await ({chromium,webkit}[name]).launch({headless:true});
  const page=await browser.newPage({httpCredentials:{username:'admin',password:'browser test password'},...options});
  const pending=new Map();apiRequests.set(page,pending);
  page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/'))pending.set(request,deferred());});
  for(const event of ['requestfinished','requestfailed'])page.on(event,request=>{pending.get(request)?.resolve();pending.delete(request);});
- const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(f.url);
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));if(controlledClock)await page.clock.install();await page.goto(f.url);
  await page.waitForFunction(()=>document.querySelector('#latitude').value!==''||document.querySelector('#setup-progress').hidden===false||document.querySelector('#readiness-text').textContent==='Saved storage unavailable');
  return {browser,page,errors,close:async()=>{assert.deepEqual(errors,[]);await browser.close();await f.close();}};
 }
@@ -129,7 +129,53 @@ async function slide(page,id,value){await page.locator('#'+id).evaluate((el,v)=>
 async function saved(page,id){await page.waitForFunction(id=>/Saved/.test(document.querySelector('#'+id+'-feedback').textContent),id);}
 async function refresh(page){await settings(page);await page.locator('#refresh').click();await page.locator('[data-view="today"]').click();}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
+async function loseSkipResponseAndRestoreContact(f,page){
+ f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();
+ await page.waitForFunction(()=>document.getElementById('action-feedback').textContent.includes('unconfirmed'));await requestsFinished(page);
+ assert.ok(await page.locator('#connection-banner').isVisible());
+ await page.route('**/api/status',route=>route.fulfill({status:503,json:{error:'Status temporarily unavailable'}}));
+ f.state.failRead=false;await page.clock.runFor(4000);await requestsFinished(page);
+ assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
+}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const restore of [false,true])for(const key of ['display','lights','time_format'])for(const released of key==='time_format'?[true]:[true,false])test(`${browserName}: unconfirmed ${restore?'Restore':'Skip'} permits independent ${key} ${released?'saves':'only after drag release'}`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.1',state:'idle',supported:true};
+  f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};
+  f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',mode:'green',settings:{enabled:true,brightness_percent:20}};
+  if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};
+  const o=await open(f,browserName,{},true),{page}=o,group={display:'screen',lights:'lights',time_format:'format'}[key],id=key==='display'?'screen-brightness':'lights-brightness',path='/api/'+key.replace('_','-'),actionPath=restore?'/api/cancel-skip':'/api/skip';
+  const value=()=>key==='time_format'?f.state.device.time_format.hours:key==='display'?f.state.device.display.brightness_percent:f.state.device.lights.settings.brightness_percent;
+  try{
+   await settled(page);await loseSkipResponseAndRestoreContact(f,page);await settings(page);
+   if(key==='time_format')await page.locator('#time-format').selectOption('12');else if(released)await slide(page,id,35);else await page.locator('#'+id).evaluate(el=>{el.value='35';el.dispatchEvent(new Event('input',{bubbles:true}));});
+   await requestsFinished(page);
+   if(!released){assert.equal(value(),key==='display'?50:20);assert.equal(f.state.posts.filter(p=>p.url===path).length,0);assert.match(await page.locator('#'+group+'-feedback').textContent(),/unsaved.*release/i);await page.locator('#'+id).evaluate(el=>el.dispatchEvent(new Event('change',{bubbles:true})));await requestsFinished(page);}
+   assert.equal(value(),key==='time_format'?12:35);assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');assert.equal(f.state.posts.filter(p=>p.url===path).length,1);
+   await page.clock.runFor(10000);await requestsFinished(page);assert.equal(f.state.posts.filter(p=>p.url===path).length,1);assert.match(await page.locator('#action-feedback').textContent(),/unconfirmed/);assert.ok(await page.locator('#skip').isDisabled());
+   assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);assert.equal(f.state.mutations,0);
+   await page.unroute('**/api/status');await page.clock.runFor(5000);await requestsFinished(page);await page.locator('[data-view="today"]').click();
+   assert.ok(await page.locator('#skip').isEnabled());assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);assert.equal(f.state.posts.filter(p=>p.url===path).length,1);
+  }finally{await o.close();}
+ });
+ for(const restore of [false,true])for(const reviewed of [false,true])test(`${browserName}: unconfirmed ${restore?'Restore':'Skip'} retains ${reviewed?'reviewed prayer changes':'automatic prayer preferences'} until status readback`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.1',state:'idle',supported:true};
+  f.state.device.settings.latitude=43.123456789;f.state.device.settings.longitude=-79.987654321;
+  if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};
+  const o=await open(f,browserName,{},true),{page}=o,actionPath=restore?'/api/cancel-skip':'/api/skip';
+  try{
+   await settled(page);await loseSkipResponseAndRestoreContact(f,page);await settings(page);await page.locator('#latitude').fill('44.123456789');
+   if(reviewed){await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);await page.locator('#confirm').click();}
+   else{await slide(page,'settings-volume',35);await page.locator('#enabled-asr').uncheck();}
+   await requestsFinished(page);assert.equal(f.state.mutations,0);assert.equal(f.state.posts.filter(p=>['/api/settings','/api/activate'].includes(p.url)).length,0);
+   assert.equal(await page.locator('#latitude').inputValue(),'44.123456789');if(!reviewed){assert.equal(await page.locator('#settings-volume').inputValue(),'35');assert.equal(await page.locator('#enabled-asr').isChecked(),false);}
+   assert.match(await page.locator('#'+(reviewed?'prayer':'preferences')+'-feedback').textContent(),/Waiting to save/);assert.match(await page.locator('#action-feedback').textContent(),/unconfirmed/);
+   await page.clock.runFor(10000);await requestsFinished(page);assert.equal(f.state.mutations,0);assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);
+   await page.unroute('**/api/status');await page.clock.runFor(5000);await requestsFinished(page);
+   if(reviewed)await page.waitForFunction(()=>document.getElementById('prayer-feedback').textContent==='Prayer settings saved');else await saved(page,'preferences');
+   assert.equal(f.state.mutations,1);const body=f.state.posts.find(p=>p.url==='/api/settings').payload;assert.equal(body.expected_revision,1);assert.equal(body.settings.latitude,reviewed?44.123456789:43.123456789);assert.equal(body.settings.longitude,-79.987654321);
+   assert.equal(f.state.device.settings.volume,reviewed?70:35);assert.equal(f.state.device.settings.enabled.asr,reviewed);assert.equal(await page.locator('#latitude').inputValue(),'44.123456789');assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);
+  }finally{await o.close();}
+ });
  for(const key of ['settings','display','lights'])test(`${browserName}: Use saved values discards a captured native ${key} drag before its release`,async()=>{
   const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',settings:{enabled:true,brightness_percent:20}};
   const o=await open(f,browserName),{page}=o,group={settings:'preferences',display:'screen',lights:'lights'}[key],id={settings:'settings-volume',display:'screen-brightness',lights:'lights-brightness'}[key],path=key==='settings'?'settings':key;

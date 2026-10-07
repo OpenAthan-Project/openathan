@@ -107,6 +107,24 @@ lines without a new state owner, timer, scheduler or dependency.
 Matched actual OTAs add **128 bytes** for reference/isolated and **112 bytes**
 for qualification/forced rollback compared with `9d30161`.
 
+## Follow-up review of `f702405`
+
+A lost Skip or Restore response followed by failed status readback left a global
+uncertainty guard blocking the entire write scheduler. A later firmware observation
+restored contact, but screen, lights and time-format edits still could not save.
+Twenty new Chromium/WebKit cases failed against `f702405`; eight adjacent
+prayer-settings readback safeguards already passed.
+
+The existing scheduler now applies that guard to Skip/Restore and the settings
+revision domain. Eligible independent domains keep their own capability, storage,
+recovery and drag-release guards. Prayer-preference and reviewed-calculation writes
+still wait for authoritative status readback; queued edits survive, and the action
+is never repeated. All 28 new cases pass with controlled clocks and failed status
+reads held until independent saves are verified. The controller adds one net line
+without a new state owner, timer, scheduler, request or dependency.
+Matched actual OTAs add **16 bytes** in every affected variant compared with
+`f702405`; compressed JavaScript adds **10 bytes**, with unchanged static RAM.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
@@ -171,6 +189,7 @@ run in both engines and across applicable persistence domains.
 | Successful timezone save repeatedly enters recovery after another client saves the drafted zone | Confirmed rules own normalization: `concurrent … draft uses confirmed timezone rules after a … save reply`; both timezone directions, successful/lost replies, exact payloads and coordinate precision |
 | Discard leaves an obsolete review conflict blocking Preview and Skip | Independent controls remain usable: `Discard after a queued review conflict …`; no edits, released preferences and unfinished drags, followed by successful recovery and Skip |
 | Successful contact leaves healthy queued preferences idle after another domain's failed save/readback | Independent controls remain usable: `restored contact via … resumes …`; polling and Refresh across display, lights and time format; uncertain volume remains blocked and drags wait for release |
+| Unconfirmed Skip/Restore blocks healthy independent preferences after contact returns | Domain-scoped uncertainty: `unconfirmed … permits independent …`; display, lights and time format save while status reads remain unavailable, drags wait for release, and actions are not repeated. `unconfirmed … retains … until status readback` keeps automatic prayer preferences and reviewed calculations queued until readback |
 | Setup completed by another client leaves untouched fields blank or old setup feedback visible | Accepted setup transition: `remote setup completion …`; unchanged revision and changed calculations; untouched fields adopt confirmed values while actual drafts survive navigation |
 | Use saved values leaves a captured drag that saves after release | Captured versions only: `Use saved values discards a captured native … drag before its release`; volume, display and lights with native pointer/keyboard interaction |
 | Fresh unsupported hardware retains controls, queued saves or invented defaults | Capability freshness: `newer unsupported … hides controls despite an older supported reply`, `unsupported … suspends its queued save while healthy preferences remain usable`, `initially unsupported … does not supply a confirmed default after a storage fault`; display and lights, restored support and independent time-format saving |
@@ -178,9 +197,9 @@ run in both engines and across applicable persistence domains.
 
 ## Automated validation
 
-- **406 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 90 added regressions, including 14 first-follow-up,
-  28 second-follow-up and 18 self-review cases.
+- **434 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 118 added regressions, including 14 first-follow-up,
+  28 second-follow-up, 18 self-review and 28 Skip/Restore uncertainty cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
   passed. All 18 self-review cases were rerun after refining fixture defaults and
@@ -223,34 +242,34 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| reference | 1,263,520 | 1,265,472 | +1,952 | +9,328 | 307,392 |
-| isolated | 1,265,296 | 1,267,264 | +1,968 | +9,360 | 305,600 |
-| qualification | 1,270,688 | 1,272,640 | +1,952 | +9,360 | 300,224 |
-| forced rollback | 1,270,688 | 1,272,640 | +1,952 | +9,360 | 300,224 |
+| reference | 1,263,520 | 1,265,488 | +1,968 | +9,344 | 307,376 |
+| isolated | 1,265,296 | 1,267,280 | +1,984 | +9,376 | 305,584 |
+| qualification | 1,270,688 | 1,272,656 | +1,968 | +9,376 | 300,208 |
+| forced rollback | 1,270,688 | 1,272,656 | +1,968 | +9,376 | 300,208 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,680 bytes; the largest variant leaves 824,512 bytes, exceeding
+free space is 831,664 bytes; the largest variant leaves 824,496 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 15,040 | +1,950 | `5de1c0b6e7f06012db3d559e6b6771c23de87b4ab243c03a0a3bccb31d007531` |
+| `app.js` | 13,090 | 15,050 | +1,960 | `29b39d546602690551af11ddb5565a0d7d9a07b44bf07b88fa1766661a0107a7` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,395 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,405 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `051c751755648c5001f8b6dabc4ae59177b9b335db064b3e3332aa7995b6d081` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `bdae3c16e55810524ce9c79c5075170c73b6d6f7e71682ad10d33a9e1930c568` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `eda730b9220a9ed0400f56055384bc5c2684897813c16d74153265f997ef950f` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `15d8c359d1db6aecbf90694fa0d09bab67ab45d8167fa622870aed04a562b7ab` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `9fb6e969d9f79c9e68c83a522ee54fab4419250245a7568f6801808bac591ecb` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `bd639a67954f48be87b770f8e20c31020f762b658e6afd19db99c996104a21d2` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `d18b80f9f699d93cbf7847f0a57f8ea2c2c5aa80b51cfcd486e5270881d0d6d7` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `fcae80af5e06cee44e020ebc5ac1082311875a0ab4eb7a8273fd8f99310ff83e` |
 
 ## Runtime and physical evidence
 

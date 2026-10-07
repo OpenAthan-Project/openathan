@@ -921,9 +921,10 @@ function finishSaved(key, operation, response, verified = false) {
     );
 }
 async function pump() {
-  if (writing() || firmwareBusy || actionUncertain) return;
+  if (writing() || firmwareBusy) return;
   if (
     pendingAction &&
+    !actionUncertain &&
     !settingsFault() &&
     !domains.settings?.operation &&
     !domains.settings?.blocked
@@ -941,7 +942,7 @@ async function pump() {
   }
   const key = Object.keys(specs).find((key) => {
     const d = domains[key];
-    return d?.confirmed && d.supported !== false && !storageFault(d) && !d.blocked && !d.operation && hasQueuedWork(d);
+    return (key !== "settings" || !actionUncertain) && d?.confirmed && d.supported !== false && !storageFault(d) && !d.blocked && !d.operation && hasQueuedWork(d);
   });
   if (!key || !connected) return;
   const d = domains[key],
