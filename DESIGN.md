@@ -165,8 +165,9 @@ physical behavior, runtime headroom or release readiness.
 
 The source for these values is the production [stylesheet](web/device-ui/style.css),
 [markup](web/device-ui/index.html) and [controller](web/device-ui/app.js).
-The [surface contract](.impeccable/surfaces/web-device-ui-index-html.md) owns the
-approved page composition and API behavior. The
+The [surface brief](.impeccable/surfaces/web-device-ui-index-html.md) owns the
+approved page composition. The [device UI README](web/device-ui/README.md) owns
+current runtime behavior, response ordering, saving/recovery and browser testing. The
 [dated validation report](docs/development/device-ui-redesign-validation-2026-10-05.md)
 records the independent finish review and its listed-fix verdict, automated
 API/browser validation and matched firmware capacity measurements. Historical
@@ -174,7 +175,9 @@ prototype reviews remain evidence of the earlier approved browser work, with
 their original simulation-only scope.
 The [holistic review report](docs/development/device-ui-holistic-review-2026-10-06.md)
 records the subsequent shared preference ownership and preview/response lifecycle
-validation; the approved visual composition remains unchanged.
+validation; the approved visual composition remains unchanged. The
+[maintenance validation report](docs/development/device-ui-maintenance-validation-2026-10-07.md)
+records the subsequent behavior-preserving controller organization and test waits.
 
 Representative captures show the real production assets with simulated APIs:
 [phone Today](docs/development/device-ui-redesign/today-phone.png),
@@ -249,18 +252,14 @@ are separated by a gap (64px).
 Navigation is labeled Today/Settings at the phone bottom and moves above the
 content on desktop. The header uses smaller phone typography and stacks at the
 compact breakpoint. Timetable rows remain two columns through responsive reflow.
-The hero is labeled “Next prayer” and uses the device's observed next occurrence.
-Only a matching occurrence in today's timetable is highlighted. A next-day
-occurrence stays in the hero with its date and leaves today's rows neutral.
-Skipping Asr retains its name/time in the hero, shows amber “Athan skipped today”
-and offers “Restore Asr today”. Hero and row advance when authoritative device
-state advances; they retain the last observed state with stale feedback when
-disconnected. Neither identifies an upcoming prayer while waiting for valid time.
-The optional date header uses the device's read-only local date and stays hidden
-when that value is unavailable.
+The “Next prayer” hero uses the display scale and readiness colors below.
+Its matching upcoming row uses a flat amber field and retains the two-column
+name/time structure. Playback and stale-connection feedback use explicit text.
+The [device UI README](web/device-ui/README.md) defines how authoritative device
+observations determine these states.
 
 The selected hero/control order and single upcoming-row emphasis belong to the
-[surface contract](.impeccable/surfaces/web-device-ui-index-html.md).
+[surface brief](.impeccable/surfaces/web-device-ui-index-html.md).
 
 Buttons, ranges and disclosure summaries have minimum targets (44px); fields and
 checkbox labels use minimum heights (48px). These are minimums, not fixed boxes:
@@ -331,7 +330,7 @@ modest control-radius corners. Equal gutters keep columns aligned. Eligibility
 text stays readable; a skipped Athan retains the highlight until the schedule
 advances. Draft previews keep neutral rows. The current row carries aria-current
 and a visually hidden next-prayer label. Its occurrence-selection rule belongs
-to the surface contract.
+to the surface brief.
 
 ### Notices / Containers
 

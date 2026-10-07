@@ -62,102 +62,43 @@ surface without physical-board simulation, code-only labels or decorative effect
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
-## Implemented behavior and constraints
+## Approved composition
 
-Keep operation local, assets compressed, system fonts, existing APIs and persistence
-domains. Preserve coordinate precision, revisions, consumption history and
-readback-before-retry. Automatic writes must not commit unconfirmed prayer edits.
-Drafts survive in-page navigation; browser navigation warns before discarding them.
+The [device UI README](../../web/device-ui/README.md) owns the current runtime,
+API-observation, saving/recovery, draft/setup and browser-testing contract.
+The [design system](../../DESIGN.md) owns extracted visual tokens and component
+rules. This brief records the approved hierarchy and interaction presentation.
 
-### Authoritative prayer and playback state
-
-`GET /api/status` supplies the device clock readiness, setup/application state,
-playback-active boolean, next occurrence, skip and today's timetable. The UI uses
-the returned local strings and saved 12/24-hour preference. The optional read-only
-`local_date` field supplies the date header when the clock is ready; clients
-tolerate absence and never substitute the browser's date or timezone. Its valid
-clock value comes from the saved device timezone. This additive status field
-does not identify the playing prayer or change persistence.
-
-Connection loss marks retained observations stale and the current playback state
-unknown, without claiming the speaker stopped. Do not invent playback history,
-current-playing prayer identity or a device-accurate countdown.
-Highlight the upcoming scheduled occurrence, independently of whether its Athan
-is skipped. Label the hero “Next prayer” and bind it to that same observed occurrence.
-Asr stays in the hero and highlighted until authoritative device state advances;
-skip and restore retain both. Skipping shows “Athan skipped today” and “Restore
-Asr today”, with no separate next-audible announcement. Later-day actions use the
-reported occurrence date when `local_date` is available. Use a flat amber-tinted
-field and amber name/time, preserving eligibility wording with no duplicate
-visible next badge.
-Only the confirmed Today timetable has a current row; draft/setup review tables do not.
-Match the row by the authoritative device next occurrence prayer and UTC instant,
-never browser time or prayer name alone. A later-day occurrence remains a dated
-hero only because no current-day row has its UTC instant. Skip/Restore requests
-retain the reported day/prayer key and settings revision. Preserve the
-last observed hero name/time, highlight, eligibility and Skip/Restore action with
-stale connection feedback. If contact is lost during Skip/Restore, show an
-unconfirmed outcome without claiming success, then reconcile the authoritative
-device state on reconnect. Show no hero name/time or highlight while waiting
-for valid time.
-The current row uses `aria-current=time` and a visually hidden next-prayer label.
-
-Stop is reachable in Today and the sticky Settings playback container while
-playback is reported active. It has an independent request path and remains
-available during preference saves. An HTTP-successful Stop response that still
-reports `playing:true` stays pending. Only authoritative `playing:false` confirms
-completion. A failed response triggers readback; failed readback reports Stop
-unconfirmed and warns that playback may still be active. Both views retain the
-same pending, confirmed or unconfirmed feedback.
-
-### Automatic preferences and prayer drafts
-
-Volume and enabled prayers share the settings revision domain. Display brightness,
-light preferences and time format retain their independent revision domains and
-existing request payloads. Screen/light controls appear only for supported
-capabilities; absence does not block prayer scheduling or local setup.
-
-Slider output follows input immediately; pointer release or coalesced keyboard
-changes enqueue the preference write. Writes are serialized while each domain
-retains its own confirmed values, versioned field edits, captured operation and
-recovery state. Both volume controls share one field and one keyboard timer.
-Preference saves merge into confirmed settings and never include the
-separate unconfirmed location/calculation/offset draft. Save feedback distinguishes
-stored values, pending application, unavailable output and storage/application
-failure. Status refreshes keep unsaved edits; conflicts keep them for an explicit
-choice. Uncertain writes read the matching domain before another write. Recovery
-offers checking saved state, retrying retained preference edits or using saved
-values; prayer conflicts require a new preview before confirmation. Discarding
-preference edits preserves an independent prayer draft.
-
-Location, timezone, calculation/Asr/high-latitude conventions and offsets remain
-a versioned prayer draft. A matching ready preview enables explicit confirmation;
-new edits or authoritative calculation changes invalidate the old preview. Back
-and Discard also invalidate pending results and errors; duplicate pending previews
-are prevented.
-Preview never activates setup or changes durable state. Coordinate fields retain
-their supplied precision. Both 12-hour and 24-hour views use the saved device
-preference for Today and preview values.
-
-### First-run setup and optional helper
-
-First run leads through Location → Calculation → Review timetable → Finish setup,
-with native validation and destination focus on step changes. Everyday preferences
-and navigation stay out of this flow. Manual entry works locally; the optional
-HTTPS location helper opens separately and returns a validated proposal that
-does not overwrite a dirty draft without an explicit choice. A helper proposal
-requires a ready preview before activation. Manual setup can finish with a
-`waiting_for_time` preview and a clear warning that announcements wait for a valid
-clock. Invalid schedules cannot be confirmed. Existing owner-requested firmware
-update controls remain in Settings with their original safety/state contract.
+- Today leads with the device date, “Next prayer” hero, time and readiness,
+  immediately followed by volume and named Skip/Restore controls. The ruled
+  two-column timetable highlights one matching current-day occurrence with a
+  flat amber field, amber name/time, `aria-current=time` and a visually hidden
+  next-prayer label; there is no duplicate visible badge. A later-day occurrence
+  appears only in the dated hero.
+- Skipped Athan keeps the same hero and highlight, shows “Athan skipped today”
+  and the named Restore action. Connection feedback marks retained information
+  stale. Waiting for valid time shows no invented upcoming prayer.
+- Stop remains reachable in Today and the sticky Settings playback container.
+  Both placements display the same pending, confirmed or unconfirmed feedback.
+- Settings groups everyday preferences, prayer calculations, optional screen/
+  lights, time format and updates. Native controls show input immediately, with
+  nearby save feedback and recovery choices. Reviewed calculations use a
+  separate timetable and explicit confirmation.
+- First run presents Location → Calculation → Review timetable → Finish setup,
+  with destination focus on step changes. Everyday preferences, navigation and
+  updates stay outside this flow. Manual entry stays available; the optional
+  location helper returns a proposal for review.
 
 ## Validation and evidence
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
 retains the initial integration and dated review evidence. The
 [holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)
-records the current controller, invariant-to-test matrix, full automated checks
-and matched pinned OTA measurements. Browser checks cover 320px, 390px and desktop,
+records its controller revision, invariant-to-test matrix, full automated checks
+and matched pinned OTA measurements. The
+[maintenance validation report](../../docs/development/device-ui-maintenance-validation-2026-10-07.md)
+records the subsequent controller cleanup and its regression/capacity checks.
+Browser checks cover 320px, 390px and desktop,
 enlarged text, keyboard/focus, touch targets, contrast, 12/24-hour formatting and
 live text without polling chatter. They inspect semantics and DOM behavior;
 actual assistive-technology speech is unmeasured.

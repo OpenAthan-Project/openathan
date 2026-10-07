@@ -2,12 +2,41 @@
 
 The reference firmware embeds this responsive interface and serves it locally
 at its unique `http://openathan-<suffix>.local/` address, with an IPv4 fallback.
+This README owns the current behavior and browser-testing contract. The
+[design system](../../DESIGN.md) owns visual rules; the
+[surface brief](../../.impeccable/surfaces/web-device-ui-index-html.md) records the
+approved composition. Dated validation reports retain evidence for their listed
+revisions.
+
+## Current behavior
+
+### Prayer and playback observations
+
 Today leads with the device’s authoritative next prayer, its local time and
 readiness, followed immediately by volume and named Skip/Restore controls. The
 highlight stays on that occurrence when skipped. An occurrence outside today’s
 timetable has a dated hero and no highlighted row. Connection loss freezes the
 last observed information and marks it stale; it does not assert playback stopped.
 Stop stays reachable from Today and Settings while playback is reported active.
+The current row matches the device's next prayer and UTC instant, rather than
+prayer name or browser time alone. Only the confirmed Today timetable has a
+highlight; preview and setup-review tables do not.
+
+`GET /api/status` supplies clock/setup readiness, playback-active state, the next
+occurrence, skip and today's timetable. Displayed times use the returned local
+strings and confirmed 12/24-hour preference. The optional read-only `local_date`
+supplies the date header from the saved device timezone when the clock is ready;
+clients tolerate its absence and hide the header rather than use the browser's
+date. No playing-prayer identity, playback history or device-accurate countdown
+is inferred. Skip/Restore keep the reported day/prayer key and settings revision.
+
+Stop bypasses the preference-write scheduler. An HTTP-successful response that
+still reports `playing:true` remains pending; only authoritative `playing:false`
+confirms completion. A failed response triggers readback. Failed readback reports
+an unconfirmed Stop and warns that playback may remain active. Today and Settings
+share that pending, confirmed or unconfirmed feedback.
+
+### Everyday preferences
 
 Settings groups Athan preferences, prayer calculations, optional screen/lights,
 time format and updates. Markup follows the phone section order for keyboard and
@@ -25,6 +54,8 @@ an ongoing drag retains its edited value. Feedback and recovery stay beside the
 affected group, distinguishing unsaved input, saving, confirmed storage, applying,
 unavailable output and failure.
 
+### Prayer drafts and first-run setup
+
 Location, timezone, calculation conventions, high-latitude rules and offsets remain
 a separate draft until **Preview timetable → Confirm prayer changes**. Timezone
 rules come from confirmed settings; same-zone saves preserve the current rules
@@ -34,11 +65,15 @@ while waiting for a valid clock, with an explicit warning; helper proposals requ
 a ready preview. Drafts survive Today/Settings navigation and device-status refreshes; browser navigation
 warns before discarding prayer edits. Back, Discard, draft changes and changed saved
 calculations invalidate pending previews, including late errors. Only one current
-preview can be submitted. Storage recovery into incomplete setup opens the setup
-view without replacing drafts; repeated polls retain focus. Fresh revision-one
+preview can be submitted. Preview never activates setup or changes durable state;
+invalid schedules cannot be confirmed. Setup step changes use native validation
+and focus their destination headings. Storage recovery into incomplete setup opens
+the setup view without replacing drafts; repeated polls retain focus. Fresh revision-one
 configuration requires choosing a location. Recovery into active setup keeps the view.
 When another client completes setup, untouched fields adopt the accepted saved
 configuration, even without a revision change. Actual local drafts are retained.
+
+### Saving, recovery and response ordering
 
 Preference writes merge into confirmed settings, preserving coordinate precision
 and excluding calculation drafts. Settings, display, lights and time format keep
@@ -81,11 +116,14 @@ without confirmed values show unknown values. Prayer drafts survive faults, and
 confirmed time format stays in use during unresolved edits. No settings defaults,
 playback identity or stopped playback are inferred from missing information.
 
+### Local access and optional location helper
+
 Assets work without the public website or a CDN. Device access uses the password
 chosen over USB and browser-native Digest login with username `admin`.
 An optional **Find my location** link opens the public HTTPS helper in a new tab.
 It can suggest browser coordinates or an approximate IP location, then returns
-proposed values in a versioned URL fragment. The fragment is checked and removed
+proposed values in a versioned URL fragment. A proposal does not replace a dirty
+prayer draft without an explicit choice. The fragment is checked and removed
 from the address bar; only supported timezones are suggested. The device requires
 a ready timetable preview before a returned location can be saved. If its clock
 has not synchronized, wait and preview again. Manual entry remains available
@@ -111,6 +149,8 @@ records physical evidence and its limits. `index.html`, `app.js`, and `style.css
 compressed into firmware during code generation; no public website build is
 involved. The npm dependency is for browser testing only.
 
+## Browser validation
+
 Browser tests use the production C++ Digest verifier with simulated settings
 endpoints. Build its host adapter from the repository root before running tests:
 
@@ -122,6 +162,12 @@ npm ci --ignore-scripts
 npx playwright install chromium webkit
 OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
 ```
+
+Tests control races with response gates and browser clocks. Startup waits for
+rendered settings or setup; subsequent waits observe each scenario's confirmed
+values, recovery choices, playback state or preview controls. Completed requests
+alone do not establish that the UI applied a response. No global list of pending
+feedback phrases or additional test-only controller state is needed.
 
 Linux requires OpenSSL development headers. To use a different build directory,
 set `OPENATHAN_DIGEST_TEST_BRIDGE` to the adapter's absolute path.
@@ -138,6 +184,8 @@ future work.
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
 retains integration evidence. The [holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)
-records current browser/API coverage, the finding-to-test matrix, matched OTA sizes
-and runtime limitations.
+records its browser/API coverage, finding-to-test matrix, matched OTA sizes and
+runtime limitations. The [maintenance validation report](../../docs/development/device-ui-maintenance-validation-2026-10-07.md)
+records the subsequent controller organization, scenario-specific test waits and
+matched capacity measurements.
 Browser fixtures are simulated; they do not establish physical-device behavior.

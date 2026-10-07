@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-06T03:40:27Z",
+  "generatedAt": "2026-10-07T13:49:45Z",
   "title": "Design System: OpenAthan device UI",
   "extensions": {
     "scope": {
@@ -15,7 +15,7 @@
       ],
       "surfaceContract": ".impeccable/surfaces/web-device-ui-index-html.md",
       "finishRecord": "docs/development/device-ui-redesign-validation-2026-10-05.md",
-      "validationReport": "docs/development/device-ui-redesign-validation-2026-10-05.md",
+      "validationReport": "docs/development/device-ui-maintenance-validation-2026-10-07.md",
       "representativeCaptures": [
         "docs/development/device-ui-redesign/today-phone.png",
         "docs/development/device-ui-redesign/today-desktop.png",
@@ -24,7 +24,8 @@
         "docs/development/device-ui-redesign/setup-review-phone.png"
       ],
       "captureData": "Real production assets with simulated API data; no physical observations or firmware raster assets.",
-      "historicalProvenance": "Earlier prototype reviews remain simulation-only; the original generated composition predates the user-approved highlight and Next prayer revisions."
+      "historicalProvenance": "Earlier prototype reviews remain simulation-only; the original generated composition predates the user-approved highlight and Next prayer revisions.",
+      "behaviorContract": "web/device-ui/README.md"
     },
     "colorMeta": {
       "primary": {
