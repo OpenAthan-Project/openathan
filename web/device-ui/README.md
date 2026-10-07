@@ -67,7 +67,10 @@ All response paths use the same acceptance rules. Durable values follow their
 revisions; playback, timetable, readiness, application feedback and update status
 also preserve newer observations. Older responses cannot clear newer storage
 faults, overwrite newer healthy values or acknowledge edits prematurely. Stale
-confirmations retain edits and require fresh saved-state recovery. An older update
+confirmations retain edits and require fresh saved-state recovery. Reconnect uses
+the same policy: an older reconnect response cannot confirm a newer unanswered
+Skip or Restore, even after Stop has confirmed an earlier action. Fresh status
+readback is still required. An older update
 poll cannot hide a newer available update. A readable storage fault stays connected,
 retains last confirmed values and disables only affected controls. Unreadable stores
 without confirmed values show unknown values. Prayer drafts survive faults, and

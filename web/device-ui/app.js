@@ -444,7 +444,7 @@ function acceptResponse({ data, order }, resource = "status") {
 }
 function acceptSavedResponse(key, response) {
   const result = acceptResponse(response, key === "settings" ? "status" : key)[key];
-  if (!result || result.stale || (!connected && response.order < contactOrder)) {
+  if (!result || result.stale) {
     const error = new Error("Newer saved state requires fresh readback");
     error.stale = true;
     error.order = response.order;
@@ -1394,12 +1394,6 @@ $("skip").addEventListener("click", () => {
 for (const id of ["stop", "settings-stop"]) $(id).addEventListener("click", stopPlayback);
 $("reconnect").addEventListener("click", async () => {
   if (await refresh()) {
-    if (actionUncertain) {
-      actionUncertain = false;
-      status("action", "Skip state checked · review the current prayer");
-      render();
-      pump();
-    }
     for (const key of Object.keys(domains))
       if (domains[key].blocked === "uncertain") await resolve(key, false);
   }

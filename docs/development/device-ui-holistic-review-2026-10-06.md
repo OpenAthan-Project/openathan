@@ -125,6 +125,26 @@ without a new state owner, timer, scheduler, request or dependency.
 Matched actual OTAs add **16 bytes** in every affected variant compared with
 `f702405`; compressed JavaScript adds **10 bytes**, with unchanged static RAM.
 
+## Confirmation cleanup of `94af0bd`
+
+Reconnect duplicated the common acceptance policy by clearing action uncertainty
+whenever its status request succeeded. An older reconnect response could therefore
+confirm a newer lost Skip or Restore after an intervening Stop. Eight new
+Chromium/WebKit cases failed against `94af0bd`; all eight pass after removing that
+override. They cover both actions and Stop from Today or Settings, retain queued
+volume edits and calculation drafts, allow independent time-format saving, and
+require fresh status before saving prayer preferences. Each action is sent once.
+
+The reconnect handler retains domain recovery and timezone retries. Action
+confirmation follows the accepted observation's request order. Save-response
+acceptance also removes a disconnected check that could never run after successful
+acceptance had established contact; its missing/stale-result, revision and fault
+checks remain. These deletions remove six net controller lines without adding
+state, requests, timers, dependencies or another recovery path.
+Matched actual OTAs decrease **32 bytes** for reference and **48 bytes** for
+isolated, qualification and forced rollback compared with `94af0bd`. Compressed
+JavaScript decreases **38 bytes**, with unchanged static RAM.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
@@ -181,6 +201,7 @@ run in both engines and across applicable persistence domains.
 | Older available/current firmware poll or Stop result reverses update observations | Freshness per resource: `shared acceptance keeps newer update status after an older firmware poll`, `delayed Stop retains newer firmware check results` |
 | Older healthy save/readback clears a newer revision, application failure or storage fault | Revision and fault acceptance: `a stale healthy … acknowledgment retains newer preferences and user edits`, same-revision application cases, older save/storage-fault cases |
 | Older Skip/Restore/Stop regresses occurrence, readiness, timetable or playback | Operational freshness: delayed Skip/Restore response/readback cases, `delayed Stop cannot hide a newer authoritative playback observation`, newer timetable/date cases |
+| Older reconnect clears a newer lost Skip/Restore after Stop | Confirmation ownership: `older reconnect cannot confirm newer lost … after … Stop`; both actions and both Stop views, queued volume and preserved calculation draft, independent time-format saving, then fresh status without repeated actions |
 | Older failed refresh/readback marks newer successful contact disconnected | Contact freshness: `shared acceptance ignores an older … refresh failure after newer contact`, `stale … readback preserves connection and active Stop` |
 | Lost reply retries an already committed write, or allows another write without confirmation | Readback before writing: `lost committed response is verified once without repeating a save`, uncertain and committed-write recovery cases in all domains |
 | A faulted/conflicted prayer domain prevents healthy controls or Stop | Independent controls remain usable: `a … queued Skip allows independent saves and waits for recovery`, unreadable-store cases, Stop-during-save checks |
@@ -197,9 +218,10 @@ run in both engines and across applicable persistence domains.
 
 ## Automated validation
 
-- **434 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 118 added regressions, including 14 first-follow-up,
-  28 second-follow-up, 18 self-review and 28 Skip/Restore uncertainty cases.
+- **442 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 126 added regressions, including 14 first-follow-up,
+  28 second-follow-up, 18 self-review, 28 Skip/Restore uncertainty cases and eight
+  reconnect-confirmation overlap cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
   passed. All 18 self-review cases were rerun after refining fixture defaults and
@@ -242,34 +264,34 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| reference | 1,263,520 | 1,265,488 | +1,968 | +9,344 | 307,376 |
-| isolated | 1,265,296 | 1,267,280 | +1,984 | +9,376 | 305,584 |
-| qualification | 1,270,688 | 1,272,656 | +1,968 | +9,376 | 300,208 |
-| forced rollback | 1,270,688 | 1,272,656 | +1,968 | +9,376 | 300,208 |
+| reference | 1,263,520 | 1,265,456 | +1,936 | +9,312 | 307,408 |
+| isolated | 1,265,296 | 1,267,232 | +1,936 | +9,328 | 305,632 |
+| qualification | 1,270,688 | 1,272,608 | +1,920 | +9,328 | 300,256 |
+| forced rollback | 1,270,688 | 1,272,608 | +1,920 | +9,328 | 300,256 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,664 bytes; the largest variant leaves 824,496 bytes, exceeding
+free space is 831,696 bytes; the largest variant leaves 824,544 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 15,050 | +1,960 | `29b39d546602690551af11ddb5565a0d7d9a07b44bf07b88fa1766661a0107a7` |
+| `app.js` | 13,090 | 15,012 | +1,922 | `dc450b340763800ef7f01a67b2a49229e5e63a9c6eaad0c653da3196121396c5` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,405 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,367 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `9fb6e969d9f79c9e68c83a522ee54fab4419250245a7568f6801808bac591ecb` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `bd639a67954f48be87b770f8e20c31020f762b658e6afd19db99c996104a21d2` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `d18b80f9f699d93cbf7847f0a57f8ea2c2c5aa80b51cfcd486e5270881d0d6d7` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `fcae80af5e06cee44e020ebc5ac1082311875a0ab4eb7a8273fd8f99310ff83e` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `5faf9eb2fc8f79200827c61f6f5e3762a2fbd6959680f18a4f478e4fc148f36f` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `0786d65311ec05d61ea81435530a7d234711627632641c676fb5167a70ee8aa5` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `ac19a96d3b6bde3ac1c80aff4731f6824cb1d18065e5e03f0156347c127065e2` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `a07299ccedd4d71e9bd157550d83817345596a466495e08427c2f696c09719dc` |
 
 ## Runtime and physical evidence
 

@@ -138,6 +138,38 @@ async function loseSkipResponseAndRestoreContact(f,page){
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const restore of [false,true])for(const stopView of ['today','settings'])test(`${browserName}: older reconnect cannot confirm newer lost ${restore?'Restore':'Skip'} after ${stopView} Stop`,async()=>{
+  const f=await fixture();f.state.device.playing=true;f.state.device.firmware={version:'v0.2.1',state:'idle',supported:true};
+  f.state.device.settings.latitude=43.123456789;f.state.device.settings.longitude=-79.987654321;
+  if(!restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred(),actionPath=restore?'/api/cancel-skip':'/api/skip';
+  try{
+   await settled(page);f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();
+   await page.waitForFunction(()=>document.getElementById('action-feedback').textContent.includes('unconfirmed'));await requestsFinished(page);
+   await page.route('**/api/status',async route=>{const raw=structuredClone(f.state.device);started.resolve();await gate.promise;await route.fulfill({status:200,json:raw});},{times:1});
+   await page.locator('#reconnect').click();await started.promise;f.state.failRead=false;
+   // Firmware contact restores Stop without confirming the outstanding action.
+   await page.clock.runFor(3000);await page.waitForFunction(()=>document.getElementById('connection-banner').hidden);assert.ok(await page.locator('#skip').isDisabled());
+   if(stopView==='settings')await settings(page);
+   const stopId=stopView==='settings'?'settings-stop':'stop';assert.ok(await page.locator('#'+stopId).isEnabled());await page.locator('#'+stopId).click();
+   await page.waitForFunction(id=>document.getElementById(id).hidden&&!document.getElementById('skip').disabled,stopId);
+   if(stopView==='settings')await page.locator('[data-view="today"]').click();
+   assert.equal(await page.locator('#skip').textContent(),restore?'Restore Asr today':'Skip Asr today');
+   f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();
+   await page.waitForFunction(action=>document.getElementById('action-feedback').textContent.includes(action+' unconfirmed'),restore?'Restore':'Skip');
+   assert.ok(await page.locator('#skip').isDisabled());assert.equal(!!f.state.device.skip,!restore);
+   gate.resolve();await requestsFinished(page);
+   assert.ok(await page.locator('#skip').isDisabled(),'An older reconnect must not confirm the newer lost action');assert.match(await page.locator('#action-feedback').textContent(),/unconfirmed/);
+   assert.ok(await page.locator('#connection-banner').isHidden());await settings(page);await page.locator('#latitude').fill('44.123456789');await slide(page,'settings-volume',35);await requestsFinished(page);
+   assert.match(await page.locator('#preferences-feedback').textContent(),/Waiting to save/);assert.equal(f.state.mutations,0);
+   await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(f.state.device.time_format.hours,12);assert.equal(f.state.mutations,0);
+   assert.deepEqual(f.state.posts.filter(p=>['/api/skip','/api/cancel-skip','/api/stop'].includes(p.url)).map(p=>p.url),[restore?'/api/skip':'/api/cancel-skip','/api/stop',actionPath]);
+   f.state.failRead=false;await page.locator('#refresh').click();await saved(page,'preferences');await requestsFinished(page);
+   assert.equal(f.state.mutations,1);const payload=f.state.posts.find(p=>p.url==='/api/settings').payload;assert.equal(payload.expected_revision,1);assert.equal(payload.settings.volume,35);assert.equal(payload.settings.latitude,43.123456789);assert.equal(payload.settings.longitude,-79.987654321);
+   assert.equal(await page.locator('#latitude').inputValue(),'44.123456789');assert.equal(f.state.posts.filter(p=>p.url==='/api/time-format').length,1);assert.equal(f.state.posts.filter(p=>['/api/skip','/api/cancel-skip','/api/stop'].includes(p.url)).length,3);
+   await page.locator('[data-view="today"]').click();assert.ok(await page.locator('#skip').isEnabled());assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');
+  }finally{gate.resolve();await o.close();}
+ });
  for(const restore of [false,true])for(const key of ['display','lights','time_format'])for(const released of key==='time_format'?[true]:[true,false])test(`${browserName}: unconfirmed ${restore?'Restore':'Skip'} permits independent ${key} ${released?'saves':'only after drag release'}`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.1',state:'idle',supported:true};
   f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};
