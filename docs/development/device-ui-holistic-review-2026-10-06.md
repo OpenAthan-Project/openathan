@@ -176,6 +176,30 @@ contact assertion. That helper and its independent-domain checks now await
 restored contact, confirmed saving and restored action availability. The gates
 use visible UI outcomes and retain the assertions and simulated request counts.
 
+## Timetable revision review of `352fefc`
+
+A Stop response could have newer request order but an older prayer-settings
+revision. Its playback observation remained useful, but it replaced the timetable
+and upcoming occurrence after an offset save: saved Asr at 16:45 displayed 15:45.
+Four new Chromium/WebKit cases initially failed against `352fefc`, covering Stop
+replies and lost-reply readbacks. Reverse-delivery cases initially passed because
+later save verification repaired the display. Holding that verification exposed
+old prayer times after the new revision had been accepted; all eight gated cases
+fail on `352fefc` and pass after the correction. They also send Skip with the
+confirmed revision and corrected UTC occurrence, retaining one highlighted row.
+
+The existing acceptance policy now rejects lower-revision prayer observations
+and accepts the timetable accompanying a newly confirmed revision. Same-revision
+observations retain request freshness. Playback has a separate request-order field
+within the existing observation owner, so a Stop confirmation remains usable
+without reviving older prayer data. Older faults and uncertain writes retain their
+existing readback rules. The correction adds 12 net controller lines and one
+freshness field, without another snapshot owner, timer, request path, dependency
+or API change.
+Matched actual OTAs increase **144 bytes** for reference, qualification and forced
+rollback, and **128 bytes** for isolated compared with `352fefc`. Compressed
+JavaScript increases **152 bytes**, with unchanged static RAM.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
@@ -195,9 +219,10 @@ fresh readback before another write in the affected domain.
 
 Requests return internal `{data, order}` metadata. One acceptance policy handles
 status, saves, recovery/readback, Stop, Skip and firmware responses. Durable values
-follow their own revisions; operational, application and update observations also
-follow request order. Older responses cannot clear newer faults or acknowledge
-unconfirmed edits. The rendered snapshot projects confirmed domain values onto
+follow their own revisions; prayer observations stay aligned with settings revision
+and use request order within that revision. Playback, application and update
+observations retain their independent freshness. Older responses cannot clear newer
+faults or acknowledge unconfirmed edits. The rendered snapshot projects confirmed domain values onto
 operational observations; it is not another mutable source of saved preferences.
 
 Previews capture a unique operation, draft version and confirmed calculation
@@ -233,6 +258,7 @@ run in both engines and across applicable persistence domains.
 | Older available/current firmware poll or Stop result reverses update observations | Freshness per resource: `shared acceptance keeps newer update status after an older firmware poll`, `delayed Stop retains newer firmware check results` |
 | Older healthy save/readback clears a newer revision, application failure or storage fault | Revision and fault acceptance: `a stale healthy … acknowledgment retains newer preferences and user edits`, same-revision application cases, older save/storage-fault cases |
 | Older Skip/Restore/Stop regresses occurrence, readiness, timetable or playback | Operational freshness: delayed Skip/Restore response/readback cases, `delayed Stop cannot hide a newer authoritative playback observation`, newer timetable/date cases |
+| A newer-order Stop reply carries an older settings revision and restores old prayer times | Revision-aligned observations: `revision-aligned timetable survives … prayer-save confirmation`; replies/readbacks in both delivery orders, Stop confirmation, one highlight and a subsequent Skip using the saved revision and occurrence |
 | Older reconnect clears a newer lost Skip/Restore after Stop | Confirmation ownership: `older reconnect cannot confirm newer lost … after … Stop`; both actions and both Stop views, queued volume and preserved calculation draft, independent time-format saving, then fresh status without repeated actions |
 | Older failed refresh/readback marks newer successful contact disconnected | Contact freshness: `shared acceptance ignores an older … refresh failure after newer contact`, `stale … readback preserves connection and active Stop` |
 | Lost reply retries an already committed write, or allows another write without confirmation | Readback before writing: `lost committed response is verified once without repeating a save`, uncertain and committed-write recovery cases in all domains |
@@ -250,10 +276,10 @@ run in both engines and across applicable persistence domains.
 
 ## Automated validation
 
-- **456 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 140 added regressions, including 14 first-follow-up,
+- **464 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 148 added regressions, including 14 first-follow-up,
   28 second-follow-up, 18 self-review, 28 Skip/Restore uncertainty cases and eight
-  reconnect-confirmation overlap cases, plus 14 location-fragment cases.
+  reconnect-confirmation overlap cases, plus 14 location-fragment and eight timetable-revision overlap cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
   passed. All 18 self-review cases were rerun after refining fixture defaults and
@@ -296,34 +322,34 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| reference | 1,263,520 | 1,265,456 | +1,936 | +9,312 | 307,408 |
-| isolated | 1,265,296 | 1,267,248 | +1,952 | +9,344 | 305,616 |
-| qualification | 1,270,688 | 1,272,624 | +1,936 | +9,344 | 300,240 |
-| forced rollback | 1,270,688 | 1,272,624 | +1,936 | +9,344 | 300,240 |
+| reference | 1,263,520 | 1,265,600 | +2,080 | +9,456 | 307,264 |
+| isolated | 1,265,296 | 1,267,376 | +2,080 | +9,472 | 305,488 |
+| qualification | 1,270,688 | 1,272,768 | +2,080 | +9,488 | 300,096 |
+| forced rollback | 1,270,688 | 1,272,768 | +2,080 | +9,488 | 300,096 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,696 bytes; the largest variant leaves 824,528 bytes, exceeding
+free space is 831,552 bytes; the largest variant leaves 824,384 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 15,021 | +1,931 | `ab5e6911a6b4d8b9f7bb0a472ae0e43b5051f5ffd89136ff818e4da8074cdfce` |
+| `app.js` | 13,090 | 15,173 | +2,083 | `905bb2a7f9935354c49ef21ddf620f9a39d99df022019fcdbc254964bdfe7ded` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,376 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,528 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `646197f2df705c1815b680323d73be4bfc29d7e85b954549b4fd3f918df22f9a` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `3dba79bd31b45bb7e09994b94112777797f140983a5509808abaf517ffe689e2` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `e7f9513b600931e94614ce39b8804cee141143d0d36dd61e436ec1083d8490a4` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `4752d19d285e7fdff33cd7dd791910009f7c31abf1de34a30644b862c5b6a23b` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `8d63279ab1d3f3b26baac1bc7bd55dabb65191b6bd50bb82e0e912e83e15432b` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `ff2bce24419143b823eaf84eeeed348536be0316d63ed64e1d69ea1690ec17d4` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `8cc7c2f3ffe6def773d3846d81f89de4987a4989ccb662d29993b5d62e76551f` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `46130b4894324dd604c17f5642923297c56eb8d3b71b40ccff68c215c34f8473` |
 
 ## Runtime and physical evidence
 

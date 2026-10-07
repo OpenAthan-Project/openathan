@@ -139,6 +139,43 @@ async function loseSkipResponseAndRestoreContact(f,page){
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const stopFirst of [false,true])for(const readback of [false,true])test(`${browserName}: revision-aligned timetable survives ${readback?'Stop readback':'Stop reply'} ${stopFirst?'before':'after'} prayer-save confirmation`,async()=>{
+  const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName,{},true),{page}=o;
+  const saveGate=deferred(),saveStarted=deferred(),stopGate=deferred(),stopStarted=deferred(),verificationGate=deferred(),verificationStarted=deferred();let saves=0,stops=0,reads=0;
+  try{
+   await settled(page);await settings(page);await page.locator('#calculation-fields summary').click();await page.locator('#offset-asr').fill('60');await page.locator('#preview').click();await page.waitForFunction(()=>!document.getElementById('confirm').hidden);
+   await page.route('**/api/settings',async route=>{
+    saves++;const body=route.request().postDataJSON();assert.equal(body.expected_revision,1);assert.equal(body.settings.offsets.asr,60);saveStarted.resolve();await saveGate.promise;
+    f.state.device.settings=body.settings;f.state.device.revision++;const asr=f.state.device.schedule.times[3];asr.local='2026-09-25 16:45';asr.utc+=3600;f.state.device.next={...f.state.device.next,local:asr.local,utc:asr.utc};
+    await route.fulfill({status:200,json:structuredClone(f.state.device)});
+   });
+   await page.route('**/api/status',async route=>{
+    reads++;
+    if(readback&&reads===1){const old=structuredClone(f.state.device);stopStarted.resolve();await stopGate.promise;await route.fulfill({status:200,json:old});return;}
+    verificationStarted.resolve();await verificationGate.promise;await route.continue();
+   });
+   await page.route('**/api/stop',async route=>{
+    stops++;f.state.device.playing=false;
+    if(readback){await route.fulfill({status:200,body:'{'});return;}
+    const old=structuredClone(f.state.device);stopStarted.resolve();await stopGate.promise;await route.fulfill({status:200,json:old});
+   });
+   await page.locator('#confirm').click();await saveStarted.promise;await page.locator('#settings-stop').click();await stopStarted.promise;
+   if(stopFirst){stopGate.resolve();await page.locator('#settings-stop').waitFor({state:'hidden'});}
+   saveGate.resolve();
+   if(stopFirst){
+    await verificationStarted.promise;await page.locator('[data-view="today"]').click();
+    assert.equal(await page.locator('#next-time').textContent(),'16:45','Accept the saved revision\'s timetable before verification finishes');assert.equal(await page.locator('#times [data-prayer="asr"] dd').textContent(),'16:45');assert.ok(await page.locator('#stop').isHidden());
+    await settings(page);verificationGate.resolve();
+   }
+   await page.waitForFunction(()=>document.getElementById('prayer-feedback').textContent==='Prayer settings saved');
+   if(!stopFirst){stopGate.resolve();await page.locator('#settings-stop').waitFor({state:'hidden'});}
+   await settled(page);assert.equal(await page.locator('#offset-asr').inputValue(),'60');assert.ok(await page.locator('#settings-stop').isHidden());assert.match(await page.locator('#settings-playback-feedback').textContent(),/Playback stopped/);
+   await page.locator('[data-view="today"]').click();assert.equal(await page.locator('#next-name').textContent(),'Asr');assert.equal(await page.locator('#next-time').textContent(),'16:45');assert.equal(await page.locator('[data-prayer="asr"] dd').first().textContent(),'16:45');assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'asr');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());assert.equal(await page.locator('#skip').textContent(),'Skip Asr today');
+   assert.equal(f.state.device.revision,2);assert.equal(saves,1);assert.equal(stops,1);assert.equal(reads,Number(readback)+Number(stopFirst));assert.equal(f.state.posts.length,1); // Only the preview uses the simulated server; routed mutations are counted above.
+   await page.locator('#skip').click();await page.waitForFunction(()=>document.getElementById('skip').textContent==='Restore Asr today'&&!document.getElementById('skip').disabled);
+   const skipped=f.state.posts.find(p=>p.url==='/api/skip').payload;assert.equal(skipped.expected_revision,2);assert.equal(skipped.occurrence.utc,f.state.device.schedule.times[3].utc);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'asr');assert.match(await page.locator('#times [data-prayer="asr"] dt').textContent(),/Skipped/);
+  }finally{saveGate.resolve();stopGate.resolve();verificationGate.resolve();await o.close();}
+ });
  for(const atLoad of [false,true])for(const unavailable of ['timezones','storage'])test(`${browserName}: pending helper from ${atLoad?'page URL':'hash handoff'} survives Skip to content during unavailable ${unavailable}`,async()=>{
   const f=await fixture();f.state.device.setup='incomplete';f.state.device.automatic_ready=false;const persisted=structuredClone(f.state.device),fragment='v=1&latitude=43.123456789&longitude=-79.987654321&source=browser&timezone=America%2FToronto';
   if(unavailable==='timezones')f.state.failTimezones=true;else{f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';delete f.state.device.settings;}

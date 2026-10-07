@@ -13,7 +13,7 @@ const specs = {
 const domains = {},
   renderKeys = new Map(),
   supportedZones = new Set();
-const observedStatus = { data: null, order: 0 },
+const observedStatus = { data: null, order: 0, playbackOrder: 0 },
   firmware = { data: null, order: 0 };
 let requestOrder = 0,
   contactOrder = 0,
@@ -367,11 +367,18 @@ function acceptResponse({ data, order }, resource = "status") {
   if (resource === "status") {
     if (!Number.isInteger(data?.revision) || (!data.settings && !storageFault(data)))
       throw new Error("Device status is incomplete");
+    const previousRevision = domains.settings?.confirmed?.revision ?? 0;
     accepted.settings = acceptDomain("settings", data, order);
     for (const key of ["display", "lights", "time_format"])
       if (data[key]) accepted[key] = acceptDomain(key, data[key], order);
-    if (order >= observedStatus.order) {
-      // Durable settings are projected from their domain, never from this copy.
+    // Prayer observations belong to their saved revision. A newly accepted
+    // revision carries its timetable even if its request preceded a Stop reply.
+    if (
+      !accepted.settings.lower &&
+      (order >= observedStatus.order ||
+        (!settingsFault() && domains.settings.confirmed?.revision > previousRevision))
+    ) {
+      // Durable settings are projected from their domain; playback is independent.
       const {
         settings,
         revision,
@@ -380,14 +387,19 @@ function acceptResponse({ data, order }, resource = "status") {
         lights,
         time_format,
         firmware: update,
+        playing,
         ...operational
       } = data;
-      observedStatus.data = operational;
+      observedStatus.data = { ...operational, playing: observedStatus.data?.playing };
       observedStatus.order = order;
       if (actionUncertain && order >= actionOrder) {
         actionUncertain = false;
         status("action", "Skip state checked · review the current prayer");
       }
+    }
+    if (order >= observedStatus.playbackOrder) {
+      observedStatus.data = { ...observedStatus.data, playing: data.playing };
+      observedStatus.playbackOrder = order;
     }
   } else if (resource !== "firmware") accepted[resource] = acceptDomain(resource, data, order);
   const update = resource === "firmware" ? data : resource === "status" ? data.firmware : null;

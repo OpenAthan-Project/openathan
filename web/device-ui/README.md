@@ -65,8 +65,12 @@ changes require confirmed outcomes or an explicit recovery choice.
 
 All response paths use the same acceptance rules. Durable values follow their
 revisions; playback, timetable, readiness, application feedback and update status
-also preserve newer observations. Older responses cannot clear newer storage
-faults, overwrite newer healthy values or acknowledge edits prematurely. Stale
+also preserve newer observations. Timetable, upcoming occurrence, local date and
+prayer readiness stay aligned with the accepted settings revision. A delayed
+lower-revision Stop reply can confirm playback independently without replacing
+those prayer observations. A newly accepted settings revision supplies its own
+timetable; same-revision responses retain request freshness. Older responses cannot
+clear newer storage faults, overwrite newer healthy values or acknowledge edits prematurely. Stale
 confirmations retain edits and require fresh saved-state recovery. Reconnect uses
 the same policy: an older reconnect response cannot confirm a newer unanswered
 Skip or Restore, even after Stop has confirmed an earlier action. Fresh status
