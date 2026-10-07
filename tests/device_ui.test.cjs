@@ -102,8 +102,8 @@ async function fixture(){
 }
 const apiRequests=new WeakMap();
 async function requestsFinished(page){
- // Wait for the gated request chain and a browser task boundary, including JSON
- // handling/readback. This stays independent of the controller's private state.
+ // Drain observed requests and allow a browser task boundary. Await the affected
+ // UI outcome separately; network completion does not guarantee application.
  const pending=apiRequests.get(page);
  do{
   await Promise.all([...pending.values()].map(item=>item.promise));
@@ -135,6 +135,7 @@ async function loseSkipResponseAndRestoreContact(f,page){
  assert.ok(await page.locator('#connection-banner').isVisible());
  await page.route('**/api/status',route=>route.fulfill({status:503,json:{error:'Status temporarily unavailable'}}));
  f.state.failRead=false;await page.clock.runFor(4000);await requestsFinished(page);
+ await page.locator('#connection-banner').waitFor({state:'hidden'});
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
@@ -219,10 +220,11 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    if(key==='time_format')await page.locator('#time-format').selectOption('12');else if(released)await slide(page,id,35);else await page.locator('#'+id).evaluate(el=>{el.value='35';el.dispatchEvent(new Event('input',{bubbles:true}));});
    await requestsFinished(page);
    if(!released){assert.equal(value(),key==='display'?50:20);assert.equal(f.state.posts.filter(p=>p.url===path).length,0);assert.match(await page.locator('#'+group+'-feedback').textContent(),/unsaved.*release/i);await page.locator('#'+id).evaluate(el=>el.dispatchEvent(new Event('change',{bubbles:true})));await requestsFinished(page);}
-   assert.equal(value(),key==='time_format'?12:35);assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');assert.equal(f.state.posts.filter(p=>p.url===path).length,1);
+   await saved(page,group);assert.equal(value(),key==='time_format'?12:35);assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');assert.equal(f.state.posts.filter(p=>p.url===path).length,1);
    await page.clock.runFor(10000);await requestsFinished(page);assert.equal(f.state.posts.filter(p=>p.url===path).length,1);assert.match(await page.locator('#action-feedback').textContent(),/unconfirmed/);assert.ok(await page.locator('#skip').isDisabled());
    assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);assert.equal(f.state.mutations,0);
    await page.unroute('**/api/status');await page.clock.runFor(5000);await requestsFinished(page);await page.locator('[data-view="today"]').click();
+   await page.waitForFunction(()=>!document.getElementById('skip').disabled);
    assert.ok(await page.locator('#skip').isEnabled());assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');assert.equal(f.state.posts.filter(p=>p.url===actionPath).length,1);assert.equal(f.state.posts.filter(p=>p.url===path).length,1);
   }finally{await o.close();}
  });

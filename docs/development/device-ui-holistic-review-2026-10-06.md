@@ -171,6 +171,11 @@ correct suggestion without further interaction. These assertions now wait for
 the resulting coordinates or invalid-link message, rather than network completion
 alone. The production correction remains the same two controller lines.
 
+A subsequent Linux run failed the existing Skip/Restore helper's immediate
+contact assertion. That helper and its independent-domain checks now await
+restored contact, confirmed saving and restored action availability. The gates
+use visible UI outcomes and retain the assertions and simulated request counts.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
