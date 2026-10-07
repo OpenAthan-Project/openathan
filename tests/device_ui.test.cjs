@@ -148,6 +148,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await page.locator('.skip-link').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>location.hash==='#main');assert.equal(await page.evaluate(()=>document.activeElement.id),'main');
    if(unavailable==='timezones')f.state.failTimezones=false;else f.state.device=persisted;
    if(await page.locator('#settings-view').isHidden())await settings(page);await page.locator('#refresh').click();await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('latitude').value==='43.123456789');
    assert.equal(await page.locator('#latitude').inputValue(),'43.123456789','The pending helper must survive unrelated fragment navigation');assert.equal(await page.locator('#longitude').inputValue(),'-79.987654321');assert.equal(await page.locator('#timezone').inputValue(),'America/Toronto');assert.match(await page.locator('#location-feedback').textContent(),/Browser location suggested/);
    assert.ok(await page.locator('#confirm').isHidden());assert.equal(f.state.mutations,0);assert.equal(f.state.posts.length,0);assert.equal(f.state.device.settings.latitude,0);
   }finally{await o.close();}
@@ -159,6 +160,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    if(malformed)await page.locator('#latitude').fill('45.5');
    await page.evaluate(bad=>location.hash=bad?'v=1&latitude=invalid&longitude=-79.2&source=ip':'v=1&latitude=44.4&longitude=-79.2&source=ip&timezone=UTC&accuracy=40',malformed);await page.waitForFunction(()=>location.hash==='');
    f.state.failTimezones=false;await page.locator('#refresh').click();await requestsFinished(page);
+   await page.waitForFunction(bad=>bad?document.getElementById('prayer-feedback').textContent.includes('Location link was invalid'):document.getElementById('latitude').value==='44.4',malformed);
    assert.equal(await page.locator('#latitude').inputValue(),malformed?'45.5':'44.4');
    if(malformed){assert.match(await page.locator('#prayer-feedback').textContent(),/Location link was invalid/);assert.ok(await page.locator('#location-feedback').isHidden());}
    else{assert.equal(await page.locator('#longitude').inputValue(),'-79.2');assert.equal(await page.locator('#timezone').inputValue(),'UTC');assert.match(await page.locator('#location-feedback').textContent(),/Approximate IP location.*40 km/);}

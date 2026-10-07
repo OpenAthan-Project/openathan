@@ -165,6 +165,12 @@ Matched actual OTAs are unchanged for reference and increase **16 bytes** for
 isolated, qualification and forced rollback compared with `2b1cae1`. Compressed
 JavaScript increases **9 bytes**, with unchanged static RAM.
 
+The first Linux CI run exposed early assertions in two new Chromium cases.
+Repeated runs with the same Node version observed blank fields followed by the
+correct suggestion without further interaction. These assertions now wait for
+the resulting coordinates or invalid-link message, rather than network completion
+alone. The production correction remains the same two controller lines.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
