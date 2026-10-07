@@ -130,6 +130,53 @@ async function saved(page,id){await page.waitForFunction(id=>/Saved/.test(docume
 async function refresh(page){await settings(page);await page.locator('#refresh').click();await page.locator('[data-view="today"]').click();}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const key of ['settings','display','lights'])test(`${browserName}: Use saved values discards a captured native ${key} drag before its release`,async()=>{
+  const f=await fixture();f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};f.state.device.lights={schema:1,supported:true,revision:1,application:'applied',settings:{enabled:true,brightness_percent:20}};
+  const o=await open(f,browserName),{page}=o,group={settings:'preferences',display:'screen',lights:'lights'}[key],id={settings:'settings-volume',display:'screen-brightness',lights:'lights-brightness'}[key],path=key==='settings'?'settings':key;
+  const store=()=>key==='settings'?f.state.device:f.state.device[key],value=()=>key==='settings'?store().settings.volume:key==='lights'?store().settings.brightness_percent:store().brightness_percent;
+  try{
+   await settled(page);await page.clock.install();await settings(page);store().revision++;if(key==='settings')store().settings.volume=80;else if(key==='lights')store().settings.brightness_percent=80;else store().brightness_percent=80;
+   await slide(page,id,25);await page.waitForFunction(group=>document.getElementById(group+'-recovery').textContent.includes('Use saved values'),group);await requestsFinished(page);
+   const range=page.locator('#'+id);await range.scrollIntoViewIfNeeded();await range.focus();const box=await range.boundingBox(),fraction=await range.evaluate(el=>(+el.value-+el.min)/(+el.max-+el.min));await page.mouse.move(box.x+10+(box.width-20)*fraction,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+10+(box.width-20)*.35,box.y+box.height/2);
+   assert.ok(+await range.inputValue()>=30&&+await range.inputValue()<=40);await page.locator('#'+group+'-recovery button').last().focus();await page.keyboard.press('Enter');await requestsFinished(page);
+   assert.ok(await page.locator('#'+group+'-recovery').isHidden());assert.equal(await range.inputValue(),'80');await page.mouse.up();await page.clock.runFor(400);await requestsFinished(page);
+   assert.equal(value(),80);assert.equal(await range.inputValue(),'80');assert.equal(await page.locator('#'+group+'-feedback').textContent(),'Saved to speaker');assert.equal(f.state.posts.filter(p=>p.url==='/api/'+path).length,1);
+  }finally{await page.mouse.up();await o.close();}
+ });
+ for(const key of ['display','lights']){
+  const available=()=>key==='display'?{schema:1,supported:true,revision:3,brightness_percent:50,application:'applied'}:{schema:1,supported:true,revision:3,application:'applied',mode:'green',settings:{enabled:true,brightness_percent:20}};
+  // These are the production local API's shapes after a firmware variant no
+  // longer initializes the optional preference store.
+  const unsupported=()=>key==='display'?{schema:1,supported:false,revision:0,brightness_percent:50,application:'unsupported'}:{schema:1,supported:false,revision:0,application:'unsupported',mode:'off'};
+  const controls=key==='display'?'screen-controls':'light-controls',id=key==='display'?'screen-brightness':'lights-brightness';
+  test(`${browserName}: newer unsupported ${key} hides controls despite an older supported reply`,async()=>{
+   const f=await fixture();f.state.device[key]=available();f.state.device.playing=true;const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+   try{
+    await settled(page);await page.clock.install();await settings(page);assert.ok(await page.locator('#'+controls).isVisible());
+    await page.route('**/api/status',async route=>{const raw=structuredClone(f.state.device);started.resolve();await gate.promise;await route.fulfill({status:200,json:raw});},{times:1});
+    await page.locator('#refresh').click();await started.promise;f.state.device[key]=unsupported();await page.locator('#settings-stop').click();await page.waitForFunction(()=>document.getElementById('settings-playback-feedback').textContent==='Playback stopped');
+    assert.ok(await page.locator('#'+controls).isHidden());gate.resolve();await requestsFinished(page);assert.ok(await page.locator('#'+controls).isHidden());assert.ok(await page.locator('#hardware-group').isHidden());
+    f.state.device[key]=available();await page.locator('#refresh').click();await requestsFinished(page);assert.ok(await page.locator('#'+controls).isVisible());assert.equal(await page.locator('#'+id).inputValue(),key==='display'?'50':'20');assert.ok(await page.locator('#enabled-asr').isEnabled());
+   }finally{gate.resolve();await o.close();}
+  });
+  test(`${browserName}: unsupported ${key} suspends its queued save while healthy preferences remain usable`,async()=>{
+   const f=await fixture();f.state.device[key]=available();f.state.device.playing=true;const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred(),group=key==='display'?'screen':'lights',value=()=>key==='display'?f.state.device[key].brightness_percent:f.state.device[key].settings.brightness_percent;
+   try{
+    await settled(page);await page.clock.install();f.state.writeWait=gate.promise;f.state.writeRequested=started.resolve;await slide(page,'volume',25);await started.promise;await settings(page);await slide(page,id,35);
+    f.state.device[key]=unsupported();await page.locator('#settings-stop').click();await page.waitForFunction(()=>document.getElementById('settings-playback-feedback').textContent==='Playback stopped');assert.ok(await page.locator('#'+controls).isHidden());
+    gate.resolve();await requestsFinished(page);assert.equal(f.state.posts.filter(p=>p.url==='/api/'+key).length,0);await page.locator('#time-format').selectOption('12');await saved(page,'format');assert.equal(f.state.device.time_format.hours,12);
+    f.state.device[key]=available();await page.locator('#refresh').click();await saved(page,group);assert.ok(await page.locator('#'+controls).isVisible());assert.equal(value(),35);assert.equal(f.state.posts.filter(p=>p.url==='/api/'+key).length,1);assert.equal(f.state.posts.find(p=>p.url==='/api/'+key).payload.expected_revision,3);
+   }finally{gate.resolve();await o.close();}
+  });
+  test(`${browserName}: initially unsupported ${key} does not supply a confirmed default after a storage fault`,async()=>{
+   const f=await fixture();f.state.device[key]=unsupported();const o=await open(f,browserName),{page}=o;
+   try{
+    await settled(page);await page.clock.install();await settings(page);assert.ok(await page.locator('#'+controls).isHidden());f.state.device[key]=key==='display'?{schema:1,supported:true,revision:0,brightness_percent:50,application:'storage_fault'}:{schema:1,supported:true,revision:0,application:'storage_fault',mode:'off'};
+    await page.locator('#refresh').click();await requestsFinished(page);assert.ok(await page.locator('#'+controls).isVisible());assert.ok(await page.locator('#'+id).isDisabled());assert.equal(await page.locator('#'+id+'-value').textContent(),'—');assert.ok(await page.locator('#enabled-asr').isEnabled());
+   }finally{await o.close();}
+  });
+ }
+
  for(const restore of ['poll','refresh'])for(const key of ['display','lights','time_format'])for(const released of key==='time_format'?[true]:[true,false])test(`${browserName}: restored contact via ${restore} resumes ${key} ${released?'queued saves':'only after drag release'}`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'current',result:'',error:''};
   f.state.device.display={schema:1,supported:true,revision:1,brightness_percent:50,application:'applied'};

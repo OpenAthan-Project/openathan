@@ -13,6 +13,9 @@ Settings groups Athan preferences, prayer calculations, optional screen/lights,
 time format and updates. Markup follows the phone section order for keyboard and
 screen-reader navigation; desktop placement retains two columns. First run hides
 everyday preferences and updates until setup finishes.
+Fresh unsupported-hardware observations hide the affected controls and suspend
+their queued saves. Older responses cannot restore them; edits remain available
+if the capability returns. Unsupported defaults are never confirmed preferences.
 
 Volume, enabled prayers, screen/light preferences and time format save automatically.
 Both volume controls edit the same value: later input in either view cancels an
@@ -48,7 +51,9 @@ Uncertain writes require readback before another write in that domain.
 Recovery offers Check saved state, Retry with my
 edits or Use saved values. Recovery updates only its own groups. It resolves
 captured edits while preserving later edits,
-including changes returning to the same value and unreleased drags. Calculation
+including changes returning to the same value and unreleased drags.
+Use saved values also discards captured drags that have not yet been released;
+releasing them afterward cannot save the discarded value. Calculation
 conflicts require fresh preview/confirmation. Discard cancels an unsent reviewed
 prayer change while keeping automatic preferences. With no preference edits or
 settings operation remaining, it releases the canceled review's block and restores

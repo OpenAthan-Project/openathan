@@ -82,6 +82,31 @@ The controller adds four net lines and removes a duplicate queue-resumption call
 without another state owner, timer, scheduler or dependency.
 The matched OTA delta from `967d8f7` is **+32 bytes** in each affected variant.
 
+## Self-review of `9d30161`
+
+The complete PR review reproduced two remaining acceptance gaps. In WebKit,
+choosing Use saved values while a native pointer drag was held could leave that
+captured edit intact; releasing afterward saved the discarded value. Recovery
+now discards the captured versions even when the readback already matches saved
+values. Later edits still survive through the existing version check.
+
+Optional display/light responses report `supported: false`, revision zero and
+no loaded preferences after a firmware variant stops initializing that hardware.
+Those fresh observations were rejected as older saved revisions, retaining
+obsolete controls and queued writes. The common acceptance policy now orders
+unsupported observations independently of saved values, using the existing domain
+order. It hides controls and suspends their queued writes; healthy domains stay
+usable, retained edits can resume when support returns, and older replies cannot
+restore the capability. Unsupported brightness defaults never become confirmed
+preferences, including a later transition into unreadable storage.
+
+Eighteen new Chromium/WebKit cases use native pointer/keyboard input, controlled
+clocks and response gates. Thirteen failed on `9d30161`; five adjacent safeguards
+already passed. All 18 pass with the focused changes, which add 12 net controller
+lines without a new state owner, timer, scheduler or dependency.
+Matched actual OTAs add **128 bytes** for reference/isolated and **112 bytes**
+for qualification/forced rollback compared with `9d30161`.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
@@ -147,16 +172,19 @@ run in both engines and across applicable persistence domains.
 | Discard leaves an obsolete review conflict blocking Preview and Skip | Independent controls remain usable: `Discard after a queued review conflict …`; no edits, released preferences and unfinished drags, followed by successful recovery and Skip |
 | Successful contact leaves healthy queued preferences idle after another domain's failed save/readback | Independent controls remain usable: `restored contact via … resumes …`; polling and Refresh across display, lights and time format; uncertain volume remains blocked and drags wait for release |
 | Setup completed by another client leaves untouched fields blank or old setup feedback visible | Accepted setup transition: `remote setup completion …`; unchanged revision and changed calculations; untouched fields adopt confirmed values while actual drafts survive navigation |
+| Use saved values leaves a captured drag that saves after release | Captured versions only: `Use saved values discards a captured native … drag before its release`; volume, display and lights with native pointer/keyboard interaction |
+| Fresh unsupported hardware retains controls, queued saves or invented defaults | Capability freshness: `newer unsupported … hides controls despite an older supported reply`, `unsupported … suspends its queued save while healthy preferences remain usable`, `initially unsupported … does not supply a confirmed default after a storage fault`; display and lights, restored support and independent time-format saving |
 | Narrow/enlarged layouts reorder controls or repeat live feedback | Discoverability and accessibility: Settings keyboard-order matrix, layout/contrast/target tests and unchanged-poll live-text checks |
 
 ## Automated validation
 
-- **388 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 72 added regressions, including 14 first-follow-up and
-  28 second-follow-up cases.
+- **406 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 90 added regressions, including 14 first-follow-up,
+  28 second-follow-up and 18 self-review cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
-  passed. A separate optional visual-capture case passed in both engines.
+  passed. All 18 self-review cases were rerun after refining fixture defaults and
+  mode values against production API source. A separate optional visual-capture case passed in both engines.
 
 - **103 Python tests passed**, with zero skips. Production and isolated adapters
   exercise the actual API, persistence, activation, timezone conversion and Digest
@@ -195,34 +223,34 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| reference | 1,263,520 | 1,265,344 | +1,824 | +9,200 | 307,520 |
-| isolated | 1,265,296 | 1,267,136 | +1,840 | +9,232 | 305,728 |
-| qualification | 1,270,688 | 1,272,528 | +1,840 | +9,248 | 300,336 |
-| forced rollback | 1,270,688 | 1,272,528 | +1,840 | +9,248 | 300,336 |
+| reference | 1,263,520 | 1,265,472 | +1,952 | +9,328 | 307,392 |
+| isolated | 1,265,296 | 1,267,264 | +1,968 | +9,360 | 305,600 |
+| qualification | 1,270,688 | 1,272,640 | +1,952 | +9,360 | 300,224 |
+| forced rollback | 1,270,688 | 1,272,640 | +1,952 | +9,360 | 300,224 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,808 bytes; the largest variant leaves 824,624 bytes, exceeding
+free space is 831,680 bytes; the largest variant leaves 824,512 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 14,921 | +1,831 | `83bba5cea2cc887c87aed9e06dc6c7c45f372ecc198c2808d3151d5415cd0067` |
+| `app.js` | 13,090 | 15,040 | +1,950 | `5de1c0b6e7f06012db3d559e6b6771c23de87b4ab243c03a0a3bccb31d007531` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,276 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,395 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `210f7c50e5485d5eccc2467bca58c3a90ab1d4d082755990cb8ce206a55a8d3c` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `d1dbc87e636e5c4f49d7618f7ec8c1c3543db25e002024602abac95b4ec86606` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `f0e09bd1a7a346799476b182b45cfc818a0e7fc2fbd327a23ea18d285c9ec02a` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `42eceb377fc9be1f0bcd7de84bc9d4c52fa9e5285ea79771911cfd90b75b18a4` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `051c751755648c5001f8b6dabc4ae59177b9b335db064b3e3332aa7995b6d081` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `bdae3c16e55810524ce9c79c5075170c73b6d6f7e71682ad10d33a9e1930c568` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `eda730b9220a9ed0400f56055384bc5c2684897813c16d74153265f997ef950f` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `15d8c359d1db6aecbf90694fa0d09bab67ab45d8167fa622870aed04a562b7ab` |
 
 ## Runtime and physical evidence
 

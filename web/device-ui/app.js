@@ -272,7 +272,7 @@ function acceptDomain(key, data, order) {
   if (!data || !Number.isInteger(data.revision)) return { stale: true };
   const fault = storageFault(data),
     value = valueFrom(key, data);
-  if (!fault && !value) return { stale: true };
+  if (!fault && !value && data.supported !== false) return { stale: true };
   let d = domains[key];
   if (!d)
     d = domains[key] = {
@@ -286,6 +286,15 @@ function acceptDomain(key, data, order) {
       blocked: null
     };
   const older = order < d.order;
+  // Unsupported hardware has no loaded preference revision. Accept capability
+  // freshness without turning its defaults into confirmed saved values.
+  if (data.supported === false) {
+    if (!older) {
+      d.order = order;
+      d.supported = false;
+    }
+    return { stale: true };
+  }
   const lower = d.confirmed && !fault && data.revision < d.confirmed.revision && !storageFault(d);
   const stale = !!(lower || older);
   if (lower || (older && (fault || storageFault(d)))) return { stale: true, lower: !!lower };
@@ -932,7 +941,7 @@ async function pump() {
   }
   const key = Object.keys(specs).find((key) => {
     const d = domains[key];
-    return d?.confirmed && !storageFault(d) && !d.blocked && !d.operation && hasQueuedWork(d);
+    return d?.confirmed && d.supported !== false && !storageFault(d) && !d.blocked && !d.operation && hasQueuedWork(d);
   });
   if (!key || !connected) return;
   const d = domains[key],
@@ -1052,6 +1061,7 @@ async function resolve(key, useSaved) {
     }
     if (persisted) {
       finishSaved(key, operation, response, true);
+      if (useSaved) acknowledgeEdits(d, edits, true);
       d.blocked = null;
     } else if (d.blocked === "uncertain") {
       d.blocked = "failure";
