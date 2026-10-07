@@ -88,12 +88,17 @@ void LocalApi::snapshot_(JsonObject root) {
   root["test_mode"] = openathan_storage::TEST_MODE;
   athan_->write_settings_json(root);
   root["setup"] = athan_->setup_state();
-  root["clock_ready"] = athan_->read().valid;
+  const auto now = athan_->read();
+  root["clock_ready"] = now.valid;
+  const auto* service = athan_->settings_service();
+  if (now.valid && service && service->saved()) {
+    const auto local = athan_->format_local(now.utc, service->saved()->value.timezone);
+    if (local.size() >= 10) root["local_date"] = local.substr(0, 10);
+  }
   root["wifi_connected"] = wifi_connected_;
   root["hostname"] = hostname_;
   const auto status = athan_->status();
   root["playing"] = status.playing;
-  const auto* service = athan_->settings_service();
   if (status.next) {
     auto next = root["next"].to<JsonObject>();
     event_json(next, *status.next);

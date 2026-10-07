@@ -130,8 +130,12 @@ bytes; queues and authentication replay state are bounded. Timed-out queued work
 is cancelled before mutation; uncertain in-progress outcomes require readback.
 
 Use `GET /api/status` for a complete settings snapshot, revision, setup state,
-time readiness, application status, current/next playback, skip, and today's
-schedule, plus an informational `test_mode` boolean. Fresh incomplete devices do not display a timetable based on seed
+time readiness, application status, a playback-active boolean, upcoming
+occurrence, skip, and today's schedule, plus an informational `test_mode` boolean.
+With a valid clock it also includes optional read-only `local_date` (`YYYY-MM-DD`),
+derived from the saved device timezone. The field is omitted while waiting for
+time; clients must tolerate its absence. It does not identify the currently
+playing prayer. Fresh incomplete devices do not display a timetable based on seed
 coordinates. `GET /api/timezones` returns the supported IANA names and the pinned
 tzdata version (2026.4).
 

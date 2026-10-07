@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T13:49:45Z",
+  "title": "Design System: OpenAthan device UI",
+  "extensions": {
+    "scope": {
+      "status": "Approved composition implemented in production asset paths at unreleased development scope; not installed, deployed or released.",
+      "composition": "A+C+B composition with an authoritative Next prayer hero, one matching current-day timetable highlight, and a dated hero-only next-day occurrence; skip advances neither.",
+      "embeddedIntegrationApproval": "approved by the user; implementation complete at development scope",
+      "productionCompFidelityGate": "historical generated-comp pixel reproduction remains open; no exact reproduction certification",
+      "sources": [
+        "web/device-ui/style.css",
+        "web/device-ui/index.html",
+        "web/device-ui/app.js"
+      ],
+      "surfaceContract": ".impeccable/surfaces/web-device-ui-index-html.md",
+      "finishRecord": "docs/development/device-ui-redesign-validation-2026-10-05.md",
+      "validationReport": "docs/development/device-ui-maintenance-validation-2026-10-07.md",
+      "representativeCaptures": [
+        "docs/development/device-ui-redesign/today-phone.png",
+        "docs/development/device-ui-redesign/today-desktop.png",
+        "docs/development/device-ui-redesign/skipped-phone.png",
+        "docs/development/device-ui-redesign/settings-desktop.png",
+        "docs/development/device-ui-redesign/setup-review-phone.png"
+      ],
+      "captureData": "Real production assets with simulated API data; no physical observations or firmware raster assets.",
+      "historicalProvenance": "Earlier prototype reviews remain simulation-only; the original generated composition predates the user-approved highlight and Next prayer revisions.",
+      "behaviorContract": "web/device-ui/README.md"
+    },
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Restrained amber",
+        "tonalRamp": [
+          "oklch(15% 0.11876 77.38)",
+          "oklch(26% 0.11876 77.38)",
+          "oklch(38% 0.11876 77.38)",
+          "oklch(49% 0.11876 77.38)",
+          "oklch(61% 0.11876 77.38)",
+          "oklch(72% 0.11876 77.38)",
+          "oklch(84% 0.11876 77.38)",
+          "oklch(95% 0.11876 77.38)"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Light amber",
+        "tonalRamp": [
+          "oklch(15% 0.10572 77.19)",
+          "oklch(26% 0.10572 77.19)",
+          "oklch(38% 0.10572 77.19)",
+          "oklch(49% 0.10572 77.19)",
+          "oklch(61% 0.10572 77.19)",
+          "oklch(72% 0.10572 77.19)",
+          "oklch(84% 0.10572 77.19)",
+          "oklch(95% 0.10572 77.19)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Ink background",
+        "tonalRamp": [
+          "oklch(15% 0.02001 248.83)",
+          "oklch(26% 0.02001 248.83)",
+          "oklch(38% 0.02001 248.83)",
+          "oklch(49% 0.02001 248.83)",
+          "oklch(61% 0.02001 248.83)",
+          "oklch(72% 0.02001 248.83)",
+          "oklch(84% 0.02001 248.83)",
+          "oklch(95% 0.02001 248.83)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Flat blue-black surface",
+        "tonalRamp": [
+          "oklch(15% 0.02526 244.13)",
+          "oklch(26% 0.02526 244.13)",
+          "oklch(38% 0.02526 244.13)",
+          "oklch(49% 0.02526 244.13)",
+          "oklch(61% 0.02526 244.13)",
+          "oklch(72% 0.02526 244.13)",
+          "oklch(84% 0.02526 244.13)",
+          "oklch(95% 0.02526 244.13)"
+        ]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Raised blue-black surface",
+        "tonalRamp": [
+          "oklch(15% 0.03166 243.55)",
+          "oklch(26% 0.03166 243.55)",
+          "oklch(38% 0.03166 243.55)",
+          "oklch(49% 0.03166 243.55)",
+          "oklch(61% 0.03166 243.55)",
+          "oklch(72% 0.03166 243.55)",
+          "oklch(84% 0.03166 243.55)",
+          "oklch(95% 0.03166 243.55)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Bright foreground",
+        "tonalRamp": [
+          "oklch(15% 0.00418 236.50)",
+          "oklch(26% 0.00418 236.50)",
+          "oklch(38% 0.00418 236.50)",
+          "oklch(49% 0.00418 236.50)",
+          "oklch(61% 0.00418 236.50)",
+          "oklch(72% 0.00418 236.50)",
+          "oklch(84% 0.00418 236.50)",
+          "oklch(95% 0.00418 236.50)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted blue-grey",
+        "tonalRamp": [
+          "oklch(15% 0.02361 241.95)",
+          "oklch(26% 0.02361 241.95)",
+          "oklch(38% 0.02361 241.95)",
+          "oklch(49% 0.02361 241.95)",
+          "oklch(61% 0.02361 241.95)",
+          "oklch(72% 0.02361 241.95)",
+          "oklch(84% 0.02361 241.95)",
+          "oklch(95% 0.02361 241.95)"
+        ]
+      },
+      "control-border": {
+        "role": "neutral",
+        "displayName": "Strong control border",
+        "tonalRamp": [
+          "oklch(15% 0.03148 241.88)",
+          "oklch(26% 0.03148 241.88)",
+          "oklch(38% 0.03148 241.88)",
+          "oklch(49% 0.03148 241.88)",
+          "oklch(61% 0.03148 241.88)",
+          "oklch(72% 0.03148 241.88)",
+          "oklch(84% 0.03148 241.88)",
+          "oklch(95% 0.03148 241.88)"
+        ]
+      },
+      "divider": {
+        "role": "neutral",
+        "displayName": "Quiet divider",
+        "tonalRamp": [
+          "oklch(15% 0.03145 236.35)",
+          "oklch(26% 0.03145 236.35)",
+          "oklch(38% 0.03145 236.35)",
+          "oklch(49% 0.03145 236.35)",
+          "oklch(61% 0.03145 236.35)",
+          "oklch(72% 0.03145 236.35)",
+          "oklch(84% 0.03145 236.35)",
+          "oklch(95% 0.03145 236.35)"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Mint success",
+        "tonalRamp": [
+          "oklch(15% 0.08929 163.17)",
+          "oklch(26% 0.08929 163.17)",
+          "oklch(38% 0.08929 163.17)",
+          "oklch(49% 0.08929 163.17)",
+          "oklch(61% 0.08929 163.17)",
+          "oklch(72% 0.08929 163.17)",
+          "oklch(84% 0.08929 163.17)",
+          "oklch(95% 0.08929 163.17)"
+        ]
+      },
+      "error": {
+        "role": "semantic",
+        "displayName": "Soft pink error",
+        "tonalRamp": [
+          "oklch(15% 0.09929 19.41)",
+          "oklch(26% 0.09929 19.41)",
+          "oklch(38% 0.09929 19.41)",
+          "oklch(49% 0.09929 19.41)",
+          "oklch(61% 0.09929 19.41)",
+          "oklch(72% 0.09929 19.41)",
+          "oklch(84% 0.09929 19.41)",
+          "oklch(95% 0.09929 19.41)"
+        ]
+      },
+      "upcoming-background": {
+        "role": "semantic",
+        "displayName": "Upcoming prayer surface",
+        "purpose": "Source --upcoming-bg: a solid warm field for one confirmed upcoming row.",
+        "tonalRamp": [
+          "oklch(15% 0.00553 121.80)",
+          "oklch(26% 0.00553 121.80)",
+          "oklch(38% 0.00553 121.80)",
+          "oklch(49% 0.00553 121.80)",
+          "oklch(61% 0.00553 121.80)",
+          "oklch(72% 0.00553 121.80)",
+          "oklch(84% 0.00553 121.80)",
+          "oklch(95% 0.00553 121.80)"
+        ]
+      }
+    },
+    "tonalRampPurpose": "Synthesized OKLCH strips for the design panel only; these are not additional implemented palette tokens.",
+    "typographyMeta": {
+      "display": {
+        "displayName": "Phone next-time display",
+        "purpose": "Next time at widths from 351px through 767px; uses tabular figures. Capped at 25vw for wider system fonts and enlarged text."
+      },
+      "display-compact": {
+        "displayName": "Compact next-time display",
+        "purpose": "Next time at widths up to 350px; uses tabular figures. Capped at 25vw for wider system fonts and enlarged text."
+      },
+      "display-desktop": {
+        "displayName": "Desktop next-time display",
+        "purpose": "Next time from 768px; uses tabular figures."
+      },
+      "title": {
+        "displayName": "Regular section title",
+        "purpose": "Regular h2 headings; page-specific heading overrides remain in source."
+      },
+      "section": {
+        "displayName": "Settings-group heading",
+        "purpose": "Settings-group h3 headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Ordinary explanatory text and native-control base."
+      },
+      "label": {
+        "displayName": "Field label",
+        "purpose": "Field labels and inherited text-field typography."
+      },
+      "feedback": {
+        "displayName": "Feedback",
+        "purpose": "Save results and supporting hints."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Primary and secondary action text."
+      },
+      "readiness": {
+        "displayName": "Readiness",
+        "purpose": "Text beside the optional dot; desktop line height is 1.5."
+      },
+      "timetable-time": {
+        "displayName": "Phone timetable time",
+        "purpose": "Tabular time values on phone."
+      },
+      "timetable-time-desktop": {
+        "displayName": "Desktop timetable time",
+        "purpose": "Tabular time values from 768px."
+      }
+    },
+    "motion": [
+      {
+        "name": "successful-feedback-color",
+        "value": "color 150ms ease-out",
+        "purpose": "Only successful-feedback text, only under prefers-reduced-motion:no-preference. No generic state, layout or active motion is inferred."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "350px",
+        "purpose": "max-width: header and coordinate stacking, smaller display, narrower gutters."
+      },
+      {
+        "name": "desktop",
+        "value": "768px",
+        "purpose": "min-width: top navigation, larger time values, paired content columns."
+      }
+    ],
+    "focus": {
+      "value": "3px solid var(--amber), 3px offset",
+      "purpose": "Interactive keyboard focus; programmatic main and step-heading focus has no outline."
+    },
+    "layout": {
+      "controlMinimum": "44px",
+      "fieldMinimum": "48px",
+      "containerMaximum": "1120px",
+      "depth": "Flat tonal surfaces and rules; no box shadows."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "description": "Implemented device UI action with its native minimum target, hover, focus and disabled states.",
+      "html": "<button class=\"ds-primary\">Confirm prayer changes</button>",
+      "css": ".ds-primary{font:600 1rem/1.4 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);cursor:pointer;min-height:44px;border:1px solid var(--amber,#f0bb67);border-radius:8px;padding:9px 16px;background:var(--amber,#f0bb67);color:var(--bg,#101820)}.ds-primary:hover{background:#ffcf86}.ds-primary:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}.ds-primary:disabled{cursor:default;opacity:.55}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Native field",
+      "kind": "input",
+      "description": "The device UI’s labeled coordinate field; native validation and control styling remain visible.",
+      "html": "<label class=\"ds-field\">Latitude<input type=\"number\" step=\"any\" min=\"-90\" max=\"90\" value=\"43.653226119\" required inputmode=\"decimal\"></label>",
+      "css": ".ds-field{display:block;font:500 .9375rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8);margin-top:12px}.ds-field input{box-sizing:border-box;display:block;font:inherit;width:100%;min-width:0;min-height:48px;margin-top:6px;border:1px solid var(--border,#7a8d9c);border-radius:8px;background:var(--surface,#19252f);color:var(--fg,#f3f6f8);padding:10px 12px;font-variant-numeric:tabular-nums}.ds-field input:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}",
+      "refersTo": "field"
+    },
+    {
+      "name": "Labeled navigation",
+      "kind": "nav",
+      "description": "Inline SVG and text labels with the actual responsive form. Shown in document flow here; the device UI fixes this navigation to the phone bottom.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Device navigation\"><button aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"4\" y=\"5\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4m8-4v4M4 10h16M8 14h2m4 0h2m-8 4h2\"/></svg><span>Today</span></button><button><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m9 3-1 3-3 1-2 4 2 2v4l4 2 3-1 3 1 4-2v-4l2-2-2-4-3-1-1-3Z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg><span>Settings</span></button></nav>",
+      "css": ".ds-nav{display:grid;grid-template-columns:1fr 1fr;background:var(--bg,#101820);border-top:1px solid var(--rule,#354854);padding:8px 20px max(8px,env(safe-area-inset-bottom));font:1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif)}.ds-nav button{display:flex;flex-direction:column;gap:4px;align-items:center;cursor:pointer;border:none;border-radius:0;background:transparent;color:var(--muted,#b6c5d1);font:600 .875rem/1.4 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);min-height:58px;padding:2px 8px 8px;position:relative}.ds-nav button:hover{background:transparent}.ds-nav button[aria-current]{color:var(--amber,#f0bb67)}.ds-nav button[aria-current]::after{content:\"\";position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--amber,#f0bb67)}.ds-nav button:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}.ds-nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}@media(min-width:768px){.ds-nav{display:flex;border-top:none;border-bottom:1px solid var(--rule,#354854);padding:0;margin-bottom:32px}.ds-nav button{flex-direction:row;min-width:120px;min-height:56px;justify-content:center;font-size:1rem;gap:8px}}",
+      "refersTo": "navigation"
+    },
+    {
+      "name": "Readiness text and dot",
+      "kind": "custom",
+      "description": "Implemented readiness styling shown with illustrative state text; there is no pill fill, padding or rounded container.",
+      "html": "<p class=\"ds-readiness\" role=\"status\"><span class=\"ds-dot\" aria-hidden=\"true\"></span><span>Ready to play</span></p>",
+      "css": ".ds-readiness{display:flex;align-items:center;gap:10px;color:var(--good,#8ed8b5);font:500 1.125rem/1.25 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);margin:0}.ds-dot{width:12px;height:12px;flex:0 0 12px;background:currentColor;border-radius:50%}@media(min-width:768px){.ds-readiness{line-height:1.5}}",
+      "refersTo": "readiness"
+    },
+    {
+      "name": "Timetable row",
+      "kind": "custom",
+      "description": "A definition-list row pairing eligibility and a tabular time. One current-day occurrence retains its highlight when skipped; values shown here are illustrative.",
+      "html": "<dl class=\"ds-times\"><div class=\"ds-time-row\"><dt>Fajr<small>Athan off</small></dt><dd>6:02 AM</dd></div><div class=\"ds-time-row\" aria-current=\"time\"><dt>Asr<span class=\"ds-visually-hidden\">, next prayer</span><small>Skipped</small></dt><dd>4:18 PM</dd></div></dl>",
+      "css": ".ds-times{margin:0;font:1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8)}.ds-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;min-height:52px;padding:4px 0;border-top:1px solid var(--rule,#354854);background:transparent}.ds-time-row:last-child{border-bottom:1px solid var(--rule,#354854)}.ds-time-row dt{font-weight:600;overflow-wrap:anywhere}.ds-time-row dt small{display:block;font-size:.8125rem;line-height:1.4;font-weight:400;color:var(--muted,#b6c5d1)}.ds-time-row dd{margin:0;font-size:1.125rem;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}@media(min-width:768px){.ds-time-row{min-height:76px;padding:16px 0}.ds-time-row dt{font-size:1.125rem}.ds-time-row dt small{font-size:.875rem}.ds-time-row dd{font-size:1.375rem}}.ds-time-row[aria-current=time]{background:var(--upcoming-bg,#2b2c29);color:var(--amber,#f0bb67);border-radius:8px;padding-left:8px;padding-right:8px;margin-left:-8px;margin-right:-8px}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}",
+      "refersTo": "timetable-row"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The native secondary action used for previews, recovery and reconnect, with source hover, focus and disabled states.",
+      "html": "<button class=\"ds-secondary\" type=\"button\">Preview timetable</button>",
+      "css": ".ds-secondary{font:600 1rem/1.4 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);cursor:pointer;min-height:44px;border:1px solid var(--border,#7a8d9c);border-radius:8px;padding:9px 16px;background:var(--surface,#19252f);color:var(--fg,#f3f6f8)}.ds-secondary:hover{background:var(--raised,#22323f)}.ds-secondary:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}.ds-secondary:disabled{cursor:default;opacity:.55}"
+    },
+    {
+      "name": "Native volume range",
+      "kind": "input",
+      "description": "Native slider and visible percentage. The sample is illustrative; live values and save feedback come from the settings domain.",
+      "html": "<label for=\"ds-volume\" class=\"ds-range-label\">Volume <output for=\"ds-volume\">70%</output></label><input class=\"ds-range\" id=\"ds-volume\" type=\"range\" min=\"0\" max=\"100\" value=\"70\">",
+      "css": ".ds-range-label{display:flex;justify-content:space-between;gap:12px;font:500 1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8)}.ds-range-label output{font-variant-numeric:tabular-nums}.ds-range{width:100%;height:44px;margin:0;accent-color:var(--amber,#f0bb67);cursor:pointer}.ds-range:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}"
+    },
+    {
+      "name": "Notice container",
+      "kind": "card",
+      "refersTo": "notice",
+      "description": "Bounded flat notice for connection or capability feedback; ordinary settings groups remain unboxed.",
+      "html": "<section class=\"ds-notice\"><h2>Connection lost</h2><p>Displayed information is stale. The speaker’s current playback state is unknown.</p></section>",
+      "css": ".ds-notice{font:1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8);padding:16px;background:var(--surface,#19252f);border:1px solid var(--border,#7a8d9c);border-radius:12px;margin:16px 20px}.ds-notice h2{font-size:1.125rem;font-weight:700;line-height:1.3;margin:0 0 8px}.ds-notice p{margin:0 0 12px;overflow-wrap:anywhere}@media(min-width:768px){.ds-notice{margin:0 0 24px}}"
+    },
+    {
+      "name": "Optional location helper link",
+      "kind": "custom",
+      "description": "Existing optional external helper entry uses the device UI control shape and native link behavior; it is not required for standalone setup.",
+      "html": "<a class=\"ds-helper-link\" target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://openathan.com/location/\">Find my location</a>",
+      "css": ".ds-helper-link{display:inline-flex;align-items:center;min-height:44px;padding:9px 16px;border:1px solid var(--border,#7a8d9c);border-radius:8px;background:var(--surface,#19252f);color:var(--amber,#f0bb67);font:600 1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);text-underline-offset:4px}.ds-helper-link:hover{text-decoration-thickness:2px}.ds-helper-link:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Next Athan board",
+    "overview": "The Next Athan board makes the speaker's next action understandable at a glance.\nInformation carries the identity: readable time, explicit state and precise,\ncomfortable controls. Ink-dark flat surfaces and system fonts support a clear\nhousehold control surface that works locally, without a framework or remote\nassets. Native HTML, CSS and JavaScript are compressed into firmware by the\nexisting asset pipeline.\n\nThis records the approved composition implemented in the production asset paths\nat **unreleased development scope**. The user approved the browser composition\nand explicitly authorized integration. The implementation extends that composition\nwith authoritative local API state; browser captures use simulated APIs.\nThe original generated composition predates the approved upcoming highlight and\nNext prayer hero revisions. Its historical pixel reproduction gate remains open,\nwithout exact reproduction certification. This document does not establish\nphysical behavior, runtime headroom or release readiness.",
+    "keyCharacteristics": [
+      "Ink-dark surfaces with restrained amber emphasis.",
+      "Familiar native controls and plain-language states.",
+      "Clear rules and tabular time figures rather than repeated nested cards.",
+      "Local feedback beside the action that caused it."
+    ],
+    "rules": [
+      {
+        "name": "The Words Carry State Rule",
+        "body": "Readiness, warning and save outcomes always have\nwords; accent color and the optional state dot reinforce that wording.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Type Rule",
+        "body": "Use the supplied system stack and tabular time figures;\nno external font service or bundled display face is required.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Groups Rule",
+        "body": "Use rules and spacing for ordinary groups; reserve a\nbounded surface for a notice or playback state that needs separate attention.",
+        "section": "elevation & depth"
+      }
+    ],
+    "dos": [
+      "Do use native semantic controls, system fonts and tabular time figures.",
+      "Do keep feedback beside its control and express every state in words.",
+      "Do preserve readable focus, labeled navigation and expanding touch targets.",
+      "Do use rules and spacing for ordinary groups, with surfaces for notices."
+    ],
+    "donts": [
+      "Don't require remote assets, a framework or an external font service for the local interface.",
+      "Don't add decorative motion, unlabeled controls or unexplained status codes.",
+      "Don't present simulated values, browser checks or this document as release acceptance or real-speaker evidence."
+    ]
+  }
+}
