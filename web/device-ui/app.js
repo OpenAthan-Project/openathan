@@ -177,41 +177,7 @@ function localTime(value) {
     ? (+match[2] % 12 || 12) + ":" + match[3] + (+match[2] < 12 ? " AM" : " PM")
     : match[2] + ":" + match[3];
 }
-async function request(path, body) {
-  const order = ++requestOrder;
-  if (["/api/skip", "/api/cancel-skip"].includes(path)) actionOrder = order;
-  if (path.startsWith("/api/firmware/")) firmwareActionOrder = order;
-  try {
-    const response = await fetch(path, {
-      method: body === undefined ? "GET" : "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: body === undefined ? {} : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(12000)
-    });
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error("The response could not be confirmed");
-    }
-    if (!response.ok) {
-      const error = new Error(data.error || "Device request failed");
-      error.status = response.status;
-      throw error;
-    }
-    return { data, order };
-  } catch (error) {
-    error.order = order;
-    throw error;
-  }
-}
-function connectionFailure(error) {
-  if (!error.stale && error.order >= contactOrder) {
-    connected = false;
-  }
-}
+// Prayer calculation drafts
 function invalidatePreview() {
   preview = undefined;
   previewOperation = undefined;
@@ -266,6 +232,42 @@ function markDraft() {
   renderDraftControls();
 }
 
+// Device requests and response acceptance
+async function request(path, body) {
+  const order = ++requestOrder;
+  if (["/api/skip", "/api/cancel-skip"].includes(path)) actionOrder = order;
+  if (path.startsWith("/api/firmware/")) firmwareActionOrder = order;
+  try {
+    const response = await fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(12000)
+    });
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error("The response could not be confirmed");
+    }
+    if (!response.ok) {
+      const error = new Error(data.error || "Device request failed");
+      error.status = response.status;
+      throw error;
+    }
+    return { data, order };
+  } catch (error) {
+    error.order = order;
+    throw error;
+  }
+}
+function connectionFailure(error) {
+  if (!error.stale && error.order >= contactOrder) {
+    connected = false;
+  }
+}
 // All response paths share this policy. Revisions order durable values; request
 // order independently orders application state, playback, capabilities and faults.
 function acceptDomain(key, data, order) {
@@ -465,6 +467,7 @@ function acceptSavedResponse(key, response) {
   }
   return response.data;
 }
+// Rendering and setup navigation
 function savedMessage(key) {
   const app = domains[key].application;
   if (app === "storage_fault" || app === "save_failed")
@@ -832,6 +835,7 @@ function renderDraftControls() {
   $("discard").disabled = !!d?.review?.sent;
 }
 
+// Preference saves and owner-selected recovery
 function discardDraft() {
   const d = domains.settings;
   if (!d?.confirmed || d.review?.sent) return;
@@ -952,11 +956,23 @@ async function pump() {
     }
     return;
   }
-  const key = Object.keys(specs).find((key) => {
-    const d = domains[key];
-    return (key !== "settings" || !actionUncertain) && d?.confirmed && d.supported !== false && !storageFault(d) && !d.blocked && !d.operation && hasQueuedWork(d);
-  });
+  const key = Object.keys(specs).find(canSaveDomain);
   if (!key || !connected) return;
+  return saveDomain(key);
+}
+function canSaveDomain(key) {
+  const d = domains[key];
+  return (
+    (key !== "settings" || !actionUncertain) &&
+    d?.confirmed &&
+    d.supported !== false &&
+    !storageFault(d) &&
+    !d.blocked &&
+    !d.operation &&
+    hasQueuedWork(d)
+  );
+}
+async function saveDomain(key) {
   const d = domains[key],
     before = clone(d.confirmed),
     edits = captureEdits(d, releasedEdits(d)),
@@ -1148,6 +1164,7 @@ async function refresh() {
     if (!connected) render();
   }
 }
+// Prayer previews and playback actions
 async function previewDraft() {
   const d = domains.settings;
   if (!draft || !connected || settingsFault() || d.operation || previewOperation) return;
@@ -1302,6 +1319,7 @@ async function stopPlayback() {
     render();
   }
 }
+// Native controls and navigation bindings
 function slider(id, key, field) {
   const input = $(id);
   input.addEventListener("input", () => {
@@ -1422,6 +1440,7 @@ addEventListener("beforeunload", (e) => {
   }
 });
 
+// Optional location helper
 function locationMessage(value, error = false) {
   status("prayer", value, error ? "error" : "warning");
 }
@@ -1532,6 +1551,7 @@ async function loadTimezones() {
     timezonesLoading = false;
   }
 }
+// Firmware updates
 let firmwareExpected = "";
 try {
   firmwareExpected = sessionStorage.getItem("firmware-expected") || "";
@@ -1662,6 +1682,7 @@ setInterval(async () => {
   }
 }, 3000);
 
+// Startup and status polling
 render();
 (async () => {
   await refresh();
