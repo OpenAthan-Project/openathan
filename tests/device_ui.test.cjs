@@ -138,6 +138,41 @@ async function loseSkipResponseAndRestoreContact(f,page){
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const atLoad of [false,true])for(const unavailable of ['timezones','storage'])test(`${browserName}: pending helper from ${atLoad?'page URL':'hash handoff'} survives Skip to content during unavailable ${unavailable}`,async()=>{
+  const f=await fixture();f.state.device.setup='incomplete';f.state.device.automatic_ready=false;const persisted=structuredClone(f.state.device),fragment='v=1&latitude=43.123456789&longitude=-79.987654321&source=browser&timezone=America%2FToronto';
+  if(unavailable==='timezones')f.state.failTimezones=true;else{f.state.device.revision=0;f.state.device.setup='storage_fault';f.state.device.application='storage_fault';delete f.state.device.settings;}
+  if(atLoad)f.url+='/#'+fragment;const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   await settled(page);if(!atLoad){await page.evaluate(hash=>location.hash=hash,fragment);await page.waitForFunction(()=>location.hash==='');}
+   assert.notEqual(await page.locator('#latitude').inputValue(),'43.123456789');assert.equal(f.state.mutations,0);
+   await page.locator('.skip-link').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>location.hash==='#main');assert.equal(await page.evaluate(()=>document.activeElement.id),'main');
+   if(unavailable==='timezones')f.state.failTimezones=false;else f.state.device=persisted;
+   if(await page.locator('#settings-view').isHidden())await settings(page);await page.locator('#refresh').click();await requestsFinished(page);
+   assert.equal(await page.locator('#latitude').inputValue(),'43.123456789','The pending helper must survive unrelated fragment navigation');assert.equal(await page.locator('#longitude').inputValue(),'-79.987654321');assert.equal(await page.locator('#timezone').inputValue(),'America/Toronto');assert.match(await page.locator('#location-feedback').textContent(),/Browser location suggested/);
+   assert.ok(await page.locator('#confirm').isHidden());assert.equal(f.state.mutations,0);assert.equal(f.state.posts.length,0);assert.equal(f.state.device.settings.latitude,0);
+  }finally{await o.close();}
+ });
+ for(const malformed of [false,true])test(`${browserName}: latest recognized location fragment ${malformed?'reports its error instead of applying an older suggestion':'replaces an older pending suggestion'}`,async()=>{
+  const f=await fixture();f.state.device.setup='incomplete';f.state.device.automatic_ready=false;f.state.failTimezones=true;const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   await settled(page);await page.evaluate(()=>location.hash='v=1&latitude=43.65&longitude=-79.38&source=browser&timezone=America%2FToronto');await page.waitForFunction(()=>location.hash==='');
+   if(malformed)await page.locator('#latitude').fill('45.5');
+   await page.evaluate(bad=>location.hash=bad?'v=1&latitude=invalid&longitude=-79.2&source=ip':'v=1&latitude=44.4&longitude=-79.2&source=ip&timezone=UTC&accuracy=40',malformed);await page.waitForFunction(()=>location.hash==='');
+   f.state.failTimezones=false;await page.locator('#refresh').click();await requestsFinished(page);
+   assert.equal(await page.locator('#latitude').inputValue(),malformed?'45.5':'44.4');
+   if(malformed){assert.match(await page.locator('#prayer-feedback').textContent(),/Location link was invalid/);assert.ok(await page.locator('#location-feedback').isHidden());}
+   else{assert.equal(await page.locator('#longitude').inputValue(),'-79.2');assert.equal(await page.locator('#timezone').inputValue(),'UTC');assert.match(await page.locator('#location-feedback').textContent(),/Approximate IP location.*40 km/);}
+   assert.equal(f.state.mutations,0);assert.equal(f.state.posts.length,0);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: unrelated fragments do not replay an applied helper or replace manual drafts`,async()=>{
+  const f=await fixture();f.state.device.setup='incomplete';f.state.device.automatic_ready=false;const o=await open(f,browserName,{},true),{page}=o;let dialogs=0;page.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});
+  try{
+   await settled(page);await page.evaluate(()=>location.hash='v=1&latitude=43.65&longitude=-79.38&source=browser&timezone=America%2FToronto');await page.waitForFunction(()=>document.getElementById('latitude').value==='43.65');await page.locator('#latitude').fill('45.5');
+   await page.evaluate(()=>location.hash='location-heading');await page.waitForFunction(()=>location.hash==='#location-heading');await page.locator('.skip-link').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>location.hash==='#main');await page.locator('#refresh').click();await requestsFinished(page);
+   assert.equal(await page.locator('#latitude').inputValue(),'45.5');assert.equal(dialogs,0);assert.match(await page.locator('#prayer-feedback').textContent(),/Draft.*preview before saving/);assert.equal(f.state.mutations,0);assert.equal(f.state.posts.length,0);
+  }finally{await o.close();}
+ });
  for(const restore of [false,true])for(const stopView of ['today','settings'])test(`${browserName}: older reconnect cannot confirm newer lost ${restore?'Restore':'Skip'} after ${stopView} Stop`,async()=>{
   const f=await fixture();f.state.device.playing=true;f.state.device.firmware={version:'v0.2.1',state:'idle',supported:true};
   f.state.device.settings.latitude=43.123456789;f.state.device.settings.longitude=-79.987654321;

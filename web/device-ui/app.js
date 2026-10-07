@@ -1494,7 +1494,9 @@ function applyPendingLocation() {
   applyLocationProposal(proposal);
 }
 addEventListener("hashchange", () => {
-  proposedLocation = incomingLocation();
+  const proposal = incomingLocation();
+  if (!proposal) return;
+  proposedLocation = proposal;
   applyPendingLocation();
 });
 

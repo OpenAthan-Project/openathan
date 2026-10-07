@@ -87,7 +87,9 @@ a ready timetable preview before a returned location can be saved. If its clock
 has not synchronized, wait and preview again. Manual entry remains available
 without the helper or internet access.
 If status or the timezone list is temporarily unavailable, the proposal waits
-in the open page; **Refresh** retries both reads.
+in the open page; **Refresh** retries both reads. Skip to content and other local
+anchors preserve that pending proposal. A newer helper fragment replaces it;
+unrelated fragment navigation does not replay an already applied suggestion.
 The published reference firmware uses the deployed `https://openathan.com/location/`
 helper. Forks changing that URL must deploy a compatible helper before shipping.
 The isolated acceptance build displays a prominent **Test firmware** banner;

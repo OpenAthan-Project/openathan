@@ -145,6 +145,26 @@ Matched actual OTAs decrease **32 bytes** for reference and **48 bytes** for
 isolated, qualification and forced rollback compared with `94af0bd`. Compressed
 JavaScript decreases **38 bytes**, with unchanged static RAM.
 
+## Location handoff review of `2b1cae1`
+
+The hash-change handler treated a local anchor as a new empty helper proposal.
+Using keyboard Skip to content while timezone loading or saved prayer storage was
+unavailable therefore discarded the pending location. Eight Chromium/WebKit
+reproductions failed against `2b1cae1`, covering both initial URL suggestions and
+later helper handoffs. Six adjacent cases already passed; all 14 pass with the fix.
+
+The existing fragment parser now updates the pending proposal only when it
+recognizes a helper fragment. Native anchor navigation and focus remain intact.
+New valid suggestions still replace older pending ones; invalid helper links
+still report their error while preserving manual edits. Consumed suggestions are
+not replayed by local anchors or Refresh, and no location settings save before
+explicit review. The correction adds two net controller lines without a new
+state owner, timer, request, dependency or API change.
+
+Matched actual OTAs are unchanged for reference and increase **16 bytes** for
+isolated, qualification and forced rollback compared with `2b1cae1`. Compressed
+JavaScript increases **9 bytes**, with unchanged static RAM.
+
 ## State ownership and complexity removed
 
 Each persistence domain owns confirmed revision/value, field edits, one captured
@@ -196,6 +216,7 @@ run in both engines and across applicable persistence domains.
 | Unreleased input or same-value edits are consumed by acknowledgment/recovery | Latest edits survive: `versioned acknowledgment never labels an unfinished newer drag saved`; existing edits-during-recovery cases across all four domains |
 | Nested enabled-prayer patches repeat old values | Captured versions only: `successive enabled-prayer edits clear acknowledged nested patches` |
 | Preference recovery discards a separate calculation draft or coordinate precision | Latest edits survive: existing recovery, draft, precision and helper-handoff cases; `preference conflict recovery … invalidates a stale prayer preview` |
+| Skip to content clears a pending location while setup data is unavailable | Helper fragment ownership: `pending helper from … survives Skip to content during unavailable …`; startup/runtime handoff, timezone/storage recovery and keyboard focus. `latest recognized location fragment …` retains replacement/error behavior; `unrelated fragments do not replay …` preserves manual drafts |
 | Late preview success/error jumps forward after Back, or Discard restores confirmation | Lifecycle acceptance: `preview lifecycle ignores a … setup preview after Back`, `preview lifecycle permits only one pending setup preview`, `Discard invalidates an in-flight timetable preview` |
 | Queued reviewed calculations use a changed baseline | Fresh review required: `versioned review waits for fresh preview when its queued calculation baseline changes`; sent/unconfirmed Discard cases |
 | Older available/current firmware poll or Stop result reverses update observations | Freshness per resource: `shared acceptance keeps newer update status after an older firmware poll`, `delayed Stop retains newer firmware check results` |
@@ -218,10 +239,10 @@ run in both engines and across applicable persistence domains.
 
 ## Automated validation
 
-- **442 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
-  original scenarios and 126 added regressions, including 14 first-follow-up,
+- **456 Chromium/WebKit scenarios passed**, with zero failures or skips: all 316
+  original scenarios and 140 added regressions, including 14 first-follow-up,
   28 second-follow-up, 18 self-review, 28 Skip/Restore uncertainty cases and eight
-  reconnect-confirmation overlap cases.
+  reconnect-confirmation overlap cases, plus 14 location-fragment cases.
   The 130-case response-ordering
   batch, 24-case affected recovery batch and six independent-group cases also
   passed. All 18 self-review cases were rerun after refining fixture defaults and
@@ -265,33 +286,33 @@ Measurements use actual `firmware.ota.bin` files, not linked-image estimates.
 | Variant | Before bytes | After bytes | Review delta | Total delta from `16fd942` main | Application budget remaining |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | reference | 1,263,520 | 1,265,456 | +1,936 | +9,312 | 307,408 |
-| isolated | 1,265,296 | 1,267,232 | +1,936 | +9,328 | 305,632 |
-| qualification | 1,270,688 | 1,272,608 | +1,920 | +9,328 | 300,256 |
-| forced rollback | 1,270,688 | 1,272,608 | +1,920 | +9,328 | 300,256 |
+| isolated | 1,265,296 | 1,267,248 | +1,952 | +9,344 | 305,616 |
+| qualification | 1,270,688 | 1,272,624 | +1,936 | +9,344 | 300,240 |
+| forced rollback | 1,270,688 | 1,272,624 | +1,936 | +9,344 | 300,240 |
 
 The **1,572,864-byte** application budget is unchanged. Both **2,097,152-byte**
 slots and the separate **3.5 MiB** shared audio partition remain. Reference slot
-free space is 831,696 bytes; the largest variant leaves 824,544 bytes, exceeding
+free space is 831,696 bytes; the largest variant leaves 824,528 bytes, exceeding
 the required 512 KiB headroom. Capacity checks verify factory/OTA payload equality,
 partitions, pinned dependencies, test/qualification isolation and audio exclusion.
 
 | Embedded asset | Before gzip bytes | After gzip bytes | Delta | Source SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `index.html` | 3,392 | 3,392 | 0 | `e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c` |
-| `app.js` | 13,090 | 15,012 | +1,922 | `dc450b340763800ef7f01a67b2a49229e5e63a9c6eaad0c653da3196121396c5` |
+| `app.js` | 13,090 | 15,021 | +1,931 | `ab5e6911a6b4d8b9f7bb0a472ae0e43b5051f5ffd89136ff818e4da8074cdfce` |
 | `style.css` | 2,963 | 2,963 | 0 | `9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e` |
 
 All three exact gzip byte sequences were verified in every after OTA. Total
-compressed UI size is 21,367 bytes, versus 19,445 before this refactor and 12,125
+compressed UI size is 21,376 bytes, versus 19,445 before this refactor and 12,125
 on main. Formatting readable source and replacing state guards accounts for the
 measured application growth; no new device dependency or partition is required.
 
 | Variant | Before OTA SHA-256 | After OTA SHA-256 |
 | --- | --- | --- |
-| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `5faf9eb2fc8f79200827c61f6f5e3762a2fbd6959680f18a4f478e4fc148f36f` |
-| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `0786d65311ec05d61ea81435530a7d234711627632641c676fb5167a70ee8aa5` |
-| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `ac19a96d3b6bde3ac1c80aff4731f6824cb1d18065e5e03f0156347c127065e2` |
-| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `a07299ccedd4d71e9bd157550d83817345596a466495e08427c2f696c09719dc` |
+| reference | `5e0e77ab1ccf82813714cd5e8d058da00153120f037a1264a92af84fe29258cd` | `646197f2df705c1815b680323d73be4bfc29d7e85b954549b4fd3f918df22f9a` |
+| isolated | `ef234e67a6cac4872982c77a7c7cedd88a6bea251777b7bf5952b7965554800b` | `3dba79bd31b45bb7e09994b94112777797f140983a5509808abaf517ffe689e2` |
+| qualification | `da796b329891f1580f4b73de1ef8ac50e9ad95de35806d666fcc561bbf87b813` | `e7f9513b600931e94614ce39b8804cee141143d0d36dd61e436ec1083d8490a4` |
+| forced rollback | `2678f1d34378e48610063069a934c3409ab90f67fce9fc8acedf49eacfb9a639` | `4752d19d285e7fdff33cd7dd791910009f7c31abf1de34a30644b862c5b6a23b` |
 
 ## Runtime and physical evidence
 
