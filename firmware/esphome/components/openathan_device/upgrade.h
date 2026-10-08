@@ -37,6 +37,8 @@ class Upgrade : public UpgradeApi {
   bool descriptor_(const std::string &envelope, UpgradeRelease &release);
   bool persist_(const std::string &queue, const std::string &expected);
   void fail_(const char *message);
+  enum class UsbSelection { UNKNOWN, SELECTED, UNSELECTED, REJECTED };
+  UsbSelection usb_selection_();
   bool usb_safe_();
   bool usb_abort_();
   openathan_component::OpenAthan *athan_{};

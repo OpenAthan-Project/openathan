@@ -561,6 +561,11 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     assert.ok(await page.locator('#firmware-check').isDisabled());
     assert.ok(await page.locator('#firmware-cancel').isHidden());
     assert.ok(await page.locator('#firmware-install').isHidden());
+    f.state.device.firmware={version:'v0.4.0',state:'usb_selection_uncertain',transport:'usb',queued_version:'v0.5.0',error:''};
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('handoff is uncertain'));
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isHidden());
+    assert.ok(await page.locator('#firmware-install').isHidden());
     f.state.device.firmware={version:'v0.4.0',state:'awaiting_power',transport:'usb',queued_version:'v0.5.0',error:''};
     await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('Pyramid bottom port'));
     assert.ok(await page.locator('#firmware-check').isDisabled());

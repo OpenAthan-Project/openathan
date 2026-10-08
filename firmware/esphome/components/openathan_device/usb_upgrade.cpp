@@ -38,6 +38,33 @@ std::vector<std::string> Upgrade::usb_info() {
       bootloader_ok_ ? "supported" : "unsupported", storage_ok_ ? state_ : "storage_fault",
       confirmed_ ? "confirmed" : "pending", result_, queued_.version, std::to_string(received_.load())};
 }
+Upgrade::UsbSelection Upgrade::usb_selection_() {
+  // Called with mutex_ held. Empty expected can also be a handoff marker that
+  // an older firmware cleared; it is never proof that selection did not happen.
+  const auto *running = esp_ota_get_running_partition();
+  const auto *candidate = esp_ota_get_next_update_partition(nullptr);
+  if (!running || !candidate || candidate == running || queued_.envelope.empty()) return UsbSelection::UNKNOWN;
+  esp_app_desc_t description{};
+  const bool identified = esp_ota_get_partition_description(candidate, &description) == ESP_OK &&
+      queued_.version == description.version;
+  esp_ota_img_states_t image_state{};
+  const auto state_result = identified ? esp_ota_get_state_partition(candidate, &image_state) : ESP_ERR_NOT_FOUND;
+  // Read selection last, including when the inactive OTA entry is absent.
+  const auto *boot = esp_ota_get_boot_partition();
+  if (!boot || (boot != running && boot != candidate)) return UsbSelection::UNKNOWN;
+  if (boot == candidate) {
+    if (!identified || state_result != ESP_OK || image_state == ESP_OTA_IMG_INVALID ||
+        image_state == ESP_OTA_IMG_ABORTED) return UsbSelection::UNKNOWN;
+    return UsbSelection::SELECTED;
+  }
+  if ((!expected_.empty() && !identified) || (state_result != ESP_OK && state_result != ESP_ERR_NOT_FOUND))
+    return UsbSelection::UNKNOWN;
+  if (!expected_.empty() && identified && state_result == ESP_OK &&
+      (image_state == ESP_OTA_IMG_INVALID || image_state == ESP_OTA_IMG_ABORTED)) return UsbSelection::REJECTED;
+  // OTA begin can leave no inactive entry, and a partial image may have no
+  // readable description. The successful running-slot selection is the proof.
+  return UsbSelection::UNSELECTED;
+}
 bool Upgrade::usb_abort_() {
   if (!expected_.empty() || state_ == "awaiting_power") return false;
   if (usb_handle_) { esp_ota_abort(usb_handle_); usb_handle_ = 0; }
@@ -68,8 +95,13 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
     usb_last_ms_ = usb_now(); received_ = 0; state_ = "usb_descriptor"; error_.clear();
     reply = {token_text(usb_token_)}; return 0;
   }
-  if (command == ABORT && fields == std::vector<std::string>{"interrupted"} && usb_request_ &&
-      !usb_token_ && expected_.empty()) {
+  if (command == ABORT && fields == std::vector<std::string>{"interrupted"} && usb_request_ && !usb_token_) {
+    if (!confirmed_ || !storage_ok_ || !expected_.empty() || state_ != "usb_interrupted") return 255;
+    const auto selection = usb_selection_();
+    if (selection != UsbSelection::UNSELECTED) {
+      state_ = selection == UsbSelection::SELECTED ? "awaiting_power" : "usb_selection_uncertain";
+      return 255;
+    }
     if (!usb_abort_()) return 255;
     reply = {"aborted"}; return 0;
   }

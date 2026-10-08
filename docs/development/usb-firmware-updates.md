@@ -67,6 +67,18 @@ If interrupted before selection, reconciliation reports `usb_interrupted` and
 waits for explicit USB discard. If the exact candidate is selected, it reports
 `awaiting_power` and never reboots automatically. A selection error retains the
 journal and reports `usb_selection_uncertain` until authoritative reconciliation.
+Unreadable boot selection, missing image identification after a completed handoff,
+or contradictory metadata also retain this uncertain state; they never authorize
+another transfer or journal clearing. Recovered reads return a selected matching
+candidate to `awaiting_power`, including a request whose `expected` marker is empty.
+A successful read selecting the confirmed running application is required before
+reporting an interrupted transfer. An absent inactive-slot OTA entry is normal after
+staging and cannot establish rejection by itself. `ABORT interrupted` requires
+confirmed startup health and repeats the selection check under the updater lock
+before clearing an interrupted request. Rollback requires an identified requested
+image with a successfully read `INVALID` or `ABORTED` state. A newer running
+version supersedes an old USB request only when selection proves the candidate
+is unselected; version comparison alone cannot clear a pending selection.
 
 After FINISH, the browser reports **written and verified**, closes USB and directs
 the owner to unplug Atom USB and power only the Pyramid bottom port. Startup

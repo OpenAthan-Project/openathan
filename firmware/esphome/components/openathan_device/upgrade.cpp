@@ -417,7 +417,8 @@ void Upgrade::loop(bool connected) {
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   if (qualification_.selected_loop(safe_)) return;
 #endif
-  if (!queued_.envelope.empty() && !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION)) {
+  if (!queued_.envelope.empty() && !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION) &&
+      (!usb_request_ || queued_.version == OPENATHAN_FIRMWARE_VERSION)) {
     // A preserving USB update can fulfill or supersede a queued Wi-Fi request
     // without setting our handoff marker. A valid old request is not corruption.
     const bool fulfilled = queued_.version == OPENATHAN_FIRMWARE_VERSION;
@@ -426,6 +427,26 @@ void Upgrade::loop(bool connected) {
     if (persist_("", "")) { expected_.clear(); queued_ = {}; }
   }
   if (!storage_ok_) return;
+  if (usb_request_) {
+    if (queued_.envelope.empty()) usb_request_ = false;
+    else {
+      // USB requests never fall through to Wi-Fi's interrupted-handoff retry.
+      // Preserve their journal until boot selection is positively established.
+      const auto selection = usb_selection_();
+      const bool superseded = !newer_release(queued_.version, OPENATHAN_FIRMWARE_VERSION);
+      if (selection == UsbSelection::UNKNOWN) state_ = "usb_selection_uncertain";
+      else if (selection == UsbSelection::SELECTED) state_ = "awaiting_power";
+      else if (selection == UsbSelection::REJECTED || superseded) {
+        result_ = superseded ? "superseded" : "rolled_back";
+        state_ = superseded ? "current" : result_;
+        if (persist_("", "")) { expected_.clear(); queued_ = {}; usb_request_ = false; }
+      } else {
+        if (!expected_.empty() && !persist_(queued_.envelope, "")) return;
+        expected_.clear(); state_ = "usb_interrupted";
+      }
+      return;
+    }
+  }
   if (!expected_.empty()
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
       && qualification_.should_reconcile(*this)
@@ -464,14 +485,6 @@ void Upgrade::loop(bool connected) {
   if (!queued_.envelope.empty() && !bootloader_ok_) {
     error_ = "This speaker needs a maintainer USB bootloader transition before Wi-Fi updates";
     return;
-  }
-  if (usb_request_) {
-    if (queued_.envelope.empty()) usb_request_ = false;
-    else if (expected_.empty()) {
-      state_ = "usb_interrupted";
-      // No USB handle survives restart. Clear only through a new owner request.
-      return;
-    } else return;
   }
   if (staged_ && safe_) {
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
