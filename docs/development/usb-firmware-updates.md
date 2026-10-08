@@ -24,7 +24,11 @@ No firmware-health or rollback requirement is relaxed for Atom-only USB power.
 
 USB and Wi-Fi update ownership are exclusive. A pending credential join/scan blocks
 BEGIN; active USB requests block other USB credential/scan mutations and authenticated
-HTTP mutations. Read-only status and identity remain available. No USB transfer
+HTTP mutations except authenticated `POST /api/stop` with an empty JSON object.
+Stop remains available during transfer, interruption and power handoff. It stops
+playback without changing USB ownership or the durable update request; ordinary
+host, origin, JSON and authentication checks still apply. Read-only status and
+identity remain available. No USB transfer
 automatically restarts, retries chunks or becomes a Wi-Fi download.
 
 ## Wire contract

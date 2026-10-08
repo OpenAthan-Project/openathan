@@ -573,6 +573,26 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/firmware/')).length,0);
   }finally{await o.close();}
  });
+ for(const usbState of ['usb_descriptor','usb_receiving','usb_interrupted','usb_selection_uncertain','awaiting_power'])for(const view of ['today','settings'])test(`${browserName}: ${view} Stop remains available during ${usbState}`,async()=>{
+  const f=await fixture();f.state.device.playing=true;
+  f.state.device.firmware={version:'v0.4.0',state:usbState,transport:'usb',queued_version:'v0.5.0',received:100,error:''};
+  const before=structuredClone(f.state.device),o=await open(f,browserName),{page}=o;
+  try{
+    if(view==='settings')await settings(page);
+    const button=page.locator(view==='settings'?'#settings-stop':'#stop');
+    assert.ok(await button.isVisible());assert.ok(await button.isEnabled());
+    await button.click();await button.waitFor({state:'hidden'});await requestsFinished(page);
+    assert.match(await page.locator(view==='settings'?'#settings-playback-feedback':'#action-feedback').textContent(),/Playback stopped/);
+    assert.deepEqual(f.state.posts.map(post=>({url:post.url,payload:post.payload})),[{url:'/api/stop',payload:{}}]);
+    assert.deepEqual(f.state.device,{...before,playing:false});
+    if(view==='today')await settings(page);
+    assert.ok(await page.locator('#settings-stop').isHidden());
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isHidden());
+    assert.ok(await page.locator('#firmware-install').isHidden());
+    await page.locator('[data-view="today"]').click();assert.ok(await page.locator('#stop').isHidden());
+  }finally{await o.close();}
+ });
  test(`${browserName}: a queued task-start failure stays visibly cancellable`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',error:'Not enough memory to start the update; retrying after five minutes'};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

@@ -106,6 +106,65 @@ Corrected development-build OTA identities:
 | Upgrade qualification | `c2c19a64f5c300c730b9500cbddcced06aaf98938f4781e3953e9edfcc3dc627` |
 | Startup failure | `2bfc1d9601d9699a0f392c611f0feeb4058dd097ed28f8106625a86e1ba89c89` |
 
+## Playback Stop correction
+
+USB ownership now permits only the exact authenticated `POST /api/stop` endpoint
+alongside existing reads. It still applies maintenance, host, method, origin,
+JSON content-type, Digest authentication and rate-limit checks before dispatching
+to the unchanged local API. Other mutations remain blocked throughout transfer,
+interruption and power handoff.
+
+The new UBSan HTTP regression compiles the production handler, host validator
+and helpers unchanged with the real Digest verifier and USB updater. Platform
+I/O is deterministic and local API dispatch is observed through a test adapter.
+It fails against `39c3d14`: a partial application transfer leaves a durable
+request after simulated restart, and authenticated Stop returns 409. The
+correction returns 200 in `usb_interrupted`, `usb_descriptor`, `usb_receiving`,
+`usb_selection_uncertain` and `awaiting_power`. It preserves USB ownership,
+the journal, NVS commit count, OTA writes/erases, boot selection and reboot count.
+Other writes and similar Stop URLs remain blocked; unauthenticated, invalid
+origin/host/content-type/method, replayed and rate-limited requests cannot stop
+playback.
+
+Production and isolated local API tests use the real scheduler to start a
+scheduled prayer, reject malformed/non-object/nonempty Stop payloads, then verify
+valid Stop returns `playing: false` without changing saved settings or any
+persisted settings/history records. CMake/CTest passed all 16 tests; the required
+Python suite passed all 103 without skips. All eleven updater/HTTP runtime
+profiles passed with UBSan, and the resolved SDK request/header regression passed.
+
+The complete device UI suite passed all 486 Chromium/WebKit cases without skips
+using Node 24.19.0 and locked Playwright 1.62.1. Twenty new cases verify Stop in
+Today and Settings across all five USB states, authoritative stopped feedback,
+unchanged device settings/update state and blocked network update controls.
+Browser endpoints remain simulated with the production Digest verifier.
+
+Matched builds compare `39c3d14` with the Stop correction using the same pinned
+toolchain, configurations, synthetic audio, qualification trust and `development`
+build identity described above. All eight builds passed capacity, dependency,
+partition and image-consistency checks.
+
+| Variant | Before OTA bytes | Corrected OTA bytes | Delta | Remaining 1.5 MiB budget | Free 2 MiB slot bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Reference | 1,274,144 | 1,274,176 | +32 | 298,688 | 822,976 |
+| Provisioning isolated | 1,275,568 | 1,275,616 | +48 | 297,248 | 821,536 |
+| Upgrade qualification | 1,281,184 | 1,281,216 | +32 | 291,648 | 815,936 |
+| Startup failure | 1,281,184 | 1,281,216 | +32 | 291,648 | 815,936 |
+
+Static RAM remains 115,395 bytes for reference/provisioning and 115,467 bytes for
+qualification variants. No new dependency, persistent allocation or partition
+change is introduced. These figures do not establish runtime heap or PSRAM
+headroom, and no hardware was accessed or changed.
+
+Stop-corrected development-build OTA identities:
+
+| Variant | SHA-256 |
+| --- | --- |
+| Reference | `4068373c9713a7879792b48f143ce33aaff3a12e1312136db5cb7ea5d1410b40` |
+| Provisioning isolated | `02cc91ae6e4001dd6d1420b4e95b5437dd7297d2d387592cd31b435d1b8a02ef` |
+| Upgrade qualification | `2c03cdc00e3e33b8326e69e37070e12e0db12bd008870f394c061937a607995a` |
+| Startup failure | `63c95565f3a36c713ee7e493363b7c2c6a3715aa921e386c7ee690ee9c1bc188` |
+
 ## Physical and runtime limits
 
 No hardware was accessed or changed. Atom-only USB health/transfer, bottom-power

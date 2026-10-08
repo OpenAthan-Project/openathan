@@ -437,7 +437,8 @@ void Device::handle_http_(HttpExchange& request) {
       request.response.assign(reinterpret_cast<const char*>(assets_[i].data), assets_[i].size);
       return;
     }
-  if (upgrade_.usb_busy() && request.method != "GET") {
+  if (upgrade_.usb_busy() && request.method != "GET" &&
+      !(request.method == "POST" && request.uri == "/api/stop")) {
     error(request, 409, "Finish or reconcile the USB update before another change"); return;
   }
   api_->set_context(hostname_, wifi::global_wifi_component->is_connected());
