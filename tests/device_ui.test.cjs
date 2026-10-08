@@ -553,6 +553,21 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    }finally{await browser.close();await f.close();}
   });
  }
+ test(`${browserName}: USB transfer and power handoff block network update controls`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.4.0',state:'usb_receiving',transport:'usb',queued_version:'v0.5.0',received:100,available:{version:'v0.5.0',bytes:300},error:''};
+  const o=await open(f,browserName),{page}=o;
+  try {
+    await settings(page);await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('over USB'));
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isHidden());
+    assert.ok(await page.locator('#firmware-install').isHidden());
+    f.state.device.firmware={version:'v0.4.0',state:'awaiting_power',transport:'usb',queued_version:'v0.5.0',error:''};
+    await page.waitForFunction(()=>document.querySelector('#firmware-status').textContent.includes('Pyramid bottom port'));
+    assert.ok(await page.locator('#firmware-check').isDisabled());
+    assert.ok(await page.locator('#firmware-cancel').isHidden());
+    assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/firmware/')).length,0);
+  }finally{await o.close();}
+ });
  test(`${browserName}: a queued task-start failure stays visibly cancellable`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'queued',queued_version:'v0.3.0',error:'Not enough memory to start the update; retrying after five minutes'};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

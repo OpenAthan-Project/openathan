@@ -6,6 +6,8 @@
 #include <mutex>
 #include <nvs.h>
 #include <esp_partition.h>
+#include <mbedtls/sha256.h>
+#include "openathan/usb_upgrade.h"
 #include "esphome/components/openathan/openathan.h"
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
 #include "esphome/components/openathan_upgrade_qualification/qualification.h"
@@ -18,11 +20,16 @@ struct UpgradeRelease {
 };
 class Upgrade : public UpgradeApi {
  public:
+  ~Upgrade() override;
   void begin(openathan_component::OpenAthan *athan, bool server_ready);
   void loop(bool connected);
   void shutdown() { cancel_ = true; safe_ = false; }
   void snapshot(JsonObject root) override;
   int action(const std::string &action, JsonObjectConst input, std::string &error) override;
+  std::vector<std::string> usb_info();
+  uint8_t usb_command(uint8_t command, const std::vector<std::string> &fields, std::vector<std::string> &reply);
+  bool usb_chunk(const ::openathan::usb_upgrade::Chunk &chunk);
+  bool usb_busy() const { return usb_token_ || usb_request_; }
  private:
   static void worker_(void *argument);
   void run_();
@@ -30,6 +37,8 @@ class Upgrade : public UpgradeApi {
   bool descriptor_(const std::string &envelope, UpgradeRelease &release);
   bool persist_(const std::string &queue, const std::string &expected);
   void fail_(const char *message);
+  bool usb_safe_();
+  bool usb_abort_();
   openathan_component::OpenAthan *athan_{};
   std::mutex mutex_;
   UpgradeRelease offered_, queued_;
@@ -41,6 +50,13 @@ class Upgrade : public UpgradeApi {
   std::atomic<uint32_t> received_{0};
   uint64_t boot_ms_{}, next_check_ms_{}, retry_ms_{};
   int64_t last_check_{};
+  bool usb_request_{};
+  uint64_t usb_token_{}, usb_last_ms_{};
+  uint32_t usb_descriptor_bytes_{};
+  std::string usb_descriptor_;
+  uint32_t usb_handle_{};
+  mbedtls_sha256_context usb_hash_{};
+  bool usb_hash_live_{};
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   friend class openathan_upgrade_qualification::Qualification;
   openathan_upgrade_qualification::Qualification qualification_;

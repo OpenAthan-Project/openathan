@@ -109,7 +109,8 @@ crashes/restarts before confirmation are handled by the rollback-enabled bootloa
 Confirmation does not establish audible quality or long-term runtime stability.
 
 The signed request remains durable through boot-slot selection and startup.
-A cut before selection retains the queue for a fresh safe-window download.
+A cut before selection retains a Wi-Fi queue for a fresh safe-window download.
+USB requests instead require an explicit owner decision and never become network downloads.
 A selected candidate waits for restart without erasing or selecting another slot.
 Startup reports rollback only when the requested inactive image is marked invalid
 or aborted by OTA metadata; the running requested version reports success after
@@ -156,3 +157,8 @@ successful slot switching, power/network interruption, failed startup, queue
 cancellation/restoration and concurrent networking/audio heap/fragmentation.
 Synthetic CI audio must never be installed or played. Publication and physical
 installation remain separate approvals.
+
+The additive [USB application-update protocol](usb-firmware-updates.md) reuses
+these trust, partition and startup contracts. It waits for owner power handoff
+after selection. The companion website keeps public USB writes disabled until
+new transport-specific physical qualification and a capable release are available.

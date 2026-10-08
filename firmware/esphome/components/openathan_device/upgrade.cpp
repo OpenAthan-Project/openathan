@@ -131,7 +131,8 @@ bool Upgrade::descriptor_(const std::string &envelope, UpgradeRelease &release) 
 bool Upgrade::persist_(const std::string &queue, const std::string &expected) {
   if (!storage_ok_) return false;
   JsonDocument doc;
-  doc["schema"] = 1; doc["queue"] = queue; doc["expected"] = expected;
+  doc["schema"] = usb_request_ ? 2 : 1; doc["queue"] = queue; doc["expected"] = expected;
+  if (usb_request_) doc["source"] = "usb";
   std::string record;
   serializeJson(doc, record);
   if (nvs_set_blob(nvs_, "request", record.data(), record.size()) != ESP_OK || nvs_commit(nvs_) != ESP_OK) {
@@ -173,8 +174,10 @@ void Upgrade::begin(openathan_component::OpenAthan *athan, bool server_ready) {
   std::string record(size, '\0');
   JsonDocument doc;
   if (nvs_get_blob(nvs_, "request", record.data(), &size) != ESP_OK || deserializeJson(doc, record) ||
-      doc.size() != 3 || doc["schema"].as<unsigned>() != 1 ||
+      ((doc.size() != 3 || doc["schema"].as<unsigned>() != 1) &&
+       (doc.size() != 4 || doc["schema"].as<unsigned>() != 2 || doc["source"].as<std::string>() != "usb")) ||
       !doc["queue"].is<const char *>() || !doc["expected"].is<const char *>()) { storage_ok_ = false; return; }
+  usb_request_ = doc["schema"].as<unsigned>() == 2;
   expected_ = doc["expected"].as<std::string>();
   if (!expected_.empty() && !release_version(expected_)) { storage_ok_ = false; return; }
   const auto queue = doc["queue"].as<std::string>();
@@ -196,6 +199,7 @@ void Upgrade::snapshot(JsonObject root) {
   std::lock_guard<std::mutex> lock(mutex_);
   root["version"] = OPENATHAN_FIRMWARE_VERSION;
   root["supported"] = bootloader_ok_;
+  if (usb_busy()) root["transport"] = "usb";
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   qualification_.snapshot(root);
 #endif
@@ -215,6 +219,7 @@ void Upgrade::snapshot(JsonObject root) {
 }
 int Upgrade::action(const std::string &action, JsonObjectConst input, std::string &error) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (usb_busy()) { error = "A USB update must be reconciled through USB"; return 409; }
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   const bool ready = qualification_.services_ready(confirmed_, action);
 #else
@@ -405,7 +410,10 @@ void Upgrade::loop(bool connected) {
     if (pending && esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) return;
     confirmed_ = true;
   }
-  if (!storage_ok_ || active_) return;
+  if (usb_token_ && now - usb_last_ms_ > 40000) {
+    usb_abort_(); error_ = "USB transfer interrupted; check status before another attempt";
+  }
+  if (!storage_ok_ || active_ || usb_token_) return;
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   if (qualification_.selected_loop(safe_)) return;
 #endif
@@ -437,8 +445,8 @@ void Upgrade::loop(bool connected) {
     } else if (identified && esp_ota_get_boot_partition() == candidate) {
       // Selection completed, but this application is still running. Do not
       // erase either slot or rewrite boot metadata while handoff is pending.
-      state_ = "restarting";
-      if (safe_) App.safe_reboot();
+      state_ = usb_request_ ? "awaiting_power" : "restarting";
+      if (!usb_request_ && safe_) App.safe_reboot();
       return;
     } else {
       // OTA begin invalidates the inactive slot's previous rollback metadata.
@@ -456,6 +464,14 @@ void Upgrade::loop(bool connected) {
   if (!queued_.envelope.empty() && !bootloader_ok_) {
     error_ = "This speaker needs a maintainer USB bootloader transition before Wi-Fi updates";
     return;
+  }
+  if (usb_request_) {
+    if (queued_.envelope.empty()) usb_request_ = false;
+    else if (expected_.empty()) {
+      state_ = "usb_interrupted";
+      // No USB handle survives restart. Clear only through a new owner request.
+      return;
+    } else return;
   }
   if (staged_ && safe_) {
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION

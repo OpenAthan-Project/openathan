@@ -179,7 +179,11 @@ The [firmware upgrade flow](../../docs/development/firmware-upgrades.md) checks
 for stable releases and queues owner-requested application updates between prayers.
 The authenticated **Updates** group provides check, install, cancel and
 reconnect/status controls. The public USB installer remains a fresh-install and
-credential-recovery tool. Quran/adhkar and owner-facing audio replacement remain
+credential-recovery tool, with a separately gated preserving USB updater for
+capable firmware. While a USB request is active, the local Updates group displays
+transfer, interruption or owner power-handoff status and hides network cancellation;
+firmware rejects competing mutations. See the [USB protocol](../../docs/development/usb-firmware-updates.md).
+Quran/adhkar and owner-facing audio replacement remain
 future work.
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)

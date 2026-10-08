@@ -27,12 +27,15 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
             "-I"+str(ROOT / "firmware"),
             "-I"+str(ROOT / "firmware/esphome/components/openathan_device"), "-I"+str(ROOT / "lib/openathan-core/include"),
             str(ROOT / "tests" / source), str(ROOT / "firmware/esphome/components/openathan_device/upgrade.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan_device/usb_upgrade.cpp"),
             *([str(ROOT / "firmware/esphome/components/openathan_upgrade_qualification/qualification.cpp")]
               if "-DOPENATHAN_UPGRADE_QUALIFICATION" in extra else []),
             *([] if os.uname().sysname == "Darwin" else ["-lcrypto"]), "-o", str(output)], check=True)
         subprocess.run([output], check=True)
     for version in ("v0.2.0", "v0.2.1", "v0.3.0", "v0.4.0"):
         run("upgrade_runtime_tests.cpp", version)
+    run("usb_upgrade_tests.cpp", "v0.2.0")
+    run("usb_upgrade_tests.cpp", "v0.3.0")
     run("upgrade_isolated_tests.cpp", "v0.2.0", ["-DOPENATHAN_PROVISIONING_TEST_STORAGE"])
     for failure in ("false", "true"):
         run("upgrade_qualification_tests.cpp", "v0.2.0", [
