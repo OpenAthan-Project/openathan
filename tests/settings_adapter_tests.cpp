@@ -476,6 +476,32 @@ static void light_api() {
   nvs_test::fail_commit=false;
   f.device.set_light_output(nullptr); CHECK(call("POST",body()).code==404);
 }
+static void local_api_stop() {
+  using namespace esphome::openathan_device;
+  Fixture f; f.begin(); f.device.utc=epoch({2026,9,25},5)-1; f.device.update(); f.device.step(1);
+  CHECK(f.audio.active && f.device.status().playing);
+  LocalApi api(&f.device,nullptr,0);
+  auto call=[&](const char *uri,const std::string &body) {
+    ApiExchange request; request.method="POST"; request.uri=uri; request.body=body;
+    api.handle(request); return request;
+  };
+  const auto settings=*f.device.settings_service()->saved();
+  const auto records=nvs_test::committed;
+  const auto writes=nvs_test::writes, commits=nvs_test::commits, stops=f.audio.stops;
+  for (const char *body : {"", "{broken", "[]", "null"}) {
+    CHECK(call("/api/stop",body).code==400 && f.audio.active && f.audio.stops==stops);
+  }
+  CHECK(call("/api/stop",R"({"unexpected":true})").code==404 && f.audio.active && f.audio.stops==stops);
+  for (const char *uri : {"/api/stop/", "/api/stop?ignored=true", "/api/stop-extra"}) {
+    CHECK(call(uri,"{}").code==404 && f.audio.active && f.audio.stops==stops);
+  }
+  const auto stopped=call("/api/stop","{}"); JsonDocument status;
+  CHECK(stopped.code==200 && !deserializeJson(status,stopped.response) && status["playing"]==false);
+  CHECK(!f.audio.active && f.audio.stops==stops+1 && !f.device.status().playing);
+  CHECK(call("/api/stop","{}").code==200 && !f.audio.active);
+  CHECK(*f.device.settings_service()->saved()==settings && nvs_test::committed==records);
+  CHECK(nvs_test::writes==writes && nvs_test::commits==commits);
+}
 static void local_api_date() {
   using namespace esphome::openathan_device;
   Fixture f;f.begin();f.device.utc=epoch({2026,9,25},23);
@@ -712,6 +738,6 @@ int main() {
   display_adapter();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_date(); local_api_coordinates();
+  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_date(); local_api_coordinates();
 #endif
 }

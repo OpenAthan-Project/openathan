@@ -13,6 +13,7 @@ void Device::loop() {
 }
 void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanResult>&) {}
 void Device::on_wifi_connect_state(StringRef, std::span<const uint8_t,6>) {}
+Upgrade::~Upgrade() = default;
 void Upgrade::snapshot(JsonObject) {}
 int Upgrade::action(const std::string& action, JsonObjectConst, std::string&) {
   if (action == "arm_safe_worker") { cancel_ = false; safe_ = true; return 200; }

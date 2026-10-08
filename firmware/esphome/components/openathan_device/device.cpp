@@ -138,6 +138,12 @@ void Device::result_(bool extension, uint8_t command, const std::vector<std::str
   send_(extension, 4, rpc(command, fields));
 }
 void Device::serial_request(const Frame& request) {
+  if (request.extension && request.type == ::openathan::usb_upgrade::DATA) {
+    const auto chunk = ::openathan::usb_upgrade::decode(request.data);
+    if (chunk && upgrade_.usb_chunk(*chunk)) send_(true, ::openathan::usb_upgrade::ACK, ::openathan::usb_upgrade::ack(*chunk));
+    else send_(true, 2, {1});
+    return;
+  }
   if (request.type != 3) return;
   uint8_t command;
   std::vector<std::string> fields;
@@ -168,7 +174,19 @@ void Device::serial_request(const Frame& request) {
     return;
   }
 #endif
-  if (maintenance_) {
+  if (request.extension && command == ::openathan::usb_upgrade::INFO && fields.empty()) {
+    result_(true, command, upgrade_.usb_info()); return;
+  }
+  if (request.extension && command >= ::openathan::usb_upgrade::BEGIN && command <= ::openathan::usb_upgrade::ABORT) {
+    if (maintenance_ || (command == ::openathan::usb_upgrade::BEGIN && (wifi_attempt_.active() || scanning_))) {
+      send_(true, 2, {255}); return;
+    }
+    std::vector<std::string> reply;
+    const auto error = upgrade_.usb_command(command, fields, reply);
+    if (error) send_(true, 2, {error}); else result_(true, command, reply);
+    return;
+  }
+  if (maintenance_ || (upgrade_.usb_busy() && !((request.extension && command == 1) || (!request.extension && (command == 2 || command == 3))))) {
     send_(request.extension, 2, {255});
     return;
   }
@@ -232,7 +250,7 @@ void Device::serial_request(const Frame& request) {
     send_(false, 1, {wifi_state_()});
     if (wifi_state_() == 4) result_(false, command, urls_());
   } else if (command == 3)
-    result_(false, command, {"OpenAthan", "1-dev", "ESP32-S3", hostname_});
+    result_(false, command, {"OpenAthan", OPENATHAN_FIRMWARE_VERSION, "ESP32-S3", hostname_});
   else if (command == 4) {
     if (wifi_attempt_.active() || scanning_) {
       send_(false, 2, {255});
@@ -419,6 +437,10 @@ void Device::handle_http_(HttpExchange& request) {
       request.response.assign(reinterpret_cast<const char*>(assets_[i].data), assets_[i].size);
       return;
     }
+  if (upgrade_.usb_busy() && request.method != "GET" &&
+      !(request.method == "POST" && request.uri == "/api/stop")) {
+    error(request, 409, "Finish or reconcile the USB update before another change"); return;
+  }
   api_->set_context(hostname_, wifi::global_wifi_component->is_connected());
   api_->handle(request);
 }

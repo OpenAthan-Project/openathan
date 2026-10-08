@@ -1577,6 +1577,11 @@ const firmwareMessages = {
   success: "Firmware updated successfully.",
   rolled_back: "The update could not start successfully. The previous firmware has been restored.",
   failed: "The update could not complete. Check again to retry.",
+  usb_descriptor: "Receiving a signed update descriptor over USB…",
+  usb_receiving: "Receiving firmware over USB. Keep Atom USB connected.",
+  usb_interrupted: "USB transfer interrupted. Reconnect through USB setup to discard it before another update.",
+  usb_selection_uncertain: "USB handoff is uncertain. Reconnect and read update status before another action.",
+  awaiting_power: "Update written and verified. Unplug Atom USB and power only through the Pyramid bottom port.",
   storage_fault: "Update storage is unavailable. Restart the device; saved data has been retained."
 };
 function renderFirmware(state = firmware.data) {
@@ -1592,7 +1597,7 @@ function renderFirmware(state = firmware.data) {
     `Installed: ${state.version}${state.queued_version ? ` · Queued: ${state.queued_version}` : state.available ? ` · Available: ${state.available.version}` : ""}`
   );
   const progress =
-    state.state === "downloading" && state.total
+    ["downloading", "usb_receiving"].includes(state.state) && state.total
       ? ` ${Math.floor((100 * state.received) / state.total)}%`
       : "";
   text(
@@ -1615,7 +1620,7 @@ function renderFirmware(state = firmware.data) {
       ? `Last checked: ${new Date(state.last_check * 1000).toLocaleString(undefined, { hour12: formatHours() === 12, timeZone: "UTC" }) + " UTC"}`
       : "No successful update check yet."
   );
-  const working = ["checking", "queued", "downloading", "verifying", "restarting"].includes(
+  const working = ["checking", "queued", "downloading", "verifying", "restarting", "usb_descriptor", "usb_receiving", "usb_interrupted", "usb_selection_uncertain", "awaiting_power"].includes(
     state.state
   );
   $("firmware-check").disabled =
@@ -1633,7 +1638,7 @@ function renderFirmware(state = firmware.data) {
     firmwareUncertain ||
     state.state === "storage_fault" ||
     state.supported === false;
-  $("firmware-cancel").hidden = !["queued", "downloading", "verifying"].includes(state.state);
+  $("firmware-cancel").hidden = state.transport === "usb" || !["queued", "downloading", "verifying"].includes(state.state);
   $("firmware-cancel").disabled = firmwareBusy || writing() || !connected || firmwareUncertain;
   $("firmware-notes").hidden = !state.available;
   if (state.available)
