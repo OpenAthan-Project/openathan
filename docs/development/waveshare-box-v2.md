@@ -33,9 +33,7 @@ the comparison and its limits. ESPHome documents this reliability tradeoff in
 [Wi-Fi power-save mode](https://esphome.io/components/wifi/#power-save-mode).
 
 The [network follow-up](waveshare-network-development-2026-10-09.md) records
-paired client observations and clean development candidate preparation. The
-[public-support plan](waveshare-public-support-plan.md) covers the separately
-reviewed production migration, recovery and release work.
+the unresolved findings and validated clean development installation.
 
 The hardware identity is `waveshare-esp32-s3-touch-lcd-1_85c-box-v2`. Development
 uses `openathan-test` with a MAC suffix and the existing `oa_test`,
