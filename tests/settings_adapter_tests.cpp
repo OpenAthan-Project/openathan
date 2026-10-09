@@ -3,9 +3,11 @@
 #include "../firmware/esphome/components/openathan_device/upgrade_policy.h"
 #include "../firmware/esphome/components/openathan_display/status_display.h"
 #include "esphome/components/wifi/wifi_component.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <vector>
 
 #define CHECK(c) do { if (!(c)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #c); std::abort(); } } while (0)
 using namespace openathan;
@@ -330,6 +332,44 @@ static void display_adapter() {
   esphome::openathan_display::StatusDisplay absent;
   absent.setup(); CHECK(absent.is_failed());
   esphome::wifi::global_wifi_component = nullptr;
+}
+
+static void display_button_guidance() {
+  struct LCD : esphome::display::Display {
+    explicit LCD(int size) : size(size), pixels(size * size) {}
+    int get_width() override { return size; }
+    int get_height() override { return size; }
+    void fill(esphome::Color) override { std::fill(pixels.begin(), pixels.end(), 0); }
+    void draw_pixel_at(int x, int y, esphome::Color color) override {
+      CHECK(x >= 0 && x < size && y >= 0 && y < size);
+      pixels[y * size + x] = (uint32_t(color.red) << 16) | (uint32_t(color.green) << 8) | color.blue;
+    }
+    int size;
+    std::vector<uint32_t> pixels;
+  };
+  Fixture f; f.begin(); f.audio.active = true;
+  for (bool round : {false, true}) {
+    LCD lcd(round ? 360 : 128);
+    esphome::openathan_display::StatusDisplay screen;
+    screen.set_round(round); screen.set_display(&lcd); screen.set_openathan(&f.device);
+    lcd.set_writer([&screen](esphome::display::Display &canvas) { screen.draw(canvas); });
+    screen.setup(); CHECK(!screen.is_failed());
+    for (bool button : {false, true}) {
+      screen.set_stop_button(button); screen.update();
+      std::vector<uint32_t> expected(lcd.pixels.size());
+      auto pixel = [&](int x, int y, uint32_t color) {
+        const int scale = round ? 2 : 1, offset = round ? 52 : 0;
+        for (int dy = 0; dy < scale; ++dy)
+          for (int dx = 0; dx < scale; ++dx)
+            expected[(offset + scale*y + dy)*lcd.size + offset + scale*x + dx] = color;
+      };
+      openathan::screen::draw_text(pixel, button ? "Button to stop" : "Use phone", 96, 1, 0xD0D8D8);
+      const int first = round ? 244 : 96, end = round ? 260 : 104;
+      for (int i = first*lcd.size; i < end*lcd.size; ++i) CHECK(lcd.pixels[i] == expected[i]);
+      const auto updates = lcd.updates;
+      screen.update(); CHECK(lcd.updates == updates);
+    }
+  }
 }
 
 static void occurrence_identity() {
@@ -736,6 +776,7 @@ static void json_transport() {
 int main() {
   upgrade_boot_scheduler_health();
   display_adapter();
+  display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
   display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_date(); local_api_coordinates();

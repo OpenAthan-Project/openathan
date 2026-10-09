@@ -60,6 +60,7 @@ session.
 | Backlight | GPIO5, 5 kHz PWM, saved 1–100%, default 50% |
 | Panel reset | TCA9554 `0x20`, zero-based P1, vendor's one-based EXIO2 |
 | Shared I²C | SCL 10, SDA 11; confirmed on the attended unit |
+| BOOT button | GPIO0, active-low input with pull-up; mapping awaits physical validation |
 
 The mappings follow the [manufacturer's V2 audio example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/Arduino/examples/03_audio_out_no_tf/03_audio_out_no_tf.ino),
 [display header](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/ESP-IDF/ESP32-S3-Touch-LCD-1.85C-Test/main/LCD_Driver/ST77916.h)
@@ -77,10 +78,33 @@ physical validation. ESPHome adds pixel format, orientation, inversion,
 sleep-out and display-on commands. Its QSPI path requires a 16-bit framebuffer
 (259,200 bytes); allocator placement and recovery must be measured on-device.
 
+### Physical controls
+
+The BOOT button uses the same release-triggered controls as the reference Atom:
+
+| Press duration | Action on release |
+| --- | --- |
+| 50 ms–1 second | Stop current playback |
+| 2–5 seconds | Skip the next scheduled Athan |
+| 6–10 seconds | Cancel the skip |
+| Other durations | No application action |
+
+These actions use existing scheduler safeguards and do not start manual playback.
+BOOT's GPIO0 connection follows the linked V2 schematic; holding it during reset
+or power-on still enters ROM download mode. RESET is wired to the chip reset
+input and retains its hardware restart function. Button operation on the attended
+unit remains untested; validate stop, skip and cancel-skip after a separately
+approved application-only installation, preserving settings, history and audio.
+See the [automated validation and capacity comparison](waveshare-buttons-validation-2026-10-09.md)
+for this mapping.
+
+### Display
+
 The existing bitmap layout is centered at offset (52,52), enlarged 2× within
 the 360×360 circle and rotated 180° for viewing opposite the rear USB cable.
 Host tests check every rendered pixel against circular
-bounds. Playback guidance says “Use phone.” Saved timezone, time format and
+bounds. Playback guidance says “Button to stop” through the explicit
+`stop_button` capability. Saved timezone, time format and
 brightness continue to use existing preferences. The presenter refreshes only
 when visible content changes. Screen or backlight failure does not gate audio,
 scheduling or startup health.

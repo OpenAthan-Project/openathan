@@ -36,3 +36,30 @@ waveshare_box_audio:
   playback_id: athan_audio
   dac_id: waveshare_dac
   amplifier_pin: GPIO15
+
+# BOOT is GPIO0 on the V2 schematic. Match the reference front-button controls.
+# Holding BOOT during reset/power-on still selects ROM download mode.
+binary_sensor:
+  - platform: gpio
+    id: boot_button
+    internal: true
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - openathan.stop:
+              id: athan_scheduler
+      - min_length: 2s
+        max_length: 5s
+        then:
+          - openathan.skip_next:
+              id: athan_scheduler
+      - min_length: 6s
+        max_length: 10s
+        then:
+          - openathan.cancel_skip:
+              id: athan_scheduler

@@ -246,3 +246,4 @@ openathan_display:
   openathan_id: athan_scheduler
   display_id: waveshare_status_lcd
   layout: round_360
+  stop_button: true

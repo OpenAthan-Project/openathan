@@ -11,6 +11,7 @@ class StatusDisplay : public PollingComponent {
   void set_openathan(openathan_component::OpenAthan *value) { athan_ = value; }
   void set_display(display::Display *value) { display_ = value; }
   void set_round(bool value) { round_ = value; }
+  void set_stop_button(bool value) { stop_button_ = value; }
   float get_setup_priority() const override { return setup_priority::LATE - 10; }
   void setup() override;
   void update() override;
@@ -20,5 +21,6 @@ class StatusDisplay : public PollingComponent {
   display::Display *display_{};
   ::openathan::screen::FrameCache cache_;
   bool round_{};
+  bool stop_button_{true};
 };
 }
