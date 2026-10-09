@@ -5,6 +5,11 @@ in the `codex/usb-updates` change based on `310b978`. These are development buil
 not release candidates or physical acceptance. The companion website retains
 `usbUpdateEnabled: false` until new qualification and a capable release.
 
+Later source-bound hardware observations and production restoration are recorded
+in the [2026-10-09 qualification report](usb-update-qualification-2026-10-09.md).
+They retain unresolved responsiveness and physical-coverage limits; the dated
+automated/development measurements below are unchanged.
+
 ## Automated behavior
 
 - CMake/CTest: all 16 host tests passed.
@@ -167,7 +172,8 @@ Stop-corrected development-build OTA identities:
 
 ## Physical and runtime limits
 
-No hardware was accessed or changed. Atom-only USB health/transfer, bottom-power
+At this development checkpoint, no hardware was accessed or changed. Atom-only
+USB health/transfer, bottom-power
 startup, actual credential/settings/history/audio preservation, interruption
 recovery, failed-startup rollback and concurrent audio/network heap/fragmentation
 remain untested for this transport. Existing Wi-Fi qualification cannot substitute
