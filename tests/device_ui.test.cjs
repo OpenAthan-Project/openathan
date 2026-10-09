@@ -507,6 +507,18 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    assert.equal(previews,1);
   }finally{gate.resolve();await o.close();}
  });
+ test(`${browserName}: development firmware shows its installed version with updates unavailable`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.4.0',hardware:'waveshare-esp32-s3-touch-lcd-1_85c-box-v2',updates_enabled:false,supported:false,state:'idle',result:'',error:''};
+  const o=await open(f,browserName),{page}=o;
+  try {
+   await settings(page);
+   assert.equal(await page.locator('#firmware-version').textContent(),'Installed: v0.4.0');
+   assert.match(await page.locator('#firmware-status').textContent(),/Updates are unavailable/);
+   for(const id of ['firmware-check','firmware-install','firmware-cancel','firmware-notes','firmware-last-check'])assert.ok(await page.locator('#'+id).isHidden());
+   await page.locator('#firmware-check').evaluate(el=>el.click());
+   assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/firmware/')).length,0);
+  }finally{await o.close();}
+ });
  test(`${browserName}: a superseded queue clears its reconnect hint and permits checks`,async()=>{
   const f=await fixture();f.state.device.firmware={version:'v0.4.0',state:'current',result:'superseded',error:''};
   const browser=await ({chromium,webkit}[browserName]).launch({headless:true});

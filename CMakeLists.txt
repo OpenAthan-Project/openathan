@@ -102,6 +102,11 @@ target_include_directories(display_tests PRIVATE tests/stubs lib/openathan-core/
 target_link_libraries(display_tests PRIVATE openathan_core)
 add_test(NAME display_status_and_backlight COMMAND display_tests)
 
+add_executable(waveshare_adapter_tests tests/waveshare_adapter_tests.cpp)
+target_include_directories(waveshare_adapter_tests PRIVATE tests/waveshare_stubs tests/stubs
+  firmware lib/openathan-core/include)
+add_test(NAME waveshare_power_and_backlight COMMAND waveshare_adapter_tests)
+
 foreach(mode IN ITEMS production isolated)
   add_executable(display_preferences_${mode}_tests tests/display_preferences_tests.cpp
     firmware/esphome/components/openathan/nvs_settings_store.cpp)

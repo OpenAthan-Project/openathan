@@ -21,7 +21,7 @@ Upgrade::~Upgrade() {
   if (usb_hash_live_) mbedtls_sha256_free(&usb_hash_);
 }
 bool Upgrade::usb_safe_() {
-  if (!confirmed_ || !storage_ok_ || !bootloader_ok_) return false;
+  if (!OPENATHAN_UPDATES_ENABLED || !confirmed_ || !storage_ok_ || !bootloader_ok_) return false;
   const auto status = athan_->status();
   const auto *settings = athan_->settings_service();
   if (!server_ready_ || athan_->is_failed() || !settings || !settings->healthy() ||
@@ -35,7 +35,7 @@ bool Upgrade::usb_safe_() {
 std::vector<std::string> Upgrade::usb_info() {
   std::lock_guard<std::mutex> lock(mutex_);
   return {"1", OPENATHAN_FIRMWARE_VERSION, OPENATHAN_BUILD_COMMIT,
-      bootloader_ok_ ? "supported" : "unsupported", storage_ok_ ? state_ : "storage_fault",
+      OPENATHAN_UPDATES_ENABLED && bootloader_ok_ ? "supported" : "unsupported", storage_ok_ ? state_ : "storage_fault",
       confirmed_ ? "confirmed" : "pending", result_, queued_.version, std::to_string(received_.load())};
 }
 Upgrade::UsbSelection Upgrade::usb_selection_() {
@@ -78,6 +78,7 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
                            std::vector<std::string> &reply) {
   using namespace ::openathan::usb_upgrade;
   std::lock_guard<std::mutex> lock(mutex_);
+  if (!OPENATHAN_UPDATES_ENABLED) return 2;
   if (command == BEGIN) {
 #ifndef OPENATHAN_UPGRADE_QUALIFICATION
     if (openathan_storage::TEST_MODE) return 2;
@@ -158,7 +159,7 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
 }
 bool Upgrade::usb_chunk(const ::openathan::usb_upgrade::Chunk &chunk) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!usb_token_ || chunk.token != usb_token_) return false;
+  if (!OPENATHAN_UPDATES_ENABLED || !usb_token_ || chunk.token != usb_token_) return false;
   if (chunk.kind == 0) {
     if (state_ != "usb_descriptor" || chunk.offset != usb_descriptor_.size() ||
         chunk.bytes.size() > usb_descriptor_bytes_ - usb_descriptor_.size()) return false;

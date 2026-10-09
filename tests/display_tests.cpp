@@ -21,6 +21,12 @@ void capture(const char *name, const Frame &frame, const char *directory, bool u
     CHECK(x >= 0 && x < 128 && y >= 0 && y < 128);
     pixels[y * 128 + x] = rgb;
   });
+  render_round(frame, [](int x, int y, uint32_t) {
+    CHECK(x >= 0 && x < 360 && y >= 0 && y < 360);
+    // Pixel centers must fit inside the visible circle, without silent clipping.
+    const int dx = 2*x + 1 - 360, dy = 2*y + 1 - 360;
+    CHECK(dx*dx + dy*dy <= 360*360);
+  });
   if (upcoming) {
     const auto occupied = [&pixels](unsigned first, unsigned end) {
       for (unsigned i = first * 128; i < end * 128; ++i)
@@ -66,6 +72,10 @@ int main(int argc, char **argv) {
   CHECK(equal(offline.footer, "Offline") && equal(offline.detail, "Next Athan"));
   capture("offline", offline, directory, true);
   in.wifi_connected = true; in.status.playing = true;
+  in.stop_button = false;
+  CHECK(equal(present(in).detail, "Use phone")); capture("phone-playback", present(in), directory);
+  in.stop_button = true;
+  CHECK(equal(present(in).detail, "Button to stop"));
   CHECK(equal(present(in).main, "Playing") && equal(present(in).footer, ""));
   capture("playback", present(in), directory);
   in.status.playing = false; in.status.skip = key;

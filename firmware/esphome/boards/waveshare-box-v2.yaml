@@ -1,0 +1,31 @@
+# ESP32-S3-Touch-LCD-1.85C-BOX V2 only; V1 has a different audio circuit.
+# Vendor V2 source uses GPIO10/11; confirm responders during attended bring-up
+# because the linked schematic still labels the expander bus GPIO12/13.
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    version: 5.5.5
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# Disable power saving following the attended LIGHT/NONE comparison on this
+# USB-powered profile. HTTP timeouts remain unresolved; see the dated report.
+wifi:
+  power_save_mode: none
+
+i2c:
+  - id: waveshare_bus
+    sda: GPIO11
+    scl: GPIO10
+    scan: false
+
+i2s_audio:
+  - id: waveshare_audio_bus
+    i2s_mclk_pin: GPIO2
+    i2s_bclk_pin: GPIO48
+    i2s_lrclk_pin: GPIO38

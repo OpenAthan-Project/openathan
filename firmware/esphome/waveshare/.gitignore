@@ -1,0 +1,3 @@
+# Local build state and private credentials.
+/.esphome/
+/secrets.yaml

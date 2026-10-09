@@ -1587,6 +1587,15 @@ const firmwareMessages = {
 function renderFirmware(state = firmware.data) {
   $("firmware-section").hidden = !state;
   if (!state) return;
+  const updatesEnabled = state.updates_enabled !== false;
+  $("firmware-check").hidden = !updatesEnabled;
+  $("firmware-last-check").hidden = !updatesEnabled;
+  if (!updatesEnabled) {
+    text("firmware-version", `Installed: ${state.version}`);
+    text("firmware-status", "Updates are unavailable on this development build.");
+    for (const id of ["firmware-install", "firmware-cancel", "firmware-notes"]) $(id).hidden = true;
+    return;
+  }
   if (firmwareExpected && state.version === firmwareExpected && state.result === "success") {
     rememberFirmware();
   } else if (["rolled_back", "superseded"].includes(state.result)) {
@@ -1646,7 +1655,7 @@ function renderFirmware(state = firmware.data) {
       `https://github.com/OpenAthan-Project/openathan/releases/tag/${encodeURIComponent(state.available.version)}`;
 }
 async function firmwareAction(action) {
-  if (firmwareBusy || firmwareUncertain || !firmware.data || writing()) return;
+  if (firmwareBusy || firmwareUncertain || !firmware.data || firmware.data.updates_enabled === false || writing()) return;
   firmwareBusy = true;
   renderFirmware(firmware.data);
   const version = firmware.data.available?.version;

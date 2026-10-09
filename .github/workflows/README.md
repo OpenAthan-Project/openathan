@@ -6,6 +6,10 @@ with UndefinedBehaviorSanitizer, the complete Python suite, and schema validatio
 for the six developer configurations, the provisioning reference configuration,
 the isolated provisioning-validation configuration, and the isolated upgrade
 qualification configuration.
+Waveshare V2 audio, display and attended diagnostic development configurations
+are also generated and compiled. These require isolated storage and disable every
+public update transport. Capacity inspection checks their 16 MiB headers explicitly;
+public release validation retains the 8 MiB reference contract.
 Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
 `openathan.yaml` and `provisioning/validation.yaml`, then enforce dependency pins, partition layout,
 the 1.5 MiB application budget and factory/OTA payload consistency. Two additional
@@ -56,7 +60,7 @@ build, package and draft-upload commands.
 
 ## Documentation-only pull requests
 
-All eight check names remain present on every pull request. Each firmware job
+All firmware check names remain present on every pull request. Each firmware job
 checks the PR merge identity and complete changed-path list before installing
 build dependencies. For documentation-only changes, it reports an intentional
 omission in its job summary and skips dependency installation, compilation,

@@ -57,6 +57,8 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
     run("usb_upgrade_tests.cpp", "v0.3.0")
     run("usb_upgrade_tests.cpp", "v0.4.0")
     run("upgrade_isolated_tests.cpp", "v0.2.0", ["-DOPENATHAN_PROVISIONING_TEST_STORAGE"])
+    run("upgrade_disabled_tests.cpp", "v0.4.0", ["-DOPENATHAN_PROVISIONING_TEST_STORAGE",
+        "-DOPENATHAN_UPDATES_ENABLED=0", '-DOPENATHAN_HARDWARE="waveshare-esp32-s3-touch-lcd-1_85c-box-v2"'])
     for failure in ("false", "true"):
         run("upgrade_qualification_tests.cpp", "v0.2.0", [
             "-DOPENATHAN_UPGRADE_QUALIFICATION", "-DOPENATHAN_PROVISIONING_TEST_STORAGE",
