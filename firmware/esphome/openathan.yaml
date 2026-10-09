@@ -11,48 +11,9 @@ esphome:
 
 packages:
   openathan: !include packages/openathan.yaml
+  product: !include packages/product.yaml
   reference_hardware: !include packages/hardware/voice-pyramid.yaml
   reference_display: !include boards/atom-s3r-gc9107-display.yaml
-
-esp32:
-  partitions: feasibility/partitions.csv
-
-external_components:
-  - source:
-      type: local
-      path: components
-    components: [openathan_audio, openathan_device, improv_serial]
-
-logger:
-  hardware_uart: USB_SERIAL_JTAG
-  level: NONE
-
-wifi:
-  enable_on_boot: false
-  reboot_timeout: 0s
-
-mdns:
-  services:
-    - service: _http
-      protocol: _tcp
-      port: 80
-
-time:
-  - platform: sntp
-    id: athan_clock
-    timezone: UTC
-
-media_player:
-  - platform: speaker
-    id: athan_player
-    internal: true
-    volume_initial: 70%
-    volume_max: 60%
-    announcement_pipeline:
-      speaker: pyramid_speaker
-      format: MP3
-      sample_rate: 44100
-      num_channels: 1
 
 voice_pyramid:
   lights:
@@ -60,29 +21,8 @@ voice_pyramid:
     i2c_id: pyramid_bus
     address: 0x1A
 
-openathan_audio:
-  id: athan_audio
-  media_player_id: athan_player
-
-# These seed values are inactive until an explicit full setup document is saved
-# and activation committed. Existing saved settings take precedence.
 openathan:
-  id: athan_scheduler
-  time_id: athan_clock
-  playback_id: athan_audio
   light_output_id: pyramid_lights
-  latitude: 0
-  longitude: 0
-  method: muslim_world_league
-  timezone_name: UTC
-  high_latitude: auto
-
-openathan_device:
-  id: athan_device
-  openathan_id: athan_scheduler
-
-improv_serial:
-  device_id: athan_device
 
 binary_sensor:
   - platform: gpio

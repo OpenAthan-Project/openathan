@@ -58,7 +58,14 @@ Responsible for:
 - composing the generic OpenAthan and reference-hardware packages;
 - exposing OpenAthan services/state.
 
-These product-distribution concerns belong in `firmware/esphome/openathan.yaml` or packages used only by that entry point, not in the generic OpenAthan package.
+These product-distribution concerns belong in official firmware entry points
+and their product packages, not in the generic OpenAthan package.
+`packages/product.yaml` now shares provisioning, the local UI, clock, stored-audio
+player and scheduler composition between the reference and isolated Waveshare V2
+entry points. The Waveshare adapters own codec/amplifier power and panel/backlight
+wiring; the reusable prayer engine does not acquire board dependencies.
+See the [Waveshare development profile](waveshare-box-v2.md) for the tested board,
+build entry points and separate public-release restrictions.
 
 ### Reference-hardware layers
 

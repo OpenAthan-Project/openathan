@@ -35,4 +35,11 @@ template<typename Pixel> void render(const Frame &frame, Pixel pixel) {
   }
   draw_text(pixel, frame.footer.data(), 116, 1, 0xD0D8D8);
 }
+// The 128-pixel layout occupies a centered 256-pixel square on the round panel.
+template<typename Pixel> void render_round(const Frame &frame, Pixel pixel) {
+  render(frame, [&pixel](int x, int y, uint32_t rgb) {
+    for (int dy = 0; dy < 2; ++dy)
+      for (int dx = 0; dx < 2; ++dx) pixel(52 + 2*x + dx, 52 + 2*y + dy, rgb);
+  });
+}
 }  // namespace openathan::screen

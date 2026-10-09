@@ -9,10 +9,10 @@ sys.path.insert(0, str(ROOT / "tools"))
 from release_artifacts import PARTITIONS
 
 
-def esp_image(payload=b"non-executable test bytes" * 4):
+def esp_image(payload=b"non-executable test bytes" * 4, flash_bytes=0x800000):
     payload += b"\0" * (-len(payload) % 4)
     header = bytearray(24)
-    header[0:4] = bytes((0xe9, 1, 0, 0x30))
+    header[0:4] = bytes((0xe9, 1, 0, 0x30 if flash_bytes == 0x800000 else 0x40))
     struct.pack_into("<H", header, 12, 9)
     header[23] = 1
     result = header + struct.pack("<II", 0x3fc88000, len(payload)) + payload
@@ -25,10 +25,10 @@ def esp_image(payload=b"non-executable test bytes" * 4):
     return bytes(result)
 
 
-def firmware():
-    app = esp_image()
+def firmware(flash_bytes=0x800000):
+    app = esp_image(flash_bytes=flash_bytes)
     factory = bytearray(b"\xff" * 0x10000 + app)
-    boot = esp_image(b"non-executable boot fixture")
+    boot = esp_image(b"non-executable boot fixture", flash_bytes=flash_bytes)
     factory[:len(boot)] = boot
     for index, (name, kind, subtype, offset, size) in enumerate(PARTITIONS):
         struct.pack_into("<HBBII16sI", factory, 0x8000 + index * 32,

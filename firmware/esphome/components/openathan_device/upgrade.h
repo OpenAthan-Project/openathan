@@ -1,5 +1,11 @@
 #pragma once
 #include "esphome/core/defines.h"
+#ifndef OPENATHAN_HARDWARE
+#define OPENATHAN_HARDWARE "atoms3r-c126-pyramid-a167"
+#endif
+#ifndef OPENATHAN_UPDATES_ENABLED
+#define OPENATHAN_UPDATES_ENABLED 1
+#endif
 #include "upgrade_api.h"
 #include "upgrade_policy.h"
 #include <atomic>

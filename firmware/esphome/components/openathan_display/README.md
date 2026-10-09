@@ -1,5 +1,10 @@
 # Optional status display
 
+The isolated [Waveshare V2 profile](../../../../docs/development/waveshare-box-v2.md)
+also uses this presenter, centering it at 2× scale on a 360×360 round QSPI panel.
+Its 16-bit buffer uses 259,200 bytes, and playback guidance says “Use phone.”
+The Atom layout, button guidance and 8-bit buffer remain unchanged.
+
 The reference candidate includes a dim, always-on 128×128 status screen through
 [the GC9107 board profile](../../boards/atom-s3r-gc9107-display.yaml).
 This is development work after v0.2.1, not a capability in the published v0.2.1

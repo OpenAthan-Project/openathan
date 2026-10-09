@@ -6,6 +6,15 @@
 namespace esphome::improv_serial {
 ImprovSerialComponent* global_improv_serial_component = nullptr;
 void ImprovSerialComponent::setup() {
+#ifdef OPENATHAN_USB_OWNS_DRIVER
+  // Network-only diagnostics disable the logger's serial driver initialization.
+  // The sole provisioning transport then owns the driver, with no serial logs.
+  if (!usb_serial_jtag_is_driver_installed()) {
+    usb_serial_jtag_driver_config_t config{};
+    config.rx_buffer_size = 256; config.tx_buffer_size = 2048;
+    if (usb_serial_jtag_driver_install(&config) != ESP_OK) { mark_failed(); return; }
+  }
+#endif
   global_improv_serial_component = this;
   device_->set_sender([this](const std::vector<uint8_t>& bytes) {
     if (outgoing_.size() >= 64) return;

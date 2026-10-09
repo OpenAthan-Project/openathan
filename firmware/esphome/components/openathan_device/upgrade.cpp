@@ -113,7 +113,7 @@ bool Upgrade::descriptor_(const std::string &envelope, UpgradeRelease &release) 
   JsonDocument doc;
   if (deserializeJson(doc, payload) || !doc.is<JsonObject>() || doc.size() != 10 ||
       !doc["schema"].is<unsigned>() || doc["schema"].as<unsigned>() != 1 ||
-      doc["hardware"].as<std::string>() != "atoms3r-c126-pyramid-a167" ||
+      doc["hardware"].as<std::string>() != OPENATHAN_HARDWARE ||
       doc["layout"].as<std::string>() != "dual-2m-audio-3_5m-v1" ||
       !doc["storageFormat"].is<unsigned>() || doc["storageFormat"].as<unsigned>() != 1 ||
       !doc["audioFormat"].is<unsigned>() || doc["audioFormat"].as<unsigned>() != 1 ||
@@ -166,7 +166,7 @@ void Upgrade::begin(openathan_component::OpenAthan *athan, bool server_ready) {
   boot_ms_ = milliseconds(); next_check_ms_ = boot_ms_ + 30000 + esp_random() % 30000;
   const char *space = openathan_storage::TEST_MODE ? "oa_upgrade_test" : "oa_upgrade";
   storage_ok_ = nvs_open(space, NVS_READWRITE, &nvs_) == ESP_OK;
-  if (!storage_ok_) return;
+  if (!storage_ok_ || !OPENATHAN_UPDATES_ENABLED) return;
   size_t size = 0;
   const auto result = nvs_get_blob(nvs_, "request", nullptr, &size);
   if (result == ESP_ERR_NVS_NOT_FOUND) return;
@@ -198,7 +198,9 @@ void Upgrade::fail_(const char *message) {
 void Upgrade::snapshot(JsonObject root) {
   std::lock_guard<std::mutex> lock(mutex_);
   root["version"] = OPENATHAN_FIRMWARE_VERSION;
-  root["supported"] = bootloader_ok_;
+  root["hardware"] = OPENATHAN_HARDWARE;
+  root["updates_enabled"] = bool(OPENATHAN_UPDATES_ENABLED);
+  root["supported"] = bool(OPENATHAN_UPDATES_ENABLED) && bootloader_ok_;
   if (usb_busy()) root["transport"] = "usb";
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   qualification_.snapshot(root);
@@ -219,6 +221,7 @@ void Upgrade::snapshot(JsonObject root) {
 }
 int Upgrade::action(const std::string &action, JsonObjectConst input, std::string &error) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (!OPENATHAN_UPDATES_ENABLED) { error = "Firmware updates are unavailable on this development build"; return 503; }
   if (usb_busy()) { error = "A USB update must be reconciled through USB"; return 409; }
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   const bool ready = qualification_.services_ready(confirmed_, action);
@@ -260,7 +263,7 @@ int Upgrade::action(const std::string &action, JsonObjectConst input, std::strin
   return 400;
 }
 bool Upgrade::start_(bool install) {
-  if (active_) return false;
+  if (!OPENATHAN_UPDATES_ENABLED || active_) return false;
   active_ = true; cancel_ = false; install_job_ = install; received_ = 0;
   state_ = install ? "downloading" : "checking"; error_.clear();
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
@@ -410,6 +413,8 @@ void Upgrade::loop(bool connected) {
     if (pending && esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) return;
     confirmed_ = true;
   }
+  // Health confirmation remains mandatory even when all update transports are disabled.
+  if (!OPENATHAN_UPDATES_ENABLED) return;
   if (usb_token_ && now - usb_last_ms_ > 40000) {
     usb_abort_(); error_ = "USB transfer interrupted; check status before another attempt";
   }

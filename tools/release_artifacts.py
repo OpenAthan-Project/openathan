@@ -57,14 +57,16 @@ def read_file(path, maximum):
     return data
 
 
-def esp_image(data, exact=False):
+def esp_image(data, exact=False, *, flash_bytes=0x800000):
     # esptool parses segment lengths, but callers must explicitly check its
     # checksum/digest results; parsing alone does not establish integrity.
     from esptool import FatalError
     from esptool.bin_image import ESP32S3FirmwareImage
     require(len(data) >= 24 and data[0] == 0xe9 and data[1] in range(1, 17), "Invalid ESP image header")
     require(struct.unpack_from("<H", data, 12)[0] == 9, "Image is not for ESP32-S3")
-    require(data[3] >> 4 == 3, "Image does not declare 8 MiB flash")
+    require(flash_bytes in (0x800000, 0x1000000), "Unsupported flash capacity")
+    require(data[3] >> 4 == (3 if flash_bytes == 0x800000 else 4),
+            f"Image does not declare {flash_bytes // 0x100000} MiB flash")
     try:
         image = ESP32S3FirmwareImage(io.BytesIO(data))
         require(image.checksum == image.calculate_checksum(), "ESP image checksum mismatch")
@@ -88,9 +90,10 @@ def reject_test_material(app, *, allow_qualification=False, allow_isolated=False
             "Isolated test firmware cannot enter production release bundles")
 
 
-def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False):
+def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False, flash_bytes=0x800000):
     require(0x10020 <= len(factory) < PARTITION_OFFSET, "Invalid factory image size")
-    esp_image(factory[:0x8000])
+    require(flash_bytes == 0x800000 or allow_isolated, "16 MiB images require isolated development storage")
+    esp_image(factory[:0x8000], flash_bytes=flash_bytes)
     table = factory[0x8000:0x9000]
     for index, (name, kind, subtype, offset, size) in enumerate(PARTITIONS):
         record = table[index * 32:(index + 1) * 32]
@@ -101,13 +104,13 @@ def validate_firmware_images(factory, app=None, *, allow_qualification=False, al
     require(table[end + 16:end + 32] == hashlib.md5(table[:end]).digest(), "Partition checksum mismatch")
     require(table[end + 32:] == b"\xff" * (4096 - end - 32), "Unexpected extra factory partition")
     require(factory[0x9000:0xe000] == b"\xff" * 0x5000, "Factory image contains initialized NVS")
-    app_length = esp_image(factory[0x10000:])
+    app_length = esp_image(factory[0x10000:], flash_bytes=flash_bytes)
     require(app_length <= 0x180000, "Application exceeds the 1.5 MiB growth-budget target")
     actual = factory[0x10000:0x10000 + app_length]
     reject_test_material(actual, allow_qualification=allow_qualification, allow_isolated=allow_isolated)
     if app is not None:
         require(actual == app, "Factory and OTA application payloads differ")
-        esp_image(app, exact=True)
+        esp_image(app, exact=True, flash_bytes=flash_bytes)
     require(factory[0x10000 + app_length:] == b"\xff" * (len(factory) - 0x10000 - app_length),
             "Unexpected data after factory application")
     return actual

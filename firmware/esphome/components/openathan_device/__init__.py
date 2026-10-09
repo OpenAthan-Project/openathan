@@ -20,11 +20,17 @@ Device = ns.class_("Device", cg.Component)
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Device),
     cv.Required("openathan_id"): cv.use_id(openathan.OpenAthan),
+    cv.Optional("hardware", default="atoms3r-c126-pyramid-a167"): cv.one_of(
+        "atoms3r-c126-pyramid-a167", "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"),
+    cv.Optional("updates_enabled", default=True): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
 def validate(config):
     full = fv.full_config.get()
+    if config["hardware"] == "waveshare-esp32-s3-touch-lcd-1_85c-box-v2":
+        if config["updates_enabled"] or "openathan_provisioning_validation" not in full:
+            raise cv.Invalid("Waveshare development requires isolated storage and updates_enabled false")
     if "improv_serial" not in full or "device_id" not in full["improv_serial"]:
         raise cv.Invalid("OpenAthan requires its external improv_serial USB dispatcher")
     if full["wifi"].get("networks") or "ap" in full["wifi"] or full["wifi"]["enable_on_boot"]:
@@ -65,6 +71,8 @@ async def to_code(config):
     if CORE.config["esphome"].get("project", {}).get("version") != version:
         raise cv.Invalid("Official project version must match release/firmware.json")
     cg.add_define("OPENATHAN_FIRMWARE_VERSION", version)
+    cg.add_define("OPENATHAN_HARDWARE", config["hardware"])
+    cg.add_define("OPENATHAN_UPDATES_ENABLED", int(config["updates_enabled"]))
     cg.add_define("OPENATHAN_BUILD_COMMIT", os.environ.get("OPENATHAN_BUILD_COMMIT", "development"))
     cg.add_define("OPENATHAN_UPGRADE_PUBLIC_KEY", public_key)
     bootloaders = json.loads((root / "release/rollback-bootloaders.json").read_text())

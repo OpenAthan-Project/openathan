@@ -1,0 +1,67 @@
+# Attended bring-up only. Manual playback uses diagnostic or phone controls;
+# scheduled playback begins only after explicit setup activation.
+packages:
+  development: !include development.yaml
+
+logger:
+  level: DEBUG
+  baud_rate: 0  # Log only through encrypted API; never interleave USB frames.
+
+esphome:
+  includes:
+    - diagnostics.h
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret diagnostic_api_key
+
+i2c:
+  - id: !extend waveshare_bus
+    scan: true
+  - id: waveshare_schematic_bus
+    sda: GPIO13
+    scl: GPIO12
+    scan: true
+
+text_sensor:
+  - platform: template
+    name: Waveshare hardware status
+    update_interval: 15s
+    lambda: |-
+      return waveshare_diagnostics(*id(waveshare_bus), *id(waveshare_schematic_bus),
+        id(athan_audio).playing(), id(waveshare_dac).is_failed(), id(waveshare_status_lcd).is_failed());
+
+button:
+  - platform: template
+    name: Display color test
+    on_press:
+      - lambda: |-
+          id(waveshare_status_lcd).set_writer([](esphome::display::Display &it) {
+            it.fill(esphome::Color::BLACK);
+            it.filled_rectangle(60, 110, 80, 140, esphome::Color(255, 0, 0));
+            it.filled_rectangle(140, 110, 80, 140, esphome::Color(0, 255, 0));
+            it.filled_rectangle(220, 110, 80, 140, esphome::Color(0, 0, 255));
+          });
+          id(waveshare_status_lcd).update();
+      - delay: 10s
+      - lambda: |-
+          id(waveshare_status_lcd).set_writer([](esphome::display::Display &it) {
+            id(athan_status_screen).draw(it);
+          });
+          id(waveshare_status_lcd).update();
+  - platform: template
+    name: Play normal
+    on_press:
+      - lambda: id(waveshare_audio).start(openathan::Track::NORMAL);
+  - platform: template
+    name: Play Fajr
+    on_press:
+      - lambda: id(waveshare_audio).start(openathan::Track::FAJR);
+  - platform: template
+    name: Stop audio
+    on_press:
+      - openathan.stop:
+          id: athan_scheduler
+  - platform: restart
+    name: Diagnostic restart

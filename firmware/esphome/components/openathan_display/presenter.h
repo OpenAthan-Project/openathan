@@ -11,6 +11,7 @@ struct Inputs {
   bool setup_complete{}, storage_fault{}, clock_valid{}, wifi_connected{}, prayers_enabled{};
   std::string_view local_time, next_time;
   uint8_t hours{24};
+  bool stop_button{true};
 };
 struct Frame {
   std::array<char, 9> clock{};
@@ -45,7 +46,7 @@ inline Frame present(const Inputs &in) {
   } else if (!in.setup_complete) {
     text(f.heading, "Setup"); text(f.main, "Needed"); text(f.detail, "Use phone setup");
   } else if (in.status.playing) {
-    text(f.heading, "Athan"); text(f.main, "Playing"); text(f.detail, "Button to stop");
+    text(f.heading, "Athan"); text(f.main, "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
   } else if (!in.clock_valid) {
     text(f.heading, "Time"); text(f.main, "Waiting"); text(f.detail, in.wifi_connected ? "Syncing clock" : "Connect Wi-Fi");
   } else if (!in.prayers_enabled) {

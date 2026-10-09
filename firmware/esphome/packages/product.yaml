@@ -1,0 +1,67 @@
+# Product services shared by hardware profiles. All controls remain device-local.
+substitutions:
+  athan_speaker_id: pyramid_speaker
+  athan_playback_id: athan_audio
+
+esp32:
+  partitions: ../feasibility/partitions.csv
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_audio, openathan_device, improv_serial]
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: NONE
+
+wifi:
+  enable_on_boot: false
+  reboot_timeout: 0s
+
+mdns:
+  services:
+    - service: _http
+      protocol: _tcp
+      port: 80
+
+time:
+  - platform: sntp
+    id: athan_clock
+    timezone: UTC
+
+media_player:
+  - platform: speaker
+    id: athan_player
+    internal: true
+    volume_initial: 70%
+    volume_max: 60%
+    announcement_pipeline:
+      speaker: ${athan_speaker_id}
+      format: MP3
+      sample_rate: 44100
+      num_channels: 1
+
+openathan_audio:
+  id: athan_audio
+  media_player_id: athan_player
+
+# These seed values are inactive until an explicit full setup document is saved
+# and activation committed. Existing saved settings take precedence.
+openathan:
+  id: athan_scheduler
+  time_id: athan_clock
+  playback_id: ${athan_playback_id}
+  latitude: 0
+  longitude: 0
+  method: muslim_world_league
+  timezone_name: UTC
+  high_latitude: auto
+
+openathan_device:
+  id: athan_device
+  openathan_id: athan_scheduler
+
+improv_serial:
+  device_id: athan_device

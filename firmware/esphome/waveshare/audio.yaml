@@ -1,0 +1,28 @@
+# Isolated development firmware. No public installer or release compatibility.
+esphome:
+  name: openathan-test
+  name_add_mac_suffix: true
+  min_version: 2026.9.0
+  project:
+    name: OpenAthan.waveshare_dev
+    version: v0.4.0
+
+packages:
+  openathan: !include ../packages/openathan.yaml
+  product: !include ../packages/product.yaml
+  hardware: !include ../packages/hardware/waveshare-box-v2.yaml
+
+esp32:
+  partitions: ../feasibility/partitions.csv
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_provisioning_validation]
+
+openathan_provisioning_validation:
+
+openathan_device:
+  hardware: waveshare-esp32-s3-touch-lcd-1_85c-box-v2
+  updates_enabled: false
