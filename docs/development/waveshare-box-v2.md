@@ -32,6 +32,9 @@ LIGHT/NONE comparison. HTTP timeouts remain unresolved; see the dated report for
 the comparison and its limits. ESPHome documents this reliability tradeoff in
 [Wi-Fi power-save mode](https://esphome.io/components/wifi/#power-save-mode).
 
+The [network follow-up](waveshare-network-development-2026-10-09.md) records
+the unresolved findings and validated clean development installation.
+
 The hardware identity is `waveshare-esp32-s3-touch-lcd-1_85c-box-v2`. Development
 uses `openathan-test` with a MAC suffix and the existing `oa_test`,
 `oa_setup_test`, `oa_network_test` and `oa_upgrade_test` namespaces. It does not
