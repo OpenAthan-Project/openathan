@@ -16,7 +16,9 @@ recovery and owner-requested signed application updates. The website verifies
 and adopts approved stable releases; it never compiles firmware or updates a
 speaker on its owner's behalf.
 
-The current firmware needs internet time synchronization after a cold boot.
+The reference firmware needs internet time synchronization after a cold boot.
+Waveshare development firmware includes RTC restoration after a powered reset;
+[physical RTC acceptance](waveshare-rtc-validation-2026-10-10.md) is pending.
 Once the clock is valid, calculations and stored-recording playback operate
 without the public website or Home Assistant. Compatible firmware updates
 preserve installed audio; replacing recordings is separate from application OTA.
@@ -88,7 +90,9 @@ discovery is separate from public OTA application-transfer acceptance.
 
 ## Phase 4 — Offline resilience and expansion
 
-- [ ] Evaluate RTC expansion.
+- [x] Implement onboard RTC restoration for Waveshare V2 development firmware.
+- [ ] Qualify Waveshare RTC offline restart; backup-power retention remains deferred.
+- [ ] Evaluate RTC expansion for other hardware.
 - [ ] Evaluate microSD or USB mass storage.
 - [ ] Optional offline Quran library.
 - [ ] Additional reference hardware if it reduces cost or improves availability.

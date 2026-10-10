@@ -10,6 +10,21 @@ external_components:
       type: local
       path: ../../components
     components: [waveshare_box_audio]
+  - source:
+      type: local
+      path: ../../components
+    components: [waveshare_box_rtc]
+
+# PCF85063A on the vendor/physically confirmed GPIO10/11 shared bus.
+# First use waits for SNTP; subsequent powered resets can restore verified UTC.
+time:
+  - platform: waveshare_box_rtc
+    id: waveshare_rtc
+    network_time_id: athan_clock
+    i2c_id: waveshare_bus
+    address: 0x51
+    timezone: UTC
+    update_interval: never
 
 audio_dac:
   - platform: es8311

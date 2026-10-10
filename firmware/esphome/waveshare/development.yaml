@@ -1,4 +1,4 @@
-# Audio + optional read-only round screen. Touch/RTC/microphones/SD are deferred.
+# Audio + optional read-only round screen and RTC. Touch/microphones/SD are deferred.
 packages:
   product: !include audio.yaml
   screen: !include ../boards/waveshare-box-v2-display.yaml
