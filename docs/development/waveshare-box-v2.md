@@ -79,6 +79,26 @@ physical validation. ESPHome adds pixel format, orientation, inversion,
 sleep-out and display-on commands. Its QSPI path requires a 16-bit framebuffer
 (259,200 bytes); allocator placement and recovery must be measured on-device.
 
+### Volume
+
+Waveshare uses fixed ES8311 output at 0 dB (register `0xBF`) and ESPHome's
+software volume control. The amplifier stays off until the fixed-gain and codec
+unmute writes succeed. A failed write prevents playback readiness until restart.
+
+The saved 0–100% volume controls software attenuation: zero is silent, 80%
+applies approximately −9.8 dB, and 100% passes the recording unchanged. The
+Waveshare profile overrides the shared 60% ceiling; the reference Voice Pyramid
+mapping is unchanged. Saved settings retain their values, so existing devices
+will sound louder at the same percentage after this change. Start attended
+listening checks at a low setting before increasing volume.
+
+This curve follows the [pinned ESPHome speaker implementation](https://github.com/esphome/esphome/blob/2026.9.0/esphome/components/i2s_audio/speaker/i2s_audio_speaker.cpp).
+Physical loudness, distortion and runtime memory under concurrent playback,
+networking and display activity require separate attended validation. The
+earlier dated listening results apply to the previous volume mapping.
+See the [volume build checks](waveshare-volume-build-2026-10-10.md) for firmware
+size comparisons, automated coverage and pending physical validation.
+
 ### RTC and offline restart
 
 The Waveshare profiles restore UTC once at startup from the onboard PCF85063A

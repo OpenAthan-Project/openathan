@@ -14,6 +14,13 @@ class Audio : public Component, public ::openathan::Playback {
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
   void setup() override { amplifier_->setup(); amplifier_->digital_write(false); }
   void loop() override {
+    if (!gain_configured_ && !is_failed() && dac_ && !dac_->is_failed() &&
+        playback_ && playback_->ready()) {
+      // ESPHome 2026.9.0 maps 0.75 to ES8311 register 0xBF (0 dB).
+      // The speaker controls volume in software; never amplify the samples.
+      if (dac_->set_volume(0.75f) && dac_->set_mute_off()) gain_configured_ = true;
+      else mark_failed();
+    }
     const bool enable = healthy_();
     if (enable != enabled_) { amplifier_->digital_write(enable); enabled_ = enable; }
   }
@@ -29,10 +36,14 @@ class Audio : public Component, public ::openathan::Playback {
     return healthy_() && playback_->request_volume_percent(percent);
   }
  private:
-  bool healthy_() const { return dac_ && !dac_->is_failed() && playback_ && playback_->ready(); }
+  bool healthy_() const {
+    return !is_failed() && gain_configured_ && dac_ && !dac_->is_failed() &&
+           playback_ && playback_->ready();
+  }
   openathan_audio::PartitionAudio *playback_{};
   es8311::ES8311 *dac_{};
   GPIOPin *amplifier_{};
   bool enabled_{};
+  bool gain_configured_{};
 };
 }
