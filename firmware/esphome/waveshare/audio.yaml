@@ -5,7 +5,7 @@ esphome:
   min_version: 2026.9.0
   project:
     name: OpenAthan.waveshare_dev
-    version: v0.4.0
+    version: v0.5.0
 
 packages:
   openathan: !include ../packages/openathan.yaml

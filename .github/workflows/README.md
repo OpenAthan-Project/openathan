@@ -9,7 +9,8 @@ qualification configuration.
 Waveshare V2 audio, display and attended diagnostic development configurations
 are also generated and compiled. These require isolated storage and disable every
 public update transport. Capacity inspection checks their 16 MiB headers explicitly;
-public release validation retains the 8 MiB reference contract.
+a separate Waveshare production job checks the registered 16 MiB production
+contract, with production storage and signed updates.
 The Waveshare RTC host fixture checks strict register validation, interrupted
 initialization, verified SNTP writes and startup restoration, including scheduler
 handoffs across clock corrections and saved skips. Hardware RTC/offline-restart

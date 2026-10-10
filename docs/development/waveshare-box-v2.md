@@ -1,4 +1,4 @@
-# Waveshare Box V2 development profile
+# Waveshare Box V2 profiles
 
 The ESP32-S3-Touch-LCD-1.85C-BOX **V2** development profile reuses standalone
 prayer calculations, scheduling, stored recordings, USB provisioning and the
@@ -23,9 +23,11 @@ The chip is configured for 16 MB flash and 8 MB octal PSRAM. The existing
 the lower 8 MiB: two 2 MiB application slots and separate 3.5 MiB shared audio.
 Additional flash is unused. Each OTA image must remain at or below 1,572,864
 bytes. `check_feasibility.py` recognizes the explicit Waveshare hardware define
-and requires 16 MiB image headers, isolated storage and disabled updates.
-The public release validator still defaults to 8 MiB reference images and
-rejects isolated development firmware.
+and requires 16 MiB image headers. Development also requires isolated storage
+and disabled updates; the registered production configuration enables updates.
+The release validator selects the registered hardware profile and continues to
+reject isolated development firmware. Production uses the same lower-8-MiB
+partition layout; additional flash remains unused.
 
 Wi-Fi power saving is disabled in this board profile following the attended
 LIGHT/NONE comparison. HTTP timeouts remain unresolved; see the dated report for
@@ -42,11 +44,11 @@ load production settings or consumption history.
 
 `firmware.hardware` and `firmware.updates_enabled` are additive status fields.
 Existing clients can ignore them; the local UI treats a missing update flag as
-enabled for older firmware. Waveshare sets it to false: automatic discovery,
+enabled for older firmware. Development sets it to false: automatic discovery,
 authenticated check/install/cancel requests and USB update writes are rejected.
 USB provisioning and healthy application startup confirmation remain enabled.
-These builds cannot be installed through the public updater or published as
-reference releases. Maintainer installation/recovery uses esptool in an attended
+Isolated builds cannot be installed through the public updater or published as
+production releases. Maintainer installation/recovery uses esptool in an attended
 session.
 
 ## Hardware adapters
@@ -206,3 +208,21 @@ to 60 minutes and retain memory/error observations. Distinguish physical power
 cycling from software restart, and queued playback from audible acceptance.
 Prefer compatible application-only recovery after initial partition migration;
 a full-flash restore also restores historical settings and prayer consumption.
+
+## Production release candidate
+
+`firmware/esphome/waveshare/production.yaml` is the v0.5.0 production candidate.
+It uses `openathan` with a MAC suffix, production settings/setup/network/upgrade
+storage, round display, BOOT controls and signed updates. It omits diagnostic and
+isolated-storage components. Existing isolated development records are not migrated.
+The merged RTC adapter is retained in production with its existing powered-reset
+behavior and qualification limits.
+
+Release bundles use `waveshare-box-v2.` filenames for this board and share the
+approved audio partition with Atom. The website selects matching firmware from
+reported OpenAthan USB hardware identity; unknown firmware requires explicit
+model and erase confirmation. See [release preparation](releases.md).
+
+The [v0.5.0 preparation report](v0.5.0-preparation-2026-10-10.md) separates
+automated evidence from pending production installation, update/recovery and
+new volume-mapping listening qualification. No new physical acceptance is claimed.

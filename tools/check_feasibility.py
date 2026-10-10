@@ -78,11 +78,11 @@ def inspect_firmware(build_dir, log, root=ROOT):
     qualification, isolated = inspect_build_profile(build_dir, app)
     defines = (build_dir / "src/esphome/core/defines.h").read_text()
     waveshare = '#define OPENATHAN_HARDWARE "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"' in defines
-    if waveshare and (not isolated or qualification or '#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines):
+    if waveshare and isolated and (qualification or '#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines):
         raise ValueError("Waveshare capacity inspection requires isolated development with updates disabled")
     flash_bytes = 0x1000000 if waveshare else 0x800000
     validate_firmware_images(factory, app, allow_qualification=qualification, allow_isolated=isolated,
-                             flash_bytes=flash_bytes)
+                             flash_bytes=flash_bytes, hardware=("waveshare-esp32-s3-touch-lcd-1_85c-box-v2" if waveshare else "atoms3r-c126-pyramid-a167"))
     log_text = log.read_text().replace("\r", "\n")
     ram = re.search(r"RAM:.*used (\d+) bytes from (\d+) bytes", log_text)
     flash = re.search(r"Flash:.*used (\d+) bytes from (\d+) bytes", log_text)

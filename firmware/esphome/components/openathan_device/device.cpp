@@ -207,6 +207,7 @@ void Device::serial_request(const Frame& request) {
                                           : "ready"};
       const auto urls = urls_();
       status.insert(status.end(), urls.begin(), urls.end());
+      status.emplace_back(std::string("hardware=") + OPENATHAN_HARDWARE);
       result_(true, command, status);
     } else if (command == 2 && fields.size() == 1 && valid_password(fields[0])) {
       if (password_.revision == std::numeric_limits<uint32_t>::max()) {

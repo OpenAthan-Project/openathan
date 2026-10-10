@@ -12,6 +12,28 @@ REPOSITORY = "OpenAthan-Project/openathan"
 HARDWARE = "atoms3r-c126-pyramid-a167"
 LAYOUT = "dual-2m-audio-3_5m-v1"
 CONFIGURATION = "firmware/esphome/openathan.yaml"
+WAVESHARE = "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"
+PROFILES = {
+    HARDWARE: dict(configuration=CONFIGURATION, flash_bytes=0x800000, prefix=""),
+    WAVESHARE: dict(configuration="firmware/esphome/waveshare/production.yaml",
+                    flash_bytes=0x1000000, prefix="waveshare-box-v2."),
+}
+
+
+def profile(hardware):
+    require(hardware in PROFILES, "Unsupported release hardware")
+    return PROFILES[hardware]
+
+
+def asset_name(hardware, name):
+    return name if name == "athan-audio.bin" else profile(hardware)["prefix"] + name
+
+
+def configuration_hardware(configuration):
+    for hardware, entry in PROFILES.items():
+        if entry["configuration"] == configuration:
+            return hardware
+    raise ValueError("Unsupported production configuration")
 MEDIA_REGISTRY = "release/recordings.json"
 LICENSE_PATH = "AUDIO-LICENSES.md"
 PINS_PATH = "firmware/esphome/feasibility/dependencies.json"
@@ -90,9 +112,9 @@ def reject_test_material(app, *, allow_qualification=False, allow_isolated=False
             "Isolated test firmware cannot enter production release bundles")
 
 
-def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False, flash_bytes=0x800000):
+def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False, flash_bytes=0x800000, hardware=HARDWARE):
     require(0x10020 <= len(factory) < PARTITION_OFFSET, "Invalid factory image size")
-    require(flash_bytes == 0x800000 or allow_isolated, "16 MiB images require isolated development storage")
+    require(flash_bytes == profile(hardware)["flash_bytes"], "Hardware and image flash capacity differ")
     esp_image(factory[:0x8000], flash_bytes=flash_bytes)
     table = factory[0x8000:0x9000]
     for index, (name, kind, subtype, offset, size) in enumerate(PARTITIONS):
@@ -152,14 +174,14 @@ def audio_payloads(media):
     return payloads
 
 
-def make_manifest(commit, tag, factory, audio):
+def make_manifest(commit, tag, factory, audio, hardware=HARDWARE):
     require(isinstance(commit, str) and SHA.fullmatch(commit), "An exact source commit is required")
     require(isinstance(tag, str) and TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
-    return dict(schema=1, repository=REPOSITORY, tag=tag, commit=commit, hardware=HARDWARE,
-                chip="ESP32-S3", flashBytes=0x800000, layout=LAYOUT, provisioningProtocol=1,
+    return dict(schema=1, repository=REPOSITORY, tag=tag, commit=commit, hardware=hardware,
+                chip="ESP32-S3", flashBytes=profile(hardware)["flash_bytes"], layout=LAYOUT, provisioningProtocol=1,
                 media=dict(redistributionApproved=True,
                            licenseUrl=f"https://github.com/{REPOSITORY}/blob/{commit}/{LICENSE_PATH}"),
-                parts=[dict(role=role, file=name, offset=offset, bytes=len(data), sha256=digest(data))
+                parts=[dict(role=role, file=asset_name(hardware, name), offset=offset, bytes=len(data), sha256=digest(data))
                        for role, name, offset, data in (("factory", ASSETS[1], 0, factory),
                                                        ("audio", ASSETS[2], PARTITION_OFFSET, audio))])
 
@@ -172,26 +194,52 @@ def validate_bundle(directory):
     require(directory.is_dir() and not directory.is_symlink(), "Bundle must be a regular directory")
     from upgrade_artifacts import UPGRADE_ASSETS
     names = {p.name for p in directory.iterdir()}
-    require(names in (set(ASSETS), set(ASSETS) | set(UPGRADE_ASSETS)), "Bundle contains unexpected release assets")
-    limits = (16384, PARTITION_OFFSET - 1, PARTITION_SIZE, 1024, 65536)
-    files = {name: read_file(directory / name, limit) for name, limit in zip(ASSETS, limits)}
-    if set(UPGRADE_ASSETS) <= names:
-        files.update({"firmware.ota.bin": read_file(directory / "firmware.ota.bin", 1572864),
-                      "upgrade.json": read_file(directory / "upgrade.json", 8192)})
-    manifest = read_json(files["manifest.json"])
+    combined = asset_name(WAVESHARE, "manifest.json") in names and "manifest.json" in names
+    hardware = HARDWARE if "manifest.json" in names else WAVESHARE
+    groups = (HARDWARE, WAVESHARE) if combined else (hardware,)
+    allowed = set()
+    for board in groups:
+        allowed.update(asset_name(board, name) for name in ASSETS)
+        if asset_name(board, "upgrade.json") in names:
+            allowed.update(asset_name(board, name) for name in UPGRADE_ASSETS)
+    require(names == allowed, "Bundle contains unexpected or incomplete release assets")
+    limits = dict(zip(ASSETS, (16384, PARTITION_OFFSET - 1, PARTITION_SIZE, 1024, 65536)))
+    limits.update({"firmware.ota.bin": 1572864, "upgrade.json": 8192})
+    files = {asset_name(board, name): read_file(directory / asset_name(board, name), limit)
+             for board in groups for name, limit in limits.items() if asset_name(board, name) in names}
+    results = [validate_profile_files(files, board) for board in groups]
+    if combined:
+        require(results[0][0]["commit"] == results[1][0]["commit"] and
+                results[0][0]["tag"] == results[1][0]["tag"], "Hardware bundles have different source/version")
+    manifest, report, payloads = results[0]
+    return manifest, report, files, payloads
+
+
+def validate_profile_files(all_files, hardware):
+    def data(name):
+        return all_files[asset_name(hardware, name)]
+    manifest = read_json(data("manifest.json"))
     require(isinstance(manifest, dict), "Invalid release manifest")
-    expected = make_manifest(manifest.get("commit"), manifest.get("tag"), files[ASSETS[1]], files[ASSETS[2]])
-    require(json_bytes(manifest) == json_bytes(expected),
-            "Release manifest does not match the supported contract and files")
-    app = validate_firmware_images(files[ASSETS[1]])
-    if "firmware.ota.bin" in files:
-        require(files["firmware.ota.bin"] == app, "Upgrade application differs from factory image")
-    payloads = audio_payloads(files[ASSETS[2]])
+    expected = make_manifest(manifest.get("commit"), manifest.get("tag"),
+                             data("firmware.factory.bin"), data("athan-audio.bin"), hardware)
+    require(json_bytes(manifest) == json_bytes(expected), "Release manifest does not match the supported contract and files")
+    app = validate_firmware_images(data("firmware.factory.bin"),
+                                  flash_bytes=profile(hardware)["flash_bytes"], hardware=hardware)
+    if asset_name(hardware, "firmware.ota.bin") in all_files:
+        require(data("firmware.ota.bin") == app, "Upgrade application differs from factory image")
+    payloads = audio_payloads(data("athan-audio.bin"))
     require(all(payload[:4096] not in app for payload in payloads), "Recording data found in application")
-    require(files["SHA256SUMS"] == checksums(files), "Bundle checksums differ")
-    report = read_json(files["build-report.json"])
+    board_files = {name: value for name, value in all_files.items()
+                   if name == "athan-audio.bin" or
+                   (name.startswith(profile(hardware)["prefix"]) if hardware == WAVESHARE else
+                    not name.startswith(profile(WAVESHARE)["prefix"]))}
+    checksum_name = asset_name(hardware, "SHA256SUMS")
+    checksum = "".join(f"{digest(board_files[name])}  {name}\n" for name in sorted(board_files)
+                       if name != checksum_name).encode()
+    require(data("SHA256SUMS") == checksum, "Bundle checksums differ")
+    report = read_json(data("build-report.json"))
     require(isinstance(report, dict) and report.get("commit") == manifest["commit"] and
-            report.get("configuration") == CONFIGURATION and report.get("schema") == 1,
+            report.get("configuration") == profile(hardware)["configuration"] and report.get("schema") == 1,
             "Invalid build report identity")
     expected_metrics = dict(application_bytes=len(app), application_sha256=digest(app),
                             application_slot_bytes=0x200000, slot_free_bytes=0x200000-len(app),
@@ -199,4 +247,4 @@ def validate_bundle(directory):
     require(isinstance(report.get("capacity"), dict), "Invalid capacity report")
     require(all(report["capacity"].get(key) == value for key, value in expected_metrics.items()),
             "Build report does not match the application")
-    return manifest, report, files, payloads
+    return manifest, report, payloads

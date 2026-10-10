@@ -298,7 +298,7 @@ void Upgrade::run_() {
   if (!buffer) { fail_("Not enough memory to check or download firmware; try again later"); return; }
   if (!install_job_) {
     Response response;
-    if (!response.open(std::string(BASE) + "latest/download/upgrade.json")) { fail_("Could not check for updates; try again later"); return; }
+    if (!response.open(std::string(BASE) + "latest/download/" + OPENATHAN_UPGRADE_DESCRIPTOR)) { fail_("Could not check for updates; try again later"); return; }
     std::string envelope;
     const auto deadline = milliseconds() + 30000;
     while (!cancel_ && milliseconds() < deadline) {
@@ -324,7 +324,7 @@ void Upgrade::run_() {
   if (cancel_) return;
   if (!safe_) { fail_("Waiting for a safe time between prayers"); return; }
   Response response;
-  if (!response.open(std::string(BASE) + "download/" + release.version + "/firmware.ota.bin") ||
+  if (!response.open(std::string(BASE) + "download/" + release.version + "/" + OPENATHAN_UPGRADE_APPLICATION) ||
       esp_http_client_get_content_length(response.client) != release.bytes) { fail_("Could not download the verified firmware"); return; }
   const auto *partition = esp_ota_get_next_update_partition(nullptr);
   esp_ota_handle_t handle = 0;

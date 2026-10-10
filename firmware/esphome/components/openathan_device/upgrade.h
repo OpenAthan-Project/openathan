@@ -1,5 +1,11 @@
 #pragma once
 #include "esphome/core/defines.h"
+#ifndef OPENATHAN_UPGRADE_DESCRIPTOR
+#define OPENATHAN_UPGRADE_DESCRIPTOR "upgrade.json"
+#endif
+#ifndef OPENATHAN_UPGRADE_APPLICATION
+#define OPENATHAN_UPGRADE_APPLICATION "firmware.ota.bin"
+#endif
 #ifndef OPENATHAN_HARDWARE
 #define OPENATHAN_HARDWARE "atoms3r-c126-pyramid-a167"
 #endif
