@@ -107,6 +107,12 @@ target_include_directories(waveshare_adapter_tests PRIVATE tests/waveshare_stubs
   firmware lib/openathan-core/include)
 add_test(NAME waveshare_power_and_backlight COMMAND waveshare_adapter_tests)
 
+add_executable(rtc_adapter_tests tests/rtc_adapter_tests.cpp
+  firmware/esphome/components/waveshare_box_rtc/rtc.cpp)
+target_include_directories(rtc_adapter_tests PRIVATE tests/rtc_stubs tests/stubs firmware)
+target_link_libraries(rtc_adapter_tests PRIVATE openathan_core)
+add_test(NAME waveshare_rtc_safety COMMAND rtc_adapter_tests)
+
 foreach(mode IN ITEMS production isolated)
   add_executable(display_preferences_${mode}_tests tests/display_preferences_tests.cpp
     firmware/esphome/components/openathan/nvs_settings_store.cpp)

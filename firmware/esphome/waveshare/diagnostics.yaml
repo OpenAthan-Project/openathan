@@ -30,7 +30,8 @@ text_sensor:
     update_interval: 15s
     lambda: |-
       return waveshare_diagnostics(*id(waveshare_bus), *id(waveshare_schematic_bus),
-        id(athan_audio).playing(), id(waveshare_dac).is_failed(), id(waveshare_status_lcd).is_failed());
+        id(athan_audio).playing(), id(waveshare_dac).is_failed(), id(waveshare_status_lcd).is_failed(),
+        id(waveshare_rtc).restore_result(), id(waveshare_rtc).save_result());
 
 button:
   - platform: template

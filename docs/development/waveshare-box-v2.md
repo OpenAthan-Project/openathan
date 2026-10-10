@@ -3,7 +3,7 @@
 The ESP32-S3-Touch-LCD-1.85C-BOX **V2** development profile reuses standalone
 prayer calculations, scheduling, stored recordings, USB provisioning and the
 authenticated device-local phone controls. V1 uses different audio hardware and
-is not supported by this profile. Touch, microphones, RTC and SD storage are
+is not supported by this profile. Touch, microphones and SD storage are
 deferred. Physical acceptance is recorded in the
 [dated validation report](waveshare-validation-2026-10-09.md).
 
@@ -60,6 +60,7 @@ session.
 | Backlight | GPIO5, 5 kHz PWM, saved 1–100%, default 50% |
 | Panel reset | TCA9554 `0x20`, zero-based P1, vendor's one-based EXIO2 |
 | Shared I²C | SCL 10, SDA 11; confirmed on the attended unit |
+| PCF85063A RTC | I²C `0x51` on the shared bus; RTC physical acceptance pending |
 | BOOT button | GPIO0, active-low input with pull-up; stop/skip/cancel observed on the attended V2 unit |
 
 The mappings follow the [manufacturer's V2 audio example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/Arduino/examples/03_audio_out_no_tf/03_audio_out_no_tf.ino),
@@ -77,6 +78,35 @@ The vendor selects this sequence for one panel ID; other panel lots require
 physical validation. ESPHome adds pixel format, orientation, inversion,
 sleep-out and display-on commands. Its QSPI path requires a 16-bit framebuffer
 (259,200 bytes); allocator placement and recovery must be measured on-device.
+
+### RTC and offline restart
+
+The Waveshare profiles restore UTC once at startup from the onboard PCF85063A
+when system time is invalid. After successful SNTP synchronization, the adapter
+saves UTC to RTC and verifies readback. It does not periodically resynchronize
+system time from RTC. Saved timezone/DST rules remain responsible for local time.
+
+The register layout and bus follow the
+[vendor RTC header](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/ESP-IDF/ESP32-S3-Touch-LCD-1.85C-Test/main/PCF85063/PCF85063.h)
+and [I²C example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/Arduino/examples/02_RTC_PCF85063/I2C_Driver.h);
+validation and STOP sequencing follow the
+[PCF85063A datasheet](https://www.nxp.com/docs/en/data-sheet/PCF85063A.pdf).
+
+Register `0x03` holds an OpenAthan initialization marker (`0xA7`), committed only
+after verified writes. Factory/vendor values are ignored because their year/time
+conventions may differ. The first boot therefore still needs internet time.
+RTC dates use years 2000–2099, with the existing valid-clock floor of 2019;
+weekday is Sunday=0. Missing markers, oscillator loss, stopped/test/12-hour modes,
+invalid BCD/calendar fields and bus errors leave automatic Athan waiting for SNTP.
+Writes invalidate the marker first and preserve offset, alarms and timers.
+RTC failures do not invalidate synchronized system time or block audio.
+
+Offline restart support requires the RTC to remain powered. Retention after
+unplugging, battery behavior and drift are not qualified. Hardware acceptance and
+runtime memory checks remain pending; see the
+[RTC implementation report and procedure](waveshare-rtc-validation-2026-10-10.md).
+Existing activation, skip and consumed-prayer records remain authoritative:
+startup and clock corrections do not play missed or consumed occurrences.
 
 ### Physical controls
 

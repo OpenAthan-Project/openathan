@@ -10,6 +10,10 @@ Waveshare V2 audio, display and attended diagnostic development configurations
 are also generated and compiled. These require isolated storage and disable every
 public update transport. Capacity inspection checks their 16 MiB headers explicitly;
 public release validation retains the 8 MiB reference contract.
+The Waveshare RTC host fixture checks strict register validation, interrupted
+initialization, verified SNTP writes and startup restoration, including scheduler
+handoffs across clock corrections and saved skips. Hardware RTC/offline-restart
+acceptance remains separate from CI.
 Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
 `openathan.yaml` and `provisioning/validation.yaml`, then enforce dependency pins, partition layout,
 the 1.5 MiB application budget and factory/OTA payload consistency. Two additional
