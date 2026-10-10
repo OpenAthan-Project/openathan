@@ -6,6 +6,11 @@ unresolved; no firmware fix was made. The existing clean development image was
 validated and installed with attended approval. Detailed diagnostics, credentials,
 recordings and recovery artifacts remain private.
 
+The later [BOOT validation](waveshare-buttons-validation-2026-10-09.md) records
+physical button acceptance and the subsequent clean development installation.
+Its image record supersedes the installed-image snapshot below; the network
+finding remains unresolved.
+
 ## Findings and limits
 
 A ten-minute simultaneous Python/Chromium observation produced two Python

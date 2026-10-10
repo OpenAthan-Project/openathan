@@ -60,7 +60,7 @@ session.
 | Backlight | GPIO5, 5 kHz PWM, saved 1–100%, default 50% |
 | Panel reset | TCA9554 `0x20`, zero-based P1, vendor's one-based EXIO2 |
 | Shared I²C | SCL 10, SDA 11; confirmed on the attended unit |
-| BOOT button | GPIO0, active-low input with pull-up; mapping awaits physical validation |
+| BOOT button | GPIO0, active-low input with pull-up; stop/skip/cancel observed on the attended V2 unit |
 
 The mappings follow the [manufacturer's V2 audio example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/Arduino/examples/03_audio_out_no_tf/03_audio_out_no_tf.ino),
 [display header](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/ESP-IDF/ESP32-S3-Touch-LCD-1.85C-Test/main/LCD_Driver/ST77916.h)
@@ -92,11 +92,12 @@ The BOOT button uses the same release-triggered controls as the reference Atom:
 These actions use existing scheduler safeguards and do not start manual playback.
 BOOT's GPIO0 connection follows the linked V2 schematic; holding it during reset
 or power-on still enters ROM download mode. RESET is wired to the chip reset
-input and retains its hardware restart function. Button operation on the attended
-unit remains untested; validate stop, skip and cancel-skip after a separately
-approved application-only installation, preserving settings, history and audio.
-See the [automated validation and capacity comparison](waveshare-buttons-validation-2026-10-09.md)
-for this mapping.
+input and retains its hardware restart function. Attended stop, skip, cancel-skip
+and RESET skip-persistence checks passed on one V2 unit, preserving settings,
+history and shared audio. Exact timing boundaries, unassigned gaps and the
+BOOT-held physical download-mode sequence remain untested. See the
+[automated and attended validation](waveshare-buttons-validation-2026-10-09.md)
+for source/image identities, capacity and remaining limits.
 
 ### Display
 
