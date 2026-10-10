@@ -1,6 +1,6 @@
 # Firmware upgrades
 
-Official reference firmware can check for published stable releases and install
+Official production firmware can check for published stable releases and install
 application-only updates from its authenticated device page. Prayer calculation,
 scheduling and recordings continue to work independently of the release service.
 The flow is included in published pre-1.0 reference releases. See the
@@ -162,3 +162,17 @@ The additive [USB application-update protocol](usb-firmware-updates.md) reuses
 these trust, partition and startup contracts. It waits for owner power handoff
 after selection. The companion website keeps public USB writes disabled until
 new transport-specific physical qualification and a capable release are available.
+
+## Hardware-specific releases
+
+v0.5.0 preparation adds the Waveshare Box V2 production profile. Atom retains
+`upgrade.json` and `firmware.ota.bin`; Waveshare uses
+`waveshare-box-v2.upgrade.json` and `waveshare-box-v2.firmware.ota.bin`. Each
+signed payload binds its hardware identity, and each device discovers only its
+board's descriptor. Settings/audio formats and partition offsets remain unchanged.
+
+USB firmware INFO accepts the legacy nine fields and appends hardware as a tenth
+field in new builds. USB status also appends `hardware=<identity>` after the
+existing fields/URLs; older website clients ignore it as a non-URL. The new
+installer validates the identity and uses Atom compatibility for older responses.
+Physical Waveshare production update qualification remains pending.

@@ -162,6 +162,15 @@ class BuildPolicyTests(unittest.TestCase):
 
 
 class WorkflowPolicyTests(unittest.TestCase):
+    def test_installer_checkout_matches_the_contract_pin(self):
+        import yaml
+        workflow = yaml.safe_load((ROOT / ".github/workflows/firmware.yml").read_text())
+        pin = json.loads((ROOT / "release/installer-contract.json").read_text())
+        step = next(step for step in workflow["jobs"]["host-tests"]["steps"]
+                    if step.get("with", {}).get("path") == ".installer-contract")
+        self.assertEqual(step["with"]["repository"], pin["repository"])
+        self.assertEqual(step["with"]["ref"], pin["commit"])
+
     def test_all_expensive_steps_require_successful_docs_only_detection_to_skip(self):
         import yaml
         workflow = yaml.safe_load((ROOT / ".github/workflows/firmware.yml").read_text())
@@ -169,7 +178,7 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertNotIn("if", build)
         self.assertEqual(build["strategy"]["matrix"]["configuration"], [
             "device", "validation", "reference", "provisioning-validation",
-            "upgrade-qualification", "upgrade-startup-failure", "waveshare-audio", "waveshare-display", "waveshare-diagnostics"])
+            "upgrade-qualification", "upgrade-startup-failure", "waveshare-production", "waveshare-audio", "waveshare-display", "waveshare-diagnostics"])
         steps = build["steps"]
         self.assertEqual(steps[0]["with"]["fetch-depth"], 2)
         detector = next(step for step in steps if step.get("id") == "build_policy")

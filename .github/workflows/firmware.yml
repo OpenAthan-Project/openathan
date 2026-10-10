@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: OpenAthan-Project/website
-          ref: ba356c80f00ff07046b7433c03e0fdc9802f64b0
+          ref: 407d6bb165b1e6bed91a0486a1eb37870004aef6
           path: .installer-contract
           persist-credentials: false
       - name: Verify producer output with the real installer validator
@@ -49,7 +49,7 @@ jobs:
       - name: Validate developer configurations
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
-          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation upgrades/qualification waveshare/audio waveshare/development waveshare/diagnostics; do
+          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation upgrades/qualification waveshare/production waveshare/audio waveshare/development waveshare/diagnostics; do
             python -m esphome config "firmware/esphome/$config.yaml" > "$RUNNER_TEMP/config.log" 2>&1 || { cat "$RUNNER_TEMP/config.log"; exit 1; }
           done
 
@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [device, validation, reference, provisioning-validation, upgrade-qualification, upgrade-startup-failure, waveshare-audio, waveshare-display, waveshare-diagnostics]
+        configuration: [device, validation, reference, provisioning-validation, upgrade-qualification, upgrade-startup-failure, waveshare-production, waveshare-audio, waveshare-display, waveshare-diagnostics]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -98,6 +98,9 @@ jobs:
             if [ "$CONFIGURATION" = upgrade-startup-failure ]; then
               options=(-s qualification_version v0.0.3 -s qualification_startup_failure true)
             fi
+          elif [ "$CONFIGURATION" = waveshare-production ]; then
+            config=firmware/esphome/waveshare/production.yaml
+            image=openathan
           elif [ "$CONFIGURATION" = waveshare-audio ] || [ "$CONFIGURATION" = waveshare-display ] || [ "$CONFIGURATION" = waveshare-diagnostics ]; then
             config=firmware/esphome/waveshare/audio.yaml
             if [ "$CONFIGURATION" = waveshare-display ]; then

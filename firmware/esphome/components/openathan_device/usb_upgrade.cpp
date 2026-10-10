@@ -36,7 +36,7 @@ std::vector<std::string> Upgrade::usb_info() {
   std::lock_guard<std::mutex> lock(mutex_);
   return {"1", OPENATHAN_FIRMWARE_VERSION, OPENATHAN_BUILD_COMMIT,
       OPENATHAN_UPDATES_ENABLED && bootloader_ok_ ? "supported" : "unsupported", storage_ok_ ? state_ : "storage_fault",
-      confirmed_ ? "confirmed" : "pending", result_, queued_.version, std::to_string(received_.load())};
+      confirmed_ ? "confirmed" : "pending", result_, queued_.version, std::to_string(received_.load()), OPENATHAN_HARDWARE};
 }
 Upgrade::UsbSelection Upgrade::usb_selection_() {
   // Called with mutex_ held. Empty expected can also be a handoff marker that

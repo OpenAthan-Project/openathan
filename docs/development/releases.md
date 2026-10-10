@@ -1,8 +1,12 @@
 # Firmware release preparation
 
-[v0.3.0](../releases/v0.3.0.md) is the published stable reference release.
-The [release evidence](release-validation-2026-10-04.md) records its exact-source
-build, reference-device acceptance, public delivery and qualification limits.
+[v0.4.0](../releases/v0.4.0.md) is the published stable reference release.
+The v0.5.0 candidate adds Waveshare Box V2 alongside Atom. Candidate preparation
+does not establish physical installer/update qualification or publication.
+The [v0.4.0 preparation record](v0.4.0-preparation-2026-10-07.md) records its
+automated builds and physical-validation limits. The earlier
+[release evidence](release-validation-2026-10-04.md) records reference-device
+acceptance and public delivery for v0.3.0.
 The earlier [preparation report](v0.3.0-preparation-2026-10-03.md) retains the
 matched development measurements.
 
@@ -14,7 +18,8 @@ schema 1.
 
 The firmware repository builds and packages releases. The website consumes a
 reviewed release; it never compiles firmware. The [installer contract](https://github.com/OpenAthan-Project/website/blob/main/installer/README.md)
-remains schema v1, for AtomS3R C126 + Voice Pyramid A167, ESP32-S3 with 8 MiB flash
+retains schema v1. Profiles identify AtomS3R C126 + Voice Pyramid A167
+(8 MiB flash) or Waveshare Box V2 (16 MiB flash), both ESP32-S3
 and the dual-2 MiB application / 3.5 MiB shared-audio layout.
 
 The selected normal and Fajr recordings have a documented
@@ -46,8 +51,10 @@ python tools/release.py build --commit <full-40-character-commit-sha> \
   --output-dir /tmp/openathan-build
 ```
 
-The command exports source to a fresh staging directory and compiles only
-`firmware/esphome/openathan.yaml`. It checks dependency pins, ESP32-S3 image
+The command exports source to a fresh staging directory and compiles the registered production configuration. The default remains
+`firmware/esphome/openathan.yaml`; pass
+`--hardware waveshare-esp32-s3-touch-lcd-1_85c-box-v2` for
+`firmware/esphome/waveshare/production.yaml`. Both builds use the same source commit. It checks dependency pins, ESP32-S3 image
 checksums/digests, the actual factory partition table, empty initial NVS, matching
 factory/OTA application payloads, and the 1,572,864-byte application budget.
 No audio is required. Output includes both images, the source archive, build record,
@@ -83,7 +90,15 @@ preserves MP3 bytes, checks their approved hashes, builds the
 shared partition, and executes the production C++ audio-format validator from the
 source commit. Format/hash validation does not decode MP3 or replace listening tests.
 
-Current upgrade-capable releases contain exactly seven assets:
+Single-board upgrade-capable releases contain seven assets. Combined releases
+contain thirteen: retain the seven Atom names below and add six Waveshare files
+prefixed `waveshare-box-v2.`. Both manifests reference the same `athan-audio.bin`.
+Pass `--waveshare-build-dir /tmp/openathan-waveshare-build` when packaging the Atom
+build to produce the combined bundle. The two builds must share an exact commit.
+Each board has its own manifest, factory, OTA, signed descriptor, checksums and
+build report; Atom filenames and signed schema 1 remain compatible.
+
+The Atom assets are:
 
 | Asset | Purpose |
 | --- | --- |
@@ -97,7 +112,7 @@ Current upgrade-capable releases contain exactly seven assets:
 
 Only factory and audio appear in the fresh-install manifest's two parts. The
 device updater consumes the separate signed descriptor and OTA application;
-the website importer consumes only the manifest, factory and audio. Legacy
+the website importer validates both installation and signed upgrade assets. Legacy
 releases without upgrade identity retain the five-asset contract and four-file
 checksum list. The report excludes raw logs, credentials and personal paths.
 Existing outputs and symlink files are rejected; regenerate a changed bundle

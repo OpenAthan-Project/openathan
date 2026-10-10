@@ -16,7 +16,8 @@ import tempfile
 
 import audio_image
 import check_feasibility
-from release_artifacts import (ASSETS, CONFIGURATION, LICENSE_PATH, MEDIA_REGISTRY, PINS_PATH,
+from release_artifacts import (ASSETS, HARDWARE, WAVESHARE, PROFILES, profile, asset_name,
+                               configuration_hardware, validate_profile_files, LICENSE_PATH, MEDIA_REGISTRY, PINS_PATH,
                                REPOSITORY, SHA, TAG, approved_tracks, checksums, digest,
                                json_bytes, make_manifest, read_file, read_json, require,
                                validate_bundle)
@@ -74,7 +75,8 @@ def export_source(commit, destination):
     return archive
 
 
-def build(commit, output):
+def build(commit, output, hardware=HARDWARE):
+    configuration = profile(hardware)["configuration"]
     source_commit(commit)
     require(sys.version_info[:2] == (3, 13), "Use the pinned Python 3.13 environment")
     pins = read_json(source_file(commit, PINS_PATH))
@@ -90,7 +92,7 @@ def build(commit, output):
         log = stage / "compile.log"
         print(f"Compiling {commit}; build output will be retained in {output}", flush=True)
         with log.open("wb") as handle:
-            completed = subprocess.run([sys.executable, "-m", "esphome", "compile", CONFIGURATION],
+            completed = subprocess.run([sys.executable, "-m", "esphome", "compile", configuration],
                                        cwd=source, env=environment, stdout=handle, stderr=subprocess.STDOUT)
         if completed.returncode:
             # Include a bounded tail before temporary failed output is removed.
@@ -100,7 +102,7 @@ def build(commit, output):
         for name in ("firmware.factory.bin", "firmware.ota.bin"):
             shutil.copyfile(compiled / "build" / name, stage / name)
         record = dict(schema=1, commit=commit, source_tree=git("rev-parse", f"{commit}^{{tree}}").decode().strip(),
-                      configuration=CONFIGURATION, capacity=capacity,
+                      configuration=configuration, capacity=capacity,
                       toolchain=dict(python=".".join(map(str, sys.version_info[:3])), esphome=version("esphome"),
                                      esp_idf=pins["esp_idf"], compiler=pins["xtensa_esp_elf"], tzdata=version("tzdata")))
         validate_report(public_report(record), commit)
@@ -113,7 +115,7 @@ def build(commit, output):
 def validate_build(directory):
     record = read_json(read_file(directory / "build-record.json", 65536))
     require(isinstance(record, dict), "Invalid build record")
-    require(record.get("schema") == 1 and record.get("configuration") == CONFIGURATION, "Unsupported build record")
+    require(record.get("schema") == 1 and record.get("configuration") in {entry["configuration"] for entry in PROFILES.values()}, "Unsupported build record")
     commit = source_commit(record.get("commit"))
     require(record.get("source_tree") == git("rev-parse", f"{commit}^{{tree}}").decode().strip(), "Build source tree differs")
     evidence = record.get("evidence", {})
@@ -154,6 +156,7 @@ def validate_report(report, commit):
     require(toolchain["esphome"] == pins["esphome"] and toolchain["esp_idf"] == pins["esp_idf"] and
             toolchain["compiler"] == pins["xtensa_esp_elf"] and toolchain["tzdata"] == "2026.4", "Toolchain report differs from pins")
     require(report["source_tree"] == git("rev-parse", f"{commit}^{{tree}}").decode().strip(), "Report source tree differs")
+    configuration_hardware(report.get("configuration"))
     capacity = report.get("capacity", {})
     keys = {"application_bytes", "linked_image_bytes", "static_ram_bytes", "application_slot_bytes", "slot_free_bytes",
             "growth_target_passed", "application_sha256", "application_budget_remaining_bytes", "managed_components"}
@@ -177,10 +180,11 @@ def validate_audio_cpp(commit, path):
         command([build_dir / "audio_validator", path.resolve()])
 
 
-def package(build_dir, tag, normal, fajr, output, signing_key=None):
+def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_build_dir=None):
     require(TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
     record = validate_build(build_dir)
     commit = record["commit"]
+    hardware = configuration_hardware(record["configuration"])
     upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
     require(not upgrade_capable or signing_key is not None, "Upgrade-capable releases require --signing-key")
     payloads = (audio_image.read_recording(normal), audio_image.read_recording(fajr))
@@ -189,7 +193,7 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None):
     factory = (build_dir / ASSETS[1]).read_bytes()
     with fresh_output(output) as stage:
         files = {ASSETS[1]: factory, ASSETS[2]: media,
-                 "manifest.json": json_bytes(make_manifest(commit, tag, factory, media)),
+                 "manifest.json": json_bytes(make_manifest(commit, tag, factory, media, hardware)),
                  "build-report.json": json_bytes(public_report(record))}
         if signing_key is not None:
             require(not signing_key.resolve().is_relative_to(ROOT.resolve()), "Keep the private signing key outside the repository")
@@ -202,13 +206,28 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None):
                     "Factory bootloader is not in the reviewed rollback allowlist")
             app = (build_dir / "firmware.ota.bin").read_bytes()
             files["firmware.ota.bin"] = app
-            files["upgrade.json"] = sign(tag, commit, app, signing_key.read_bytes(), public)
-        files["SHA256SUMS"] = checksums(files)
+            files["upgrade.json"] = sign(tag, commit, app, signing_key.read_bytes(), public, hardware)
+        files = {asset_name(hardware, name): data for name, data in files.items()}
+        checksum_name = asset_name(hardware, "SHA256SUMS")
+        files[checksum_name] = checksums(files)
+        if waveshare_build_dir is not None:
+            require(hardware == HARDWARE, "Combined packaging starts with the Atom build")
+            other = validate_build(waveshare_build_dir)
+            require(other["commit"] == commit and configuration_hardware(other["configuration"]) == WAVESHARE,
+                    "Combined packaging requires the same-commit Waveshare production build")
+            with tempfile.TemporaryDirectory(prefix="openathan-waveshare-package-") as temporary:
+                destination = Path(temporary) / "bundle"
+                package(waveshare_build_dir, tag, normal, fajr, destination, signing_key)
+                for path in destination.iterdir():
+                    if path.name in files:
+                        require(files[path.name] == path.read_bytes(), "Shared release asset differs")
+                    else:
+                        files[path.name] = path.read_bytes()
         for name, data in files.items():
             (stage / name).write_bytes(data)
         validate_bundle(stage)
         validate_audio_cpp(commit, stage / ASSETS[2])
-    return dict(bundle=str(output), manifest_sha256=digest(files["manifest.json"]))
+    return dict(bundle=str(output), manifest_sha256=digest(files[asset_name(hardware, "manifest.json")]))
 
 
 class GitHub:
@@ -277,16 +296,21 @@ def upload_draft(bundle, github=None):
     manifest, report, files, payloads = validate_bundle(bundle)
     commit, tag = manifest["commit"], manifest["tag"]
     source_commit(commit)
+    groups = (HARDWARE, WAVESHARE) if asset_name(WAVESHARE, "manifest.json") in files and "manifest.json" in files else (manifest["hardware"],)
     upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
-    require(not upgrade_capable or "upgrade.json" in files, "Upgrade-capable release is missing signed upgrade assets")
-    if "upgrade.json" in files:
-        from upgrade_artifacts import validate
-        bootloaders = read_json(source_file(commit, "release/rollback-bootloaders.json"))
-        require(bootloaders["regionBytes"] == 32768 and digest(files["firmware.factory.bin"][:32768]) in bootloaders["sha256"],
-                "Factory bootloader is not in the reviewed rollback allowlist")
-        validate(files["upgrade.json"], files["firmware.ota.bin"],
-                 source_file(commit, "release/upgrade-public-key.pem"), tag, commit)
-    validate_report(report, commit)
+    for hardware in groups:
+        _, board_report, _ = validate_profile_files(files, hardware)
+        descriptor = asset_name(hardware, "upgrade.json")
+        require(not upgrade_capable or descriptor in files, "Upgrade-capable release is missing signed upgrade assets")
+        if descriptor in files:
+            from upgrade_artifacts import validate
+            bootloaders = read_json(source_file(commit, "release/rollback-bootloaders.json"))
+            require(bootloaders["regionBytes"] == 32768 and
+                    digest(files[asset_name(hardware, "firmware.factory.bin")][:32768]) in bootloaders["sha256"],
+                    "Factory bootloader is not in the reviewed rollback allowlist")
+            validate(files[descriptor], files[asset_name(hardware, "firmware.ota.bin")],
+                     source_file(commit, "release/upgrade-public-key.pem"), tag, commit, hardware)
+        validate_report(board_report, commit)
     approved_tracks(read_json(source_file(commit, MEDIA_REGISTRY)), source_file(commit, LICENSE_PATH), payloads)
     github = github or GitHub()
     with tempfile.TemporaryDirectory(prefix="openathan-upload-") as temporary:
@@ -300,11 +324,11 @@ def upload_draft(bundle, github=None):
         release = find_release(github, tag)
         if release is None:
             notes = snapshot / "notes.md"
-            notes.write_text(f"Reference firmware candidate from `{commit}`.\n\n"
+            notes.write_text(f"Board-specific firmware candidate from `{commit}`.\n\n"
                              "Recording redistribution metadata was checked against the committed registry. "
                              "Physical qualification and public publication remain pending. "
-                             "The website installer requires a separate reviewed release selection.\n\n"
-                             f"Manifest SHA-256: `{digest(files['manifest.json'])}`\n")
+                             "The website may adopt a qualified stable release after explicit publication.\n\n"
+                             f"Manifest SHA-256: `{digest(files[asset_name(manifest['hardware'], 'manifest.json')])}`\n")
             github.call("release", "create", tag, "--repo", REPOSITORY, "--draft", "--verify-tag", "--latest=false",
                         "--title", f"OpenAthan {tag}", "--notes-file", notes)
             release = find_release(github, tag)
@@ -319,17 +343,19 @@ def upload_draft(bundle, github=None):
         require(find_release(github, tag)["id"] == release["id"], "Draft identity changed")
         require(github.tag_commit(tag) == commit, "Remote tag changed during upload")
         require(set(verify_assets(github, release, files)) == set(files), "Upload is incomplete; rerun to reconcile")
-    return dict(url=release["html_url"], manifest_sha256=digest(files["manifest.json"]), status="draft",
-                remaining="Hardware qualification, explicit publication, and reviewed website release selection")
+    return dict(url=release["html_url"], manifest_sha256=digest(files[asset_name(manifest["hardware"], "manifest.json")]), status="draft",
+                remaining="Hardware qualification, explicit publication, and verified website adoption")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="action", required=True)
     build_parser = commands.add_parser("build", help="Compile an exact source commit without recordings")
+    build_parser.add_argument("--hardware", choices=tuple(PROFILES), default=HARDWARE)
     build_parser.add_argument("--commit", required=True)
     build_parser.add_argument("--output-dir", required=True, type=Path)
     package_parser = commands.add_parser("package", help="Package firmware with approved recordings")
+    package_parser.add_argument("--waveshare-build-dir", type=Path, help="Same-commit production build for a combined release")
     package_parser.add_argument("--build-dir", required=True, type=Path)
     package_parser.add_argument("--tag", required=True)
     package_parser.add_argument("--signing-key", type=Path, help="Private P-256 key outside the repository")
@@ -341,9 +367,9 @@ def main():
     args = parser.parse_args()
     try:
         if args.action == "build":
-            result = build(args.commit, args.output_dir)
+            result = build(args.commit, args.output_dir, args.hardware)
         elif args.action == "package":
-            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key)
+            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key, args.waveshare_build_dir)
         else:
             result = upload_draft(args.bundle)
         print(json.dumps(result, indent=2))

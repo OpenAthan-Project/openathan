@@ -18,12 +18,26 @@ class WaveshareCapacityTests(unittest.TestCase):
         factory, app = firmware(0x1000000)
         with self.assertRaisesRegex(ValueError, "8 MiB"):
             validate_firmware_images(factory, app)
-        with self.assertRaisesRegex(ValueError, "isolated"):
+        with self.assertRaisesRegex(ValueError, "Hardware"):
             validate_firmware_images(factory, app, flash_bytes=0x1000000)
-        self.assertEqual(validate_firmware_images(factory, app, allow_isolated=True, flash_bytes=0x1000000), app)
+        self.assertEqual(validate_firmware_images(factory, app, allow_isolated=True, flash_bytes=0x1000000, hardware="waveshare-esp32-s3-touch-lcd-1_85c-box-v2"), app)
         old_factory, old_app = firmware()
         with self.assertRaisesRegex(ValueError, "16 MiB"):
-            validate_firmware_images(old_factory, old_app, allow_isolated=True, flash_bytes=0x1000000)
+            validate_firmware_images(old_factory, old_app, allow_isolated=True, flash_bytes=0x1000000, hardware="waveshare-esp32-s3-touch-lcd-1_85c-box-v2")
+
+    def test_production_profile_uses_production_storage_and_updates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            build = Path(temporary) / "build"
+            result = subprocess.run([sys.executable, "-m", "esphome", "compile", "--only-generate",
+                str(ROOT / "firmware/esphome/waveshare/production.yaml")],
+                env=dict(os.environ, ESPHOME_BUILD_PATH=str(build)), capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            defines = (build / "openathan/src/esphome/core/defines.h").read_text()
+            self.assertIn('#define OPENATHAN_UPDATES_ENABLED 1\n', defines)
+            self.assertIn('"waveshare-box-v2.upgrade.json"', defines)
+            self.assertNotIn('OPENATHAN_PROVISIONING_TEST_STORAGE', defines)
+            self.assertNotIn('OPENATHAN_UPGRADE_QUALIFICATION', defines)
+            self.assertIn('waveshare_rtc->set_network_time(athan_clock)', (build / 'openathan/src/main.cpp').read_text())
 
     def test_generated_board_and_profile_guards(self):
         with tempfile.TemporaryDirectory() as directory:
