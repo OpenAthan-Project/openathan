@@ -1,6 +1,7 @@
 #include "rtc.h"
 #include "esphome/core/log.h"
 #include "openathan/scheduler.h"
+#include <esp_sntp.h>
 #include <array>
 
 namespace esphome::waveshare_box_rtc {
@@ -56,6 +57,10 @@ void RTC::restore_() {
 }
 
 void RTC::save_() {
+  // ESPHome's first SNTP loop also notifies when RTC restored system time.
+  // Only a completed network update may replace our retained UTC. Reading
+  // this status consumes completion, so duplicate callbacks cannot rewrite it.
+  if (esp_sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED) return;
   const auto now = network_time_->utcnow();
   if (!now.is_valid() || now.year > 2099 || now.second > 59) { save_result_ = "time_invalid"; return; }
   std::array<uint8_t, 11> raw{};

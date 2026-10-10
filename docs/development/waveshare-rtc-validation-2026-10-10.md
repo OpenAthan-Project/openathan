@@ -19,25 +19,48 @@ resumes scheduling on the next date. The pinned timezone bridge checks saved
 timezone/DST conversion separately.
 
 - All 18 C++ CTests passed with UndefinedBehaviorSanitizer.
-- All 105 Python tests passed, including the production/isolated settings bridge
+- All 106 Python tests passed, including the production/isolated settings bridge
   against the resolved ArduinoJson library and pinned ESPHome timezone code.
 - All 12 firmware configurations passed schema validation. Generated configuration
   checks connect RTC to the selected SNTP source and shared bus with polling disabled.
 - Three paired Waveshare builds passed dependency pins, partition/image-header,
   factory/OTA consistency, shared-audio and capacity inspection.
 
+### Network synchronization guard
+
+ESPHome 2026.9.0 can emit its first SNTP callback from already valid system time,
+including RTC-restored time without a network response. RTC writes now require
+ESP-IDF's completed network synchronization status. Reading that status consumes
+completion, so inferred startup and duplicate notifications leave RTC registers
+and save diagnostics untouched. This adapter is the sole status consumer in the
+pinned profiles, which use immediate SNTP synchronization.
+
+The new regression compiles the pinned production SNTP implementation with the
+RTC adapter. It fails against the original PR head `6abeafb` and passes with the
+guard: the inferred startup callback performs no RTC bus access, injected write
+failures cannot damage retained time, and another offline restart still restores it. Genuine
+updates before/after the first loop, deferred/duplicate notifications, incomplete
+synchronization and recovery after a genuine interrupted write are also covered.
+
 ## Firmware capacity
 
-Baseline main was `681687f1b33e3fefda9202b3ed903fe1e023f39b`. Both phases used
-identical public compile-only configuration/fixtures, ESPHome 2026.9.0,
+Baseline main was `681687f1b33e3fefda9202b3ed903fe1e023f39b`. The initial RTC
+builds and synchronization-guard follow-up used identical public compile-only
+configuration/fixtures, ESPHome 2026.9.0,
 ESP-IDF 5.5.5 and the pinned Xtensa toolchain. These synthetic fixtures must never
 be installed or played.
 
 | Variant | Baseline OTA bytes | RTC OTA bytes | Delta bytes | Remaining application budget bytes |
 | --- | ---: | ---: | ---: | ---: |
-| Waveshare audio only | 1,210,736 | 1,212,752 | +2,016 | 360,112 |
-| Waveshare round display | 1,260,752 | 1,262,704 | +1,952 | 310,160 |
-| Waveshare encrypted diagnostics | 1,347,360 | 1,349,632 | +2,272 | 223,232 |
+| Waveshare audio only | 1,210,736 | 1,212,816 | +2,080 | 360,048 |
+| Waveshare round display | 1,260,752 | 1,262,784 | +2,032 | 310,080 |
+| Waveshare encrypted diagnostics | 1,347,360 | 1,349,712 | +2,352 | 223,152 |
+
+The guard was separately measured against original PR head `6abeafb`, using
+before/after builds in the same directories and configurations. It adds 64 bytes
+to audio-only and 80 bytes to display/diagnostics, with zero static RAM growth.
+All six guard-comparison builds passed capacity inspection; the table above
+includes this correction in the total RTC cost relative to baseline main.
 
 Static RAM grew by 40 bytes for audio/diagnostics and 48 bytes for display. This
 does not establish runtime heap, fragmentation or PSRAM headroom. The application

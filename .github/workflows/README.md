@@ -14,6 +14,8 @@ The Waveshare RTC host fixture checks strict register validation, interrupted
 initialization, verified SNTP writes and startup restoration, including scheduler
 handoffs across clock corrections and saved skips. Hardware RTC/offline-restart
 acceptance remains separate from CI.
+A Python host regression compiles the pinned production SNTP source with the RTC
+adapter to verify offline startup preservation and genuine network updates.
 Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
 `openathan.yaml` and `provisioning/validation.yaml`, then enforce dependency pins, partition layout,
 the 1.5 MiB application budget and factory/OTA payload consistency. Two additional

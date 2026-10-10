@@ -1,7 +1,9 @@
 #pragma once
 #include "esphome/core/component.h"
+#include <esp_sntp.h>
 #include <ctime>
 #include <functional>
+#include <utility>
 #include <vector>
 
 namespace esphome {
@@ -20,12 +22,27 @@ inline time_t system_epoch{};
 class RealTimeClock : public Component {
  public:
   virtual void update() {}
+  virtual void dump_config() {}
+  ESPTime now() { return utcnow(); }
   ESPTime utcnow() { return ESPTime::from_epoch_utc(system_epoch); }
-  std::vector<std::function<void()>> callbacks;
-  template<typename F> void add_on_time_sync_callback(F callback) { callbacks.emplace_back(callback); }
-  void network_sync(time_t epoch) { system_epoch = epoch; for (auto &callback : callbacks) callback(); }
+  struct Callbacks {
+    std::vector<std::function<void()>> values;
+    void call() { for (auto &callback : values) callback(); }
+  } time_sync_callback_;
+  template<typename F> void add_on_time_sync_callback(F callback) { time_sync_callback_.values.emplace_back(callback); }
+  void network_sync(time_t epoch) {
+    system_epoch = epoch;
+    sntp_test::status = SNTP_SYNC_STATUS_COMPLETED;
+    time_sync_callback_.call();
+  }
+  void disable_loop() { loop_disabled = true; }
+  unsigned get_update_interval() const { return 900000; }
+  template<typename F> void defer(F callback) { deferred.emplace_back(callback); }
+  void run_deferred() { auto pending = std::move(deferred); for (auto &callback : pending) callback(); }
+  bool loop_disabled{};
+  std::vector<std::function<void()>> deferred;
  protected:
-  void synchronize_epoch_(uint32_t epoch) { system_epoch = epoch; for (auto &callback : callbacks) callback(); }
+  void synchronize_epoch_(uint32_t epoch) { system_epoch = epoch; time_sync_callback_.call(); }
 };
 }
 }

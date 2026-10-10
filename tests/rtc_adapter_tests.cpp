@@ -13,6 +13,7 @@ struct Fixture {
   esphome::time::RealTimeClock network;
   RTC rtc;
   Fixture() {
+    sntp_test::reset();
     system_epoch = 0;
     rtc.set_network_time(&network);
     rtc.registers = {1, 0xC3, 0x8A, 0xA7, 0x05, 0x04, 0x12, 0x09, 5, 0x10, 0x26,
@@ -51,6 +52,8 @@ static void saves() {
   assert(f.rtc.writes.size() == 5 && f.rtc.writes.front().reg == 3 && f.rtc.writes.front().data[0] == 0);
   assert(f.rtc.writes[1].reg == 0 && f.rtc.writes[1].data[0] == 0x21);
   assert(f.rtc.writes.back().reg == 3 && f.rtc.writes.back().data[0] == 0xA7);
+  f.network.time_sync_callback_.call();
+  assert(f.rtc.writes.size() == 5); // Completion is consumed; duplicate notification is harmless.
   for (unsigned i : {1u, 2u, 11u, 12u, 13u, 14u, 15u, 16u, 17u}) assert(f.rtc.registers[i] == before[i]);
   // Sunday=0, leap day, midnight, upper supported year; each survives restart.
   for (auto value : {epoch({2028,2,29},23,59,59), epoch({2026,10,11}), epoch({2099,12,31},23,59,59)}) {

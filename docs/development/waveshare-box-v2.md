@@ -85,6 +85,9 @@ The Waveshare profiles restore UTC once at startup from the onboard PCF85063A
 when system time is invalid. After successful SNTP synchronization, the adapter
 saves UTC to RTC and verifies readback. It does not periodically resynchronize
 system time from RTC. Saved timezone/DST rules remain responsible for local time.
+Only completed ESP-IDF network synchronizations permit RTC writes. ESPHome's
+inferred startup notification after RTC restoration leaves retained time untouched;
+duplicate notifications cannot repeat a completed write.
 
 The register layout and bus follow the
 [vendor RTC header](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/ESP-IDF/ESP32-S3-Touch-LCD-1.85C-Test/main/PCF85063/PCF85063.h)
