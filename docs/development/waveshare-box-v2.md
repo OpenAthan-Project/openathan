@@ -101,14 +101,30 @@ for source/image identities, capacity and remaining limits.
 
 ### Display
 
-The existing bitmap layout is centered at offset (52,52), enlarged 2× within
-the 360×360 circle and rotated 180° for viewing opposite the rear USB cable.
+The approved [Ring + countdown layout](../../.impeccable/surfaces/firmware-esphome-components-openathan-display-render-h.md)
+keeps the existing bitmap text sizes in the 360×360 circle, with a steady 8px
+outer ring, a small inline AM/PM suffix beside the prayer time, an hours/minutes
+countdown below the time and a lower Offline footer.
+It follows every calculated prayer, including muted and skipped announcements,
+using the portable LED timetable independently of LED hardware/preferences.
+Green means above 30 minutes, orange above 10 through 30, red 10 or less.
+Countdown duration uses UTC; displayed times use the saved local timezone.
+Setup, clock-waiting, playback and faults keep their existing centered 2× layout
+at offset (52,52), without a countdown or proximity ring. The panel remains
+rotated 180° for viewing opposite the rear USB cable.
 Host tests check every rendered pixel against circular
 bounds. Playback guidance says “Button to stop” through the explicit
 `stop_button` capability. Saved timezone, time format and
 brightness continue to use existing preferences. The presenter refreshes only
 when visible content changes. Screen or backlight failure does not gate audio,
 scheduling or startup health.
+See the [display guide](../../firmware/esphome/components/openathan_display/README.md)
+for formatting and state rules, and the
+[validation report](waveshare-countdown-validation-2026-10-09.md) for paired
+capacity measurements and the attended application installations. Owner
+readability confirmation passed for both the first separate-AM/PM layout and
+the approved inline-suffix refinement; concurrent
+audio/network/display runtime memory remains unmeasured for the clean candidate.
 
 ## Attended validation
 

@@ -1,7 +1,8 @@
 # Optional status display
 
 The isolated [Waveshare V2 profile](../../../../docs/development/waveshare-box-v2.md)
-also uses this presenter, centering it at 2× scale on a 360×360 round QSPI panel.
+also uses this presenter on a 360×360 round QSPI panel, with the approved
+[Ring + countdown surface](../../../../.impeccable/surfaces/firmware-esphome-components-openathan-display-render-h.md).
 Its 16-bit buffer uses 259,200 bytes, and playback guidance says “Button to stop”
 for its mapped BOOT button.
 The Atom layout, button guidance and 8-bit buffer remain unchanged.
@@ -33,6 +34,11 @@ The presenter is plain C++ without ESPHome dependencies. Its firmware adapter
 reads the existing scheduler, activation, settings and Wi-Fi state; it does not
 calculate prayer times, write settings/history or issue playback/update commands.
 Saved timezone rules supply both displayed times, including recurring DST.
+For the round display, the portable LED timetable supplies prayer identity and
+UTC time independently of LED hardware or preferences. It follows every
+calculated prayer, including muted and skipped announcements, while preserving
+schedule validation and shared Isha/Fajr conflict rules. Settings changes,
+schedule reloads, local date rollover and clock corrections invalidate its cache.
 The display is optional: its absence, allocation failure or a failed backlight
 must not gate the scheduler, local controls or application-update health.
 
@@ -83,6 +89,33 @@ the footer to Offline: valid-clock standalone scheduling continues. An
 unrelated/stale skip does not label a different event. Front-button stop/skip/cancel behavior is
 unchanged, and the display introduces no additional controls.
 
+### Waveshare round layout
+
+Upcoming-prayer screens retain the existing text sizes: local clock at y=64
+(2×), guidance at y=112 (2×), prayer name at y=140 (4×), scheduled time at y=188
+(6×). In 12-hour mode, center the time and its 2× AM/PM suffix as one group,
+with a 12px gap and the suffix at y=216 to align their visible baselines.
+In 24-hour mode, center the digits alone. The countdown is at y=252 (2×) in
+both formats; Offline stays at y=310 (2×), leaving clear gaps inside the circle.
+The 8px steady outer ring
+has radii 164–172px, inset 8px from the panel edge. It uses the existing LED
+proximity thresholds: green `#00FF00` above 30 minutes, orange `#FF6000` above
+10 through 30 minutes, red `#FF0000` at 10 minutes or less.
+
+All cues refer to the same calculated prayer. Muted prayers show “Muted,” even
+when all announcements are disabled; matching skipped/shared occurrences show
+“Will be skipped.” Other readiness guidance remains unchanged. UTC timestamps
+determine remaining duration, with positive durations rounded up before splitting
+into hours and minutes: `In 2hr 15min`, `In 1hr`, `In 8min`. Below 60 seconds
+use `In <1min`; omit zero-valued units. Color uses exact seconds rather than
+rounded wording. Wi-Fi loss adds Offline without interrupting the countdown.
+
+The state table's “All prayers off” row applies to the square display. Round
+setup, clock-waiting, playback and faults keep the existing centered 2× square
+layout and messages, without a countdown or proximity ring. At an occurrence's
+timestamp, playback takes priority or the timetable advances to the next future
+calculated prayer. No new preference, HTTP API or framebuffer is introduced.
+
 ## Font attribution
 
 [font.h](font.h) contains the printable ASCII subset of Daniel Hepper's
@@ -97,6 +130,9 @@ shared/stale skips, refresh deduplication, PWM limits and each failed I2C write.
 The production and isolated settings-adapter tests exercise the real presenter
 adapter with pinned ESPHome timezone conversion: both DST boundaries, midnight,
 unchanged polls, network loss, and scheduled playback with a failed display.
+Round regressions also cover muted/all-disabled prayers, shared and suppressed
+Isha, schedule/settings invalidation, exact 30/10-minute boundaries, rounded
+hour/minute wording, and countdown changes across both DST transitions.
 
 To inspect all fixture screens using the actual shipping renderer:
 
@@ -104,6 +140,7 @@ To inspect all fixture screens using the actual shipping renderer:
 ./build/display_tests /tmp/openathan-display-previews
 ```
 
-The resulting PPM images are 128×128. They contain illustrative prayer/time
+The resulting PPM images are 128×128 and, for `round-*`, 360×360. They contain illustrative prayer/time
 values, not device observations. See the [dated build report](../../../../docs/development/display-validation-2026-10-03.md)
+and [countdown validation](../../../../docs/development/waveshare-countdown-validation-2026-10-09.md),
 and the [hardware runbook](../../provisioning/HARDWARE_TEST.md).

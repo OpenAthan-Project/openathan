@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-07T13:49:45Z",
+  "generatedAt": "2026-10-10T01:42:34Z",
   "title": "Design System: OpenAthan device UI",
   "extensions": {
     "scope": {
@@ -270,13 +270,36 @@
     ],
     "focus": {
       "value": "3px solid var(--amber), 3px offset",
-      "purpose": "Interactive keyboard focus; programmatic main and step-heading focus has no outline."
+      "purpose": "Interactive keyboard focus; a native select also outlines its containing label so clipped widget text cannot hide focus. Programmatic main and step-heading focus has no outline."
     },
     "layout": {
       "controlMinimum": "44px",
       "fieldMinimum": "48px",
       "containerMaximum": "1120px",
-      "depth": "Flat tonal surfaces and rules; no box shadows."
+      "depth": "Flat tonal surfaces and rules; no box shadows.",
+      "select": "Closed native selects: height 3rem, min-height 48px, max-width 100%, overflow hidden with ellipsis; containing labels clip overflow and retain an outer focus outline."
+    },
+    "waveshareLayout": {
+      "surface": ".impeccable/surfaces/firmware-esphome-components-openathan-display-render-h.md",
+      "scheduledMeridiem": "inline suffix, centered with the time",
+      "suffixGapPx": 12,
+      "visibleTimeBaselineY": 229,
+      "countdownY": 252,
+      "offlineY": 310
+    },
+    "sourceVerification": {
+      "sources": {
+        "DESIGN.md": "9ec88ea2649786941f837a803fd4b8285ba33d49acdf5da670d189a5903b9d5e",
+        "web/device-ui/index.html": "e149859c0a88df4e9d996e0f9602fbfc73d80a723c9ce3b999ac9f2f9761f40c",
+        "web/device-ui/style.css": "9752c994e6672c191aa5481c284d0ff0a9a3c797d4be14794fba93cd5b60d36e",
+        "web/device-ui/app.js": "bfb2f8be66625c44cb661566b04048a4e56a500fa525038154639bc1a09b13dc"
+      },
+      "corrections": [
+        "Recorded native select clipping, sizing and outer label focus from the current phone stylesheet, already described in DESIGN.md.",
+        "Added a source-matched native select preview with the existing time-format options.",
+        "Normalized the flat-groups narrative rule to the documented elevation section identifier."
+      ],
+      "displaySurface": ".impeccable/surfaces/firmware-esphome-components-openathan-display-render-h.md"
     }
   },
   "components": [
@@ -349,6 +372,14 @@
       "description": "Existing optional external helper entry uses the device UI control shape and native link behavior; it is not required for standalone setup.",
       "html": "<a class=\"ds-helper-link\" target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://openathan.com/location/\">Find my location</a>",
       "css": ".ds-helper-link{display:inline-flex;align-items:center;min-height:44px;padding:9px 16px;border:1px solid var(--border,#7a8d9c);border-radius:8px;background:var(--surface,#19252f);color:var(--amber,#f0bb67);font:600 1rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);text-underline-offset:4px}.ds-helper-link:hover{text-decoration-thickness:2px}.ds-helper-link:focus-visible{outline:3px solid var(--amber,#f0bb67);outline-offset:3px}"
+    },
+    {
+      "name": "Native select",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Existing time-format select, including clipped closed values and the containing label focus outline; options remain native. Values are illustrative.",
+      "html": "<label class=\"ds-select\">Show times as<select><option value=\"24\">24-hour (13:30)</option><option value=\"12\">12-hour (1:30 PM)</option></select></label>",
+      "css": ".ds-select{display:block;overflow:hidden;font:500 .9375rem/1.5 var(--font,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif);color:var(--fg,#f3f6f8);margin-top:12px}.ds-select select{box-sizing:border-box;display:block;font:inherit;width:100%;min-width:0;min-height:48px;height:3rem;max-width:100%;margin-top:6px;border:1px solid var(--border,#7a8d9c);border-radius:8px;background:var(--surface,#19252f);color:var(--fg,#f3f6f8);padding:10px 12px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}.ds-select select:focus-visible,.ds-select:has(>select:focus){outline:3px solid var(--amber,#f0bb67);outline-offset:3px}"
     }
   ],
   "narrative": {
@@ -374,7 +405,7 @@
       {
         "name": "The Flat Groups Rule",
         "body": "Use rules and spacing for ordinary groups; reserve a\nbounded surface for a notice or playback state that needs separate attention.",
-        "section": "elevation & depth"
+        "section": "elevation"
       }
     ],
     "dos": [

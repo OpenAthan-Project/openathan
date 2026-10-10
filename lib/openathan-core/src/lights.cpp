@@ -63,8 +63,11 @@ LightMode light_mode(const LightSettings &s, const LightInputs &i) {
   if (!i.setup_complete || !i.clock_ready) return LightMode::WAITING;
   if (i.playing) return LightMode::PLAYING;
   if (!i.next_utc || *i.next_utc <= i.utc) return LightMode::OFF;
-  const auto left = *i.next_utc - i.utc;
-  return left <= 600 ? LightMode::RED : left <= 1800 ? LightMode::ORANGE : LightMode::GREEN;
+  return prayer_proximity(*i.next_utc - i.utc);
+}
+LightMode prayer_proximity(int64_t remaining_seconds) {
+  if (remaining_seconds <= 0) return LightMode::OFF;
+  return remaining_seconds <= 600 ? LightMode::RED : remaining_seconds <= 1800 ? LightMode::ORANGE : LightMode::GREEN;
 }
 const char *light_mode_name(LightMode mode) {
   switch (mode) {
@@ -102,14 +105,21 @@ LightFrame light_frame(LightMode mode, uint8_t brightness, uint64_t ms) {
 }
 bool LightSchedule::rebuild(DayCalculator &calculator, const Settings &settings, CivilDate date) {
   times_ = {};
+  previous_isha_.reset(); following_fajr_.reset();
   if (!valid_date(date) || !valid_settings(settings)) return false;
   const auto serial = day_number(date);
+  first_day_ = serial - 1;
+  enabled_ = settings.enabled;
   size_t at = 0;
-  for (int offset = -1; offset <= 1; ++offset) {
+  // Like the scheduler, guard days classify conflicts at both window edges.
+  // They never add independently selected LED/display timestamps.
+  for (int offset = -2; offset <= 2; ++offset) {
     const auto day = civil_date(serial + offset);
-    if (!valid_date(day)) { at += 5; continue; }
+    if (!valid_date(day)) { if (offset >= -1 && offset <= 1) at += 5; continue; }
     PrayerDay calculated;
     if (!calculator.calculate(settings, day, calculated)) { times_ = {}; return false; }
+    if (offset == -2) { previous_isha_ = calculated[5]; continue; }
+    if (offset == 2) { following_fajr_ = calculated[0]; continue; }
     for (unsigned index : {0U, 2U, 3U, 4U, 5U}) times_[at++] = calculated[index];
   }
   return true;
@@ -118,5 +128,32 @@ std::optional<int64_t> LightSchedule::next(int64_t utc) const {
   std::optional<int64_t> result;
   for (const auto &time : times_) if (time && *time > utc && (!result || *time < *result)) result = time;
   return result;
+}
+std::optional<Event> LightSchedule::next_event(int64_t utc) const {
+  size_t at = times_.size();
+  for (size_t i = 0; i < times_.size(); ++i)
+    if (times_[i] && *times_[i] > utc && (at == times_.size() || *times_[i] < *times_[at])) at = i;
+  if (at == times_.size()) return {};
+  const auto key = [this](size_t i) { return EventKey{first_day_ + static_cast<int32_t>(i / 5), static_cast<Prayer>(i % 5)}; };
+  Event event{key(at), *times_[at], enabled_[at % 5], {}};
+  // Match the scheduler's shared Isha/Fajr identity without filtering muted
+  // prayers or consulting consumption history. The LED timestamp stays raw.
+  const auto share = [&](EventKey isha, EventKey fajr) {
+    event.key = fajr; event.shared_with = isha;
+    if (!enabled_[0] && enabled_[4]) std::swap(event.key, *event.shared_with);
+    event.enabled = enabled_[0] || enabled_[4];
+  };
+  if (at % 5 == 0) {
+    const auto previous = at ? times_[at - 1] : previous_isha_;
+    if (previous == times_[at]) share({event.key.day - 1, Prayer::ISHA}, event.key);
+  } else if (at % 5 == 4) {
+    const auto following = at + 1 < times_.size() ? times_[at + 1] : following_fajr_;
+    if (following == times_[at]) {
+      share(event.key, {event.key.day + 1, Prayer::FAJR});
+    } else if (following && *times_[at] > *following) {
+      event.enabled = false;  // The scheduler suppresses a late overlapping Isha.
+    }
+  }
+  return event;
 }
 }  // namespace openathan

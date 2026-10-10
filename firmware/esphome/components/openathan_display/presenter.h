@@ -1,5 +1,6 @@
 #pragma once
 #include "openathan/scheduler.h"
+#include "openathan/lights.h"
 #include "openathan/time_format.h"
 #include <array>
 #include <cstdio>
@@ -12,12 +13,17 @@ struct Inputs {
   std::string_view local_time, next_time;
   uint8_t hours{24};
   bool stop_button{true};
+  bool round{};
+  std::optional<Event> visual_next;
+  int64_t utc{};
 };
 struct Frame {
   std::array<char, 9> clock{};
   std::array<char, 3> meridiem{};
   std::array<char, 9> heading{}, main{};
   std::array<char, 16> detail{}, footer{};
+  std::array<char, 16> countdown{};
+  LightMode proximity{LightMode::OFF};
   unsigned main_scale{2};
   bool error{}, upcoming{};
   bool operator==(const Frame &) const = default;
@@ -32,8 +38,23 @@ inline bool valid_time(std::string_view value) {
       value[1] >= '0' && value[1] <= '9' && (value[0] != '2' || value[1] <= '3') &&
       value[3] >= '0' && value[3] <= '5' && value[4] >= '0' && value[4] <= '9';
 }
+inline std::array<char, 16> format_countdown(int64_t seconds) {
+  std::array<char, 16> out{};
+  if (seconds <= 0) return out;
+  if (seconds < 60) { text(out, "In <1min"); return out; }
+  const auto minutes = seconds / 60 + (seconds % 60 != 0);
+  const auto hours = minutes / 60, remainder = minutes % 60;
+  int written;
+  if (!hours) written = std::snprintf(out.data(), out.size(), "In %lldmin", static_cast<long long>(minutes));
+  else if (!remainder) written = std::snprintf(out.data(), out.size(), "In %lldhr", static_cast<long long>(hours));
+  else written = std::snprintf(out.data(), out.size(), "In %lldhr %lldmin", static_cast<long long>(hours), static_cast<long long>(remainder));
+  // A valid three-day visual timetable fits. Never display truncated numbers.
+  if (written < 0 || static_cast<size_t>(written) >= out.size()) out = {};
+  return out;
+}
 inline Frame present(const Inputs &in) {
   Frame f;
+  const auto &next = in.round ? in.visual_next : in.status.next;
   f.clock = format_clock(in.clock_valid ? in.local_time : std::string_view{}, in.hours);
   if (!f.clock[0]) text(f.clock, "--:--");
   if (!in.wifi_connected) text(f.footer, "Offline");
@@ -49,17 +70,21 @@ inline Frame present(const Inputs &in) {
     text(f.heading, "Athan"); text(f.main, "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
   } else if (!in.clock_valid) {
     text(f.heading, "Time"); text(f.main, "Waiting"); text(f.detail, in.wifi_connected ? "Syncing clock" : "Connect Wi-Fi");
-  } else if (!in.prayers_enabled) {
+  } else if (!in.prayers_enabled && !in.round) {
     text(f.heading, "Athan"); text(f.main, "Off"); text(f.detail, "All prayers off");
-  } else if (in.status.next && valid_time(in.next_time)) {
+  } else if (next && (!in.round || next->utc > in.utc) && valid_time(in.next_time)) {
     f.upcoming = true;
-    text(f.heading, prayer_name(in.status.next->key.prayer)); const auto formatted = format_clock(in.next_time, in.hours);
+    text(f.heading, prayer_name(next->key.prayer)); const auto formatted = format_clock(in.next_time, in.hours);
     const std::string_view time(formatted.data());
     text(f.main, time.substr(0, time.find(' '))); f.main_scale = 3;
     if (in.hours == 12) text(f.meridiem, time.substr(time.size() - 2));
-    const bool skipped = in.status.skip && (*in.status.skip == in.status.next->key ||
-        (in.status.next->shared_with && *in.status.skip == *in.status.next->shared_with));
-    text(f.detail, skipped ? "Will be skipped" : in.status.automatic_ready ? "Next Athan" : "Not ready yet");
+    const bool skipped = in.status.skip && (*in.status.skip == next->key ||
+        (next->shared_with && *in.status.skip == *next->shared_with));
+    text(f.detail, skipped ? "Will be skipped" : in.round && !next->enabled ? "Muted" : in.status.automatic_ready ? "Next Athan" : "Not ready yet");
+    if (in.round) {
+      f.countdown = format_countdown(next->utc - in.utc);
+      f.proximity = prayer_proximity(next->utc - in.utc);
+    }
   } else {
     text(f.heading, "Athan"); text(f.main, "Waiting"); text(f.detail, "No time set");
   }

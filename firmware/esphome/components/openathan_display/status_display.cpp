@@ -25,10 +25,11 @@ void StatusDisplay::update() {
   const auto status = athan_->status();
   const auto *service = athan_->settings_service();
   const auto *saved = service && service->saved() ? &*service->saved() : nullptr;
+  const auto next_event = round_ ? athan_->next_visual_prayer(clock) : status.next;
   std::string local, next;
   if (saved && clock.valid) {
     local = athan_->format_local(clock.utc, saved->value.timezone);
-    if (status.next) next = athan_->format_local(status.next->utc, saved->value.timezone);
+    if (next_event) next = athan_->format_local(next_event->utc, saved->value.timezone);
   }
   // format_local uses the saved timezone and its recurring DST rules, never the SNTP UTC zone.
   const auto hhmm = [](const std::string &value) -> std::string_view {
@@ -39,7 +40,8 @@ void StatusDisplay::update() {
   const ::openathan::screen::Inputs input{status, athan_->activated(),
       std::strcmp(athan_->setup_state(), "storage_fault") == 0 || (service && !service->healthy()),
       clock.valid, wifi::global_wifi_component && wifi::global_wifi_component->is_connected(),
-      enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), stop_button_};
+      enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), stop_button_,
+      round_, next_event, clock.utc};
   if (cache_.accept(::openathan::screen::present(input))) display_->update();
 }
 }
