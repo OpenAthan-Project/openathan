@@ -1,6 +1,7 @@
 #pragma once
 #include "esphome/core/component.h"
 #include <esp_sntp.h>
+#include <cstdint>
 #include <ctime>
 #include <functional>
 #include <utility>
