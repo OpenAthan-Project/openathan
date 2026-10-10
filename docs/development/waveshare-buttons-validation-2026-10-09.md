@@ -1,9 +1,10 @@
-# Waveshare BOOT controls — automated validation, 2026-10-09
+# Waveshare BOOT controls — validation, 2026-10-09
 
 The isolated Waveshare V2 profiles map BOOT to the reference Atom's stop,
 skip-next and cancel-skip actions. The [profile](waveshare-box-v2.md#physical-controls)
-records GPIO0 wiring, release timing and recovery behavior. Physical button
-acceptance remains pending; these results establish source/build behavior only.
+records GPIO0 wiring, release timing and recovery behavior. Automated checks and
+attended stop, skip, cancel-skip and RESET persistence checks passed on one V2
+unit. Exact timing boundaries and physical download-mode recovery remain untested.
 
 ## Firmware capacity
 
@@ -37,11 +38,56 @@ static figures do not establish runtime heap, fragmentation or PSRAM headroom.
 - The real display adapter rendered the correct button/phone guidance for both
   square and round layouts, with unchanged-frame refresh suppression.
 
-## Hardware limits
+## Attended button acceptance
 
-No device was accessed or flashed for these checks. BOOT stop/skip/cancel timing,
-restart/download-mode recovery and runtime memory during button/audio/network
-activity require a separately approved attended application-only installation.
-Preserve current settings, consumption history and shared audio under the linked
-runbooks. Synthetic CI recordings and these compile-only images must not be
-installed or played. This change does not qualify a public release.
+The attended builds used source
+[`a728f3c214883d38e53ed43c88c4d9d8fa28e8c2`](https://github.com/OpenAthan-Project/openathan/commit/a728f3c214883d38e53ed43c88c4d9d8fa28e8c2),
+the same pinned toolchain, private configuration and approved real shared audio.
+The public compile-only images and synthetic fixtures above were not installed.
+
+| Physical action | Observed result |
+| --- | --- |
+| BOOT about 0.5 seconds, released during normal Athan | Audible playback stopped; “Button to stop” guidance was correct. |
+| BOOT about 3 seconds, released | The next Fajr was saved as skipped; “Will be skipped” appeared. |
+| Brief RESET press | A new boot returned synchronized and ready, retaining the skip and saved state. |
+| BOOT about 7 seconds, released | The skip cleared and normal next-prayer guidance returned. |
+
+Hold times were approximate. Stop acceptance uses operator audible confirmation
+and subsequent idle readback; the first playing-state HTTP read returned after
+the physical stop. Settings, consumption history, preferences and setup matched
+after the tests and final startup, with no skip remaining.
+
+Both applications passed capacity inspection and were installed with one
+application-only write each. Independent complete 16 MiB readbacks verified the
+exact image and every byte outside its application erase extent before restart.
+Bootloader, partitions, OTA metadata, inactive application and shared audio were
+preserved. Private diagnostics and recovery evidence remain outside Git.
+
+- Temporary diagnostic OTA: **1,345,536 bytes**, SHA-256
+  `4cd264a29762ec042272d65dd7ccdeabb88015221cb99e0d46a0f1afdeaad5c5`.
+- Final clean development OTA: **1,258,896 bytes**, SHA-256
+  `5ec0dd504024db3fb5a1e70fadc81937354d24d438c8b23e81821d05b8552322`.
+  Growth over the previous clean image is **2,640 bytes**, leaving **313,968 bytes**
+  within the application budget. The diagnostic native API is excluded.
+
+The final clean-image screen was confirmed upright, with saved brightness,
+12-hour time and no skipped-prayer message. Compatible application-only USB
+recovery is retained; the inactive vendor image remains an unqualified fallback.
+
+## Runtime observations and limits
+
+The temporary diagnostic image supplied 32 encrypted telemetry samples during
+brief playback, network/control activity and one planned physical RESET.
+Minimum sampled internal free heap/largest block were **217,576/176,128 bytes**;
+the reported internal low-water mark was **207,000 bytes**. Minimum sampled PSRAM
+free/largest block were **6,973,060/6,815,744 bytes**. No codec/display fault sample
+or unexpected uptime regression was observed.
+
+These samples do not establish continuous peak use, fragmentation bounds or
+clean-image runtime headroom. Exact click boundaries and unassigned gaps,
+BOOT-held physical download-mode recovery and clean-image runtime memory remain
+untested. No full listening, scheduled occurrence, cold-power or hour-long soak
+was repeated; [earlier evidence](waveshare-validation-2026-10-09.md) retains its
+source limits. The [intermittent HTTP finding](waveshare-network-development-2026-10-09.md)
+remains unresolved. Public updates remain disabled; this development acceptance
+does not qualify a public release.
