@@ -82,6 +82,8 @@ class WaveshareCapacityTests(unittest.TestCase):
     def test_volume_routes_for_each_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            # Included diagnostic profiles fall back to the main config's secrets.
+            (root / 'secrets.yaml').write_text('diagnostic_api_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=\n')
             for profile in ('waveshare/audio', 'waveshare/development',
                             'waveshare/diagnostics', 'openathan'):
                 with self.subTest(profile=profile):
