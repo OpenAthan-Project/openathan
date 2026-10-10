@@ -44,7 +44,12 @@ speaker:
     bits_per_sample: 16bit
     sample_rate: 44100
     channel: mono
-    audio_dac: waveshare_dac
+    # Keep the codec at fixed 0 dB through waveshare_box_audio. Without an
+    # audio_dac binding, ESPHome applies its existing software volume curve.
+
+media_player:
+  - id: !extend athan_player
+    volume_max: 100%
 
 waveshare_box_audio:
   id: waveshare_audio
