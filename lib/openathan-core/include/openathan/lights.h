@@ -52,13 +52,20 @@ struct LightInputs {
   int64_t utc{};
 };
 LightMode light_mode(const LightSettings &settings, const LightInputs &inputs);
+LightMode prayer_proximity(int64_t remaining_seconds);
 LightFrame light_frame(LightMode mode, uint8_t brightness, uint64_t monotonic_ms);
 // Raw calculated prayer times, independent of audible eligibility and history.
 class LightSchedule {
  public:
   bool rebuild(DayCalculator &calculator, const Settings &settings, CivilDate date);
   std::optional<int64_t> next(int64_t utc) const;
+  // Read-only identity/eligibility view for displays; timestamp selection stays
+  // identical to next(), including muted and suppressed calculated prayers.
+  std::optional<Event> next_event(int64_t utc) const;
  private:
   std::array<std::optional<int64_t>, 15> times_{};
+  std::optional<int64_t> previous_isha_, following_fajr_;
+  int32_t first_day_{};
+  std::array<bool, 5> enabled_{};
 };
 }  // namespace openathan

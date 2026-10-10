@@ -64,6 +64,8 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void update() override;
   ::openathan::ClockSample read() override;
   ::openathan::SchedulerStatus status() const;
+  // Read-only calculated prayer cue, including muted and skipped occurrences.
+  std::optional<::openathan::Event> next_visual_prayer(const ::openathan::ClockSample &now);
   void stop();
   bool skip_next();
   bool cancel_skip();
@@ -80,6 +82,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
  private:
   void log_status_();
   void update_lights_();
+  void refresh_light_schedule_(const ::openathan::ClockSample &now);
   ::openathan::LightOutput *light_output_{};
   ::openathan::DisplayOutput *display_output_{};
   NvsDisplayStore display_store_;

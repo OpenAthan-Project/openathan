@@ -6,7 +6,8 @@
 using namespace openathan;
 #define CHECK(c) do { if (!(c)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #c); std::abort(); } } while (0)
 struct Calculator : DayCalculator {
-  bool fail{}, empty{}, overlap{};
+  bool fail{}, empty{};
+  unsigned overlap{};
   bool calculate(const Settings &s, CivilDate date, PrayerDay &out) override {
     out = {};
     if (fail) return false;
@@ -14,7 +15,7 @@ struct Calculator : DayCalculator {
     const int64_t day = int64_t(day_number(date)) * 86400;
     const int hours[]{5, 6, 12, 15, 18, 20};
     for (unsigned i = 0; i < 6; ++i) out[i] = day + hours[i] * 3600 + s.offsets[i] * 60;
-    if (overlap) out[5] = day + 29 * 3600; // Coincident with next day's Fajr.
+    if (overlap) out[5] = day + 29*3600 + (overlap-1)*1800; // Shared or late Isha, before sunrise.
     return true;
   }
 };
@@ -50,16 +51,43 @@ void timetable() {
   const CivilDate date{2026,9,29}; const int64_t day=int64_t(day_number(date))*86400;
   CHECK(schedule.rebuild(calculator,s,date));
   CHECK(schedule.next(day+5*3600-1)==day+5*3600);
+  const auto muted = schedule.next_event(day+5*3600-1);
+  CHECK(muted && muted->key == EventKey({day_number(date),Prayer::FAJR}) && !muted->enabled);
+  CHECK(muted->utc == *schedule.next(day+5*3600-1));
   CHECK(schedule.next(day+5*3600)==day+12*3600); // No sunrise or audio eligibility filter.
   CHECK(schedule.next(day+23*3600)==day+29*3600);
   CHECK(schedule.next(day+4*3600)==day+5*3600); // Backward correction.
   s.offsets[0]=30; CHECK(schedule.rebuild(calculator,s,date));
   CHECK(schedule.next(day+5*3600)==day+5*3600+1800);
-  calculator.overlap=true; s.offsets[0]=0; CHECK(schedule.rebuild(calculator,s,date));
+  calculator.overlap=1; s.offsets[0]=0; CHECK(schedule.rebuild(calculator,s,date));
   CHECK(schedule.next(day+28*3600)==day+29*3600);
+  auto shared = schedule.next_event(day+28*3600);
+  CHECK(shared && shared->key == EventKey({day_number(date)+1,Prayer::FAJR}));
+  CHECK(shared->shared_with == EventKey({day_number(date),Prayer::ISHA}) && !shared->enabled);
+  s.enabled[4]=true; CHECK(schedule.rebuild(calculator,s,date));
+  shared = schedule.next_event(day+28*3600);
+  CHECK(shared->key == EventKey({day_number(date),Prayer::ISHA}) && shared->enabled);
+  CHECK(shared->shared_with == EventKey({day_number(date)+1,Prayer::FAJR}));
+  s.enabled[0]=true; CHECK(schedule.rebuild(calculator,s,date));
+  shared = schedule.next_event(day+28*3600);
+  CHECK(shared->key.prayer == Prayer::FAJR && shared->enabled);
+  // Guard days retain both identities at either edge without adding targets.
+  shared = schedule.next_event(day-86400+5*3600-1);
+  CHECK(shared->key == EventKey({day_number(date)-1,Prayer::FAJR}));
+  CHECK(shared->shared_with == EventKey({day_number(date)-2,Prayer::ISHA}));
+  shared = schedule.next_event(day+86400+19*3600);
+  CHECK(shared->key == EventKey({day_number(date)+2,Prayer::FAJR}));
+  CHECK(shared->shared_with == EventKey({day_number(date)+1,Prayer::ISHA}));
   CHECK(schedule.next(day+29*3600)==day+36*3600);
+  calculator.overlap=2; CHECK(schedule.rebuild(calculator,s,date));
+  const auto suppressed = schedule.next_event(day+29*3600);
+  CHECK(suppressed && suppressed->key.prayer == Prayer::ISHA && !suppressed->enabled);
+  CHECK(suppressed->utc == *schedule.next(day+29*3600));
+  const auto edge = schedule.next_event(day+86400+19*3600);
+  CHECK(edge && edge->key.prayer == Prayer::ISHA && !edge->enabled);
   calculator.empty=true; CHECK(schedule.rebuild(calculator,s,date)); CHECK(!schedule.next(day));
   calculator.fail=true; CHECK(!schedule.rebuild(calculator,s,date)); CHECK(!schedule.next(day));
+  CHECK(!schedule.next_event(day));
 }
 void records() {
   const SavedLights original{42,{false,37}}; const auto encoded=encode_lights(original);

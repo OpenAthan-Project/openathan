@@ -253,6 +253,22 @@ void OpenAthan::update_lights_() {
   if (monotonic_ms < light_next_frame_) return;
   light_next_frame_ = monotonic_ms + 50;
   const auto now = read();
+  refresh_light_schedule_(now);
+  const bool fault = (scheduler_ && scheduler_->fault() != ::openathan::Fault::NONE) ||
+      (settings_service_ && !settings_service_->healthy()) ||
+      (setup_gate_ && !setup_gate_->healthy()) || volume_attempts_ >= 20 ||
+      (now.valid && activated() && !light_schedule_ok_);
+  const auto &saved = light_preferences_.saved();
+  light_mode_ = saved ? ::openathan::light_mode(saved->value,
+      {maintenance_, fault, activated(), now.valid, playback_ && playback_->playing(),
+       light_schedule_ok_ ? light_schedule_.next(now.utc) : std::nullopt, now.utc}) : ::openathan::LightMode::OFF;
+  const auto frame = ::openathan::light_frame(light_mode_, saved ? saved->value.brightness_percent : 0, monotonic_ms);
+  if (monotonic_ms < light_retry_at_ || (light_applied_ && *light_applied_ == frame)) return;
+  light_output_ok_ = light_output_->apply(frame);
+  if (light_output_ok_) { light_applied_ = frame; light_retry_at_ = 0; }
+  else { light_applied_.reset(); light_retry_at_ = monotonic_ms + 1000; }
+}
+void OpenAthan::refresh_light_schedule_(const ::openathan::ClockSample &now) {
   const bool time_jump = now.utc < light_last_utc_ || now.utc - light_last_utc_ > 2;
   light_last_utc_ = now.utc;
   if (now.valid && activated() && settings_service_ && settings_service_->healthy()) {
@@ -267,19 +283,10 @@ void OpenAthan::update_lights_() {
     light_day_ = ::openathan::NEVER_CONSUMED;
     light_schedule_ok_ = false;
   }
-  const bool fault = (scheduler_ && scheduler_->fault() != ::openathan::Fault::NONE) ||
-      (settings_service_ && !settings_service_->healthy()) ||
-      (setup_gate_ && !setup_gate_->healthy()) || volume_attempts_ >= 20 ||
-      (now.valid && activated() && !light_schedule_ok_);
-  const auto &saved = light_preferences_.saved();
-  light_mode_ = saved ? ::openathan::light_mode(saved->value,
-      {maintenance_, fault, activated(), now.valid, playback_ && playback_->playing(),
-       light_schedule_ok_ ? light_schedule_.next(now.utc) : std::nullopt, now.utc}) : ::openathan::LightMode::OFF;
-  const auto frame = ::openathan::light_frame(light_mode_, saved ? saved->value.brightness_percent : 0, monotonic_ms);
-  if (monotonic_ms < light_retry_at_ || (light_applied_ && *light_applied_ == frame)) return;
-  light_output_ok_ = light_output_->apply(frame);
-  if (light_output_ok_) { light_applied_ = frame; light_retry_at_ = 0; }
-  else { light_applied_.reset(); light_retry_at_ = monotonic_ms + 1000; }
+}
+std::optional<::openathan::Event> OpenAthan::next_visual_prayer(const ::openathan::ClockSample &now) {
+  refresh_light_schedule_(now);
+  return light_schedule_ok_ ? light_schedule_.next_event(now.utc) : std::nullopt;
 }
 void OpenAthan::quiesce_for_maintenance() {
   maintenance_ = true;

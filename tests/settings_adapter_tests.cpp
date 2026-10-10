@@ -28,11 +28,13 @@ struct Calculator : DayCalculator {
   Settings last_settings;
   unsigned calls{};
   int shift_seconds{};
+  unsigned overlap{};
   bool calculate(const Settings &s, CivilDate date, PrayerDay &out) override {
     ++calls;
     last_settings = s;
     constexpr unsigned hours[] = {5,6,12,15,18,20};
     for (unsigned i=0; i<6; ++i) out[i] = epoch(date,hours[i])+60*s.offsets[i]+shift_seconds;
+    if (overlap) out[5] = epoch(date,29)+(overlap-1)*1800+60*s.offsets[5]+shift_seconds;
     return true;
   }
 };
@@ -332,6 +334,115 @@ static void display_adapter() {
   esphome::openathan_display::StatusDisplay absent;
   absent.setup(); CHECK(absent.is_failed());
   esphome::wifi::global_wifi_component = nullptr;
+}
+
+static void round_display_adapter() {
+  struct LCD : esphome::display::Display {
+    std::array<uint32_t,360*360> pixels{};
+    int get_width() override { return 360; }
+    int get_height() override { return 360; }
+    void fill(esphome::Color) override { pixels.fill(0); }
+    void draw_pixel_at(int x,int y,esphome::Color color) override {
+      CHECK(x>=0 && x<360 && y>=0 && y<360);
+      pixels[y*360+x]=(uint32_t(color.red)<<16)|(uint32_t(color.green)<<8)|color.blue;
+    }
+    void text(const char *expected,int y,int scale,uint32_t color) {
+      std::array<uint32_t,360*360> reference{};
+      auto pixel=[&](int x,int yy,uint32_t rgb) { reference[yy*360+x]=rgb; };
+      openathan::screen::draw_text(pixel,expected,y,scale,color,360);
+      // Compare text inside the ring; its curved sides cross the footer band.
+      for (int yy=y; yy<y+8*scale; ++yy) for (int x=60; x<300; ++x) {
+        const int dx=2*x+1-360, dy=2*yy+1-360;
+        if (dx*dx+dy*dy>=328*328) continue;
+        if (pixels[yy*360+x]!=reference[yy*360+x])
+          std::fprintf(stderr,"Round text '%s' differs at (%d,%d): %06x vs %06x\n",expected,x,yy,
+                       pixels[yy*360+x],reference[yy*360+x]);
+        CHECK(pixels[yy*360+x]==reference[yy*360+x]);
+      }
+    }
+    void countdown(const char *value,uint32_t ring) {
+      text(value,252,2,0xD0D8D8); CHECK(pixels[8*360+179]==ring);
+    }
+  } lcd;
+  esphome::wifi::WiFiComponent wifi;
+  esphome::wifi::global_wifi_component=&wifi;
+  Fixture f; // No physical LED output, with LED preferences disabled.
+  esphome::openathan_component::NvsLightStore preferences;
+  SavedLights initial; CHECK(preferences.load(initial)==LoadResult::EMPTY);
+  CHECK(preferences.save({1,{false,20}})); f.begin();
+  auto settings=f.value(); settings.prayer.enabled[0]=false;
+  CHECK(f.save(settings)==SettingsResult::SAVED);
+  CHECK(f.device.status().next->key.prayer==Prayer::DHUHR);
+  esphome::openathan_display::StatusDisplay screen;
+  screen.set_round(true); screen.set_display(&lcd); screen.set_openathan(&f.device);
+  lcd.set_writer([&](esphome::display::Display &canvas) { screen.draw(canvas); });
+  screen.setup(); CHECK(!screen.is_failed());
+  lcd.text("Fajr",140,4,0xFFFFFF); lcd.text("05:00",188,6,0xFFFFFF);
+  lcd.text("Muted",112,2,0xD0D8D8); lcd.countdown("In 1hr",0x00FF00);
+  auto calculations=f.calculator.calls, updates=lcd.updates;
+  const auto durable=nvs_test::committed; const auto writes=nvs_test::writes;
+  for (unsigned i=0; i<20; ++i) screen.update();
+  CHECK(lcd.updates==updates && f.calculator.calls==calculations);
+  CHECK(nvs_test::writes==writes && nvs_test::committed==durable);
+  f.device.step(1); screen.update(); CHECK(lcd.updates==updates);
+  f.device.utc=epoch({2026,9,25},4)+29*60+59; f.device.step(0); screen.update();
+  lcd.countdown("In 31min",0x00FF00);
+  f.device.step(1); screen.update(); lcd.countdown("In 30min",0xFF6000);
+  f.device.step(20*60); screen.update(); lcd.countdown("In 10min",0xFF0000);
+  wifi.connected=false; screen.update(); lcd.text("Offline",310,2,0xD0D8D8);
+  lcd.countdown("In 10min",0xFF0000); CHECK(f.device.status().automatic_ready);
+  settings=f.value(); settings.prayer.offsets[0]=30;
+  CHECK(f.save(settings)==SettingsResult::SAVED); screen.update();
+  lcd.text("05:30",188,6,0xFFFFFF); lcd.countdown("In 40min",0x00FF00);
+  settings.prayer.enabled.fill(false); CHECK(f.save(settings)==SettingsResult::SAVED); screen.update();
+  CHECK(!f.device.status().next); lcd.text("Muted",112,2,0xD0D8D8);
+  lcd.countdown("In 40min",0x00FF00);
+  f.calculator.shift_seconds=-40*60; f.device.reload_schedule(); screen.update();
+  lcd.text("Dhuhr",140,4,0xFFFFFF); lcd.text("11:20",188,6,0xFFFFFF);
+  // Moving the clock back rebuilds the visual window, without replaying history.
+  f.device.utc=epoch({2026,9,25},4); f.device.step(0); screen.update();
+  lcd.text("Fajr",140,4,0xFFFFFF); lcd.countdown("In 50min",0x00FF00);
+  f.device.failed_clock_read=true; screen.update(); CHECK(lcd.pixels[8*360+179]==0);
+  f.device.failed_clock_read=false;
+  f.calculator.shift_seconds=0; settings.prayer.offsets[0]=0;
+  settings.prayer.enabled.fill(true); CHECK(f.save(settings)==SettingsResult::SAVED);
+  CHECK(f.device.skip_next()); screen.update();
+  // Consumption history can make the audible skip refer to a later prayer.
+  // The visual timetable still shows this calculated Fajr without that label.
+  lcd.text("Next Athan",112,2,0xD0D8D8);
+  f.device.utc=epoch({2026,9,26},4); f.device.step(0);
+  CHECK(f.device.skip_next()); screen.update(); lcd.text("Will be skipped",112,2,0xD0D8D8);
+  lcd.countdown("In 1hr",0x00FF00);
+  f.device.utc=epoch({2026,9,25},23)+59*60; f.device.step(0); screen.update();
+  lcd.text("Fajr",140,4,0xFFFFFF); lcd.countdown("In 5hr 1min",0x00FF00);
+  f.device.step(60); screen.update(); lcd.countdown("In 5hr",0x00FF00);
+  settings=f.value(); settings.timezone={"America/Toronto",18000,14400,
+      {7200,0,DstRuleType::MONTH_WEEK_DAY,3,2,0}, {7200,0,DstRuleType::MONTH_WEEK_DAY,11,1,0}};
+  CHECK(f.save(settings)==SettingsResult::SAVED);
+  f.device.utc=epoch({2026,3,8},6)+59*60; f.device.step(0); screen.update();
+  lcd.text("01:59",64,2,0xD0D8D8); lcd.countdown("In 5hr 1min",0x00FF00);
+  f.device.step(60); screen.update(); lcd.text("03:00",64,2,0xD0D8D8); lcd.countdown("In 5hr",0x00FF00);
+  f.device.utc=epoch({2026,11,1},5)+59*60; f.device.step(0); screen.update();
+  lcd.text("01:59",64,2,0xD0D8D8); lcd.countdown("In 6hr 1min",0x00FF00);
+  f.device.step(60); screen.update(); lcd.text("01:00",64,2,0xD0D8D8); lcd.countdown("In 6hr",0x00FF00);
+  // The same occurrence identity is exposed by the LED timetable and scheduler.
+  Fixture shared; shared.calculator.overlap=1; shared.device.utc=epoch({2026,9,25},19); shared.begin();
+  screen.set_openathan(&shared.device); screen.update();
+  CHECK(shared.device.status().next->shared_with);
+  const auto visual=shared.device.next_visual_prayer(shared.device.read()), audible=shared.device.status().next;
+  CHECK(visual && audible && visual->key==audible->key && visual->utc==audible->utc &&
+        visual->enabled==audible->enabled && visual->shared_with==audible->shared_with);
+  lcd.text("Fajr",140,4,0xFFFFFF); lcd.countdown("In 10hr",0x00FF00);
+  CHECK(shared.device.skip_next()); screen.update(); lcd.text("Will be skipped",112,2,0xD0D8D8);
+  shared.calculator.overlap=2; shared.device.reload_schedule();
+  shared.device.utc=epoch({2026,9,26},5)+60; shared.device.step(0); screen.update();
+  lcd.text("Isha",140,4,0xFFFFFF); lcd.text("Muted",112,2,0xD0D8D8);
+  // A failed round screen cannot interrupt an enabled automatic announcement.
+  Fixture healthy; healthy.begin(); screen.set_openathan(&healthy.device);
+  lcd.mark_failed(); screen.update(); CHECK(healthy.device.upgrade_health());
+  healthy.device.utc=epoch({2026,9,25},5)-1; healthy.device.step(0); healthy.device.step(1);
+  CHECK(healthy.audio.starts==1);
+  esphome::wifi::global_wifi_component=nullptr;
 }
 
 static void display_button_guidance() {
@@ -776,6 +887,7 @@ static void json_transport() {
 int main() {
   upgrade_boot_scheduler_health();
   display_adapter();
+  round_display_adapter();
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST

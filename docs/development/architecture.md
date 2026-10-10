@@ -96,6 +96,10 @@ while the C126 board layer owns SPI and its internal-bus backlight adapter.
 Optional saved brightness uses `display_output_id` and the portable
 `DisplayOutput` backlight capability, with independent persistence and revisions.
 Backlight failures never gate scheduling or update health.
+The Waveshare round display also reads the portable LED timetable's calculated
+prayer identity and UTC time for its ring/countdown, independently of LED output
+or preferences. This read-only view includes muted/skipped prayers, preserves
+schedule conflict/cache handling and never changes announcement history.
 See the [display contract](../../firmware/esphome/components/openathan_display/README.md)
 for its compatibility and acceptance limits. Broader display and control mappings remain planned;
 `firmware/esphome/examples/custom-hardware.yaml` illustrates that future mapping
