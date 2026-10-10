@@ -1,4 +1,4 @@
-# Waveshare volume build checks — 2026-10-10
+# Waveshare volume build and attended validation — 2026-10-10
 
 The Waveshare Box V2 volume change replaces the inherited 60% codec ceiling
 with fixed 0 dB codec output and ESPHome software attenuation. Codec gain and
@@ -28,15 +28,60 @@ change. Both use the same configurations, compile-only fixtures, ESPHome
 Both 2 MiB application slots and the separate 3.5 MiB shared audio partition
 remain unchanged. Compile-only fixture builds must never be installed or played.
 
-## Physical validation pending
+## Attended physical validation
 
-These checks do not establish audible loudness, distortion, sustained playback
-or runtime heap/PSRAM headroom. Attended testing must use the approved real
-recordings and a separately verified application-only candidate, starting at low
-volume before testing 50%, 80% and 100%. Verify silence at zero, volume changes,
-Stop, concurrent network/display activity and cold-restart persistence.
+One Box V2 unit with 16 MiB flash and 8 MiB PSRAM was tested with approved real
+recordings and the isolated diagnostic application from source
+`264b4f734bc9dbb3499bc36caa8dab30d8ab04b8`, whose tree matches merged revision
+`96670c1e30a9d4c16ca522ac976f41682acb3ccd`. These observations apply to the
+new volume mapping on that development source.
 
-Reidentify the live unit and preserve settings, prayer history, shared audio and
-fresh compatible recovery according to the
-[hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md).
-The earlier dated Waveshare listening results cover the previous volume mapping.
+| Listening check | Owner-confirmed result |
+| --- | --- |
+| Normal Athan at 20% | Audible and clear |
+| Live increase to 50% | Louder and clear |
+| Normal Athan at 80% | Good volume and clear compared with before the fix |
+| Live increase to 100% | Clear, no distortion |
+| Live mute to zero while playback remained active | Completely silent |
+| Complete Fajr recording at 80% after cold restart | Clear throughout, including the Fajr-specific wording |
+
+Normal playback used bounded 60- and 180-second samples. Stop returned the player
+to idle. The full Fajr recording completed naturally before its watchdog Stop
+command. After all power was disconnected for ten seconds, a fresh power-on boot
+returned idle at the saved 80%; settings, revision, prayer history and preferences
+matched the fresh pre-cut baseline. Clock synchronization returned through SNTP;
+this does not establish RTC retention after power loss.
+
+Across the audio windows, 40 diagnostic telemetry samples and 52 authenticated
+status polls recorded no codec/display faults, unexpected resets, scheduler faults
+or failed status requests. Minimum sampled internal free/largest block was
+215,564 / 172,032 bytes; minimum sampled free PSRAM was 6,972,840 bytes. Two
+`openathan_device` operation warnings (64 ms and 51 ms) occurred without a failed
+request or playback error. These memory measurements cover the diagnostic image.
+
+## Clean development installation and limits
+
+Fresh matching full-flash reads, live identity/partition/security checks, zero
+NVS integrity errors and the approved shared-audio hash preceded an application-only
+clean installation using the [hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md).
+Complete independent readback verified the candidate and every byte outside its
+sector erase extent. The retained application identities are:
+
+| Application | OTA bytes | SHA-256 |
+| --- | ---: | --- |
+| Attended diagnostics | 1,349,792 | `9cde040ee8fec0231f5e0708a679591e74752a0961796d469e547ce8bc513c42` |
+| Final clean development | 1,262,864 | `3b9fd7bddeecb27b1d876bf922b69243812b5bcce88421ffef90567ae4891825` |
+
+The final clean application booted ready and idle with the original 80% settings
+restored, settings/history/preferences and shared audio preserved, and the native
+diagnostic API closed. Fresh compatible application recovery and private evidence
+remain outside Git. Historical full-flash restoration would also restore old
+settings/history and is not routine recovery.
+
+The complete normal recording, physical stop button, real scheduled announcement
+and a new long soak were not repeated in this focused volume session. Clean-image
+runtime heap/fragmentation/PSRAM remains unmeasured. Earlier button and scheduled
+playback evidence remains separate, as do unresolved intermittent HTTP timeouts.
+These results establish focused development acceptance; they do not qualify the
+later [v0.5.0 production candidate](v0.5.0-preparation-2026-10-10.md), its production
+storage, signed updates or recovery.

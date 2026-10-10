@@ -95,11 +95,14 @@ will sound louder at the same percentage after this change. Start attended
 listening checks at a low setting before increasing volume.
 
 This curve follows the [pinned ESPHome speaker implementation](https://github.com/esphome/esphome/blob/2026.9.0/esphome/components/i2s_audio/speaker/i2s_audio_speaker.cpp).
-Physical loudness, distortion and runtime memory under concurrent playback,
-networking and display activity require separate attended validation. The
-earlier dated listening results apply to the previous volume mapping.
-See the [volume build checks](waveshare-volume-build-2026-10-10.md) for firmware
-size comparisons, automated coverage and pending physical validation.
+Attended checks on one development unit confirmed clear normal samples at
+20%, 50%, 80% and 100%, silence at zero, and clear complete Fajr playback at 80%
+after cold restart. Saved settings/history were preserved, and the clean
+development application was restored at 80%. See the
+[volume build and attended validation report](waveshare-volume-build-2026-10-10.md)
+for exact images, size comparisons, diagnostic runtime measurements and remaining
+limits. Clean-image runtime memory, a new real scheduled announcement and the
+later production candidate remain separately unqualified by this session.
 
 ### RTC and offline restart
 
