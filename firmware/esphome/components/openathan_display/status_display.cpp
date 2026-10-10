@@ -39,7 +39,7 @@ void StatusDisplay::update() {
   const ::openathan::screen::Inputs input{status, athan_->activated(),
       std::strcmp(athan_->setup_state(), "storage_fault") == 0 || (service && !service->healthy()),
       clock.valid, wifi::global_wifi_component && wifi::global_wifi_component->is_connected(),
-      enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), !round_};
+      enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), stop_button_};
   if (cache_.accept(::openathan::screen::present(input))) display_->update();
 }
 }
