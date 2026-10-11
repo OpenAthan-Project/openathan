@@ -1,8 +1,9 @@
 # Firmware release preparation
 
-[v0.4.0](../releases/v0.4.0.md) is the published stable reference release.
-The v0.5.0 candidate adds Waveshare Box V2 alongside Atom. Candidate preparation
-does not establish physical installer/update qualification or publication.
+[v0.5.0](../releases/v0.5.0.md) is the published stable release for Atom and
+Waveshare Box V2. The [release qualification report](release-validation-2026-10-10.md)
+records exact production images, attended Waveshare installation/update results,
+public delivery and remaining limits.
 The [v0.4.0 preparation record](v0.4.0-preparation-2026-10-07.md) records its
 automated builds and physical-validation limits. The earlier
 [release evidence](release-validation-2026-10-04.md) records reference-device
@@ -28,7 +29,7 @@ revision containing that approval and the exact approved MP3 files. Other privat
 test recordings, CI audio fixtures and historical recovery images are not release
 inputs. This tooling never flashes or publishes. Once a qualified release is
 explicitly published as stable latest, the website's automatic policy can adopt
-it after validation. See the [current release evidence](release-validation-2026-10-04.md).
+it after validation. See the [current release evidence](release-validation-2026-10-10.md).
 
 ## Prerequisites
 

@@ -1,24 +1,25 @@
 # Roadmap
 
-Status as of **2026-10-04**, following the v0.3.0 reference release and verified
+Status as of **2026-10-10 Toronto**, following the v0.5.0 release and verified
 website adoption. Checked items describe implemented or published capabilities,
 not blanket physical qualification. See the
-[current release evidence and limits](release-validation-2026-10-04.md), [earlier device results](feasibility-report.md)
+[current release evidence and limits](release-validation-2026-10-10.md), [earlier device results](feasibility-report.md)
 and [upgrade qualification](upgrade-qualification-2026-10-01.md).
 
 ## Current milestone
 
-The standalone Athan reference experience is available on AtomS3R C126 +
-Voice Pyramid A167: precompiled USB installation, local setup/settings,
+The standalone Athan experience is available on AtomS3R C126 + Voice Pyramid A167
+and Waveshare Box V2: precompiled USB installation, local setup/settings,
 scheduled stored normal/Fajr audio, durable skip/replay protection, optional
-prayer lights, an optional GC9107 clock/prayer/playback display, USB credential
+Atom prayer lights, hardware-specific clock/prayer/playback displays, USB credential
 recovery and owner-requested signed application updates. The website verifies
 and adopts approved stable releases; it never compiles firmware or updates a
 speaker on its owner's behalf.
 
-The reference firmware needs internet time synchronization after a cold boot.
-Waveshare development firmware includes RTC restoration after a powered reset;
-[physical RTC acceptance](waveshare-rtc-validation-2026-10-10.md) is pending.
+Atom firmware needs internet time synchronization after a cold boot. Waveshare
+production firmware includes RTC restoration after a powered reset, following
+initial internet time synchronization. [Attended powered RESET validation](waveshare-rtc-validation-2026-10-10.md#attended-powered-reset-validation)
+passed; unplugged retention and RTC-only scheduled listening remain unqualified.
 Once the clock is valid, calculations and stored-recording playback operate
 without the public website or Home Assistant. Compatible firmware updates
 preserve installed audio; replacing recordings is separate from application OTA.
@@ -35,7 +36,8 @@ preserve installed audio; replacing recordings is separate from application OTA.
 - [ ] Qualify broader hardware/browser/network coverage and longer runtime operation.
 
 Measurements and physical results remain tied to their tested images. The
-linked v0.3.0 evidence does not include a new physical fresh-install test or a
+[earlier v0.3.0 evidence](release-validation-2026-10-04.md) does not include a new
+physical fresh-install test or a
 public OTA application-transfer/slot-switch test. Its focused instrumented
 display/audio memory run contains a 13m50s observation gap and does not establish
 maximum-load production headroom or overnight stability. Earlier accepted
@@ -55,6 +57,7 @@ evidence is retained within its source limits.
 - [ ] Optional touch playback/volume/dismiss adapter.
 - [x] Optional GC9107 AtomS3R display-status adapter (published in v0.3.0;
       [production orientation and bounded memory results](release-validation-2026-10-04.md)).
+- [x] Waveshare Box V2 production audio, round display and BOOT controls (published in v0.5.0).
 
 Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 
@@ -68,12 +71,13 @@ Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 - [x] Startup health confirmation, compatible bootloader checks and automatic rollback.
 - [x] Document preserving USB transitions for older firmware/bootloaders.
 - [x] Automatic website adoption of published stable latest releases after validation.
+- [ ] Qualify and enable browser USB firmware updates that preserve saved data.
 
 The fresh installer erases settings, credentials and prayer history. Existing
-speakers use compatible device-page updates or a reviewed preserving USB
-transition. Older partition layouts need a deliberate migration; ordinary
-application OTA cannot change them. Historical NVS restores old consumption
-history and is not routine recovery.
+speakers use compatible device-page updates or a reviewed maintainer USB
+transition; preserving browser USB update writes remain disabled. Older partition
+layouts need a deliberate migration; ordinary application OTA cannot change them.
+Historical NVS restores old consumption history and is not routine recovery.
 
 The signed updater's interruption, handoff and rollback tests use a separate
 maintainer qualification build. Production excludes its private feed, isolated
@@ -90,8 +94,9 @@ discovery is separate from public OTA application-transfer acceptance.
 
 ## Phase 4 — Offline resilience and expansion
 
-- [x] Implement onboard RTC restoration for Waveshare V2 development firmware.
-- [ ] Qualify Waveshare RTC offline restart; backup-power retention remains deferred.
+- [x] Implement onboard RTC restoration for Waveshare V2 production and development firmware.
+- [x] Qualify Waveshare clock restoration after offline physical RESET with RTC power retained.
+- [ ] Qualify RTC-only scheduled playback, backup-power retention and long-term drift.
 - [ ] Evaluate RTC expansion for other hardware.
 - [ ] Evaluate microSD or USB mass storage.
 - [ ] Optional offline Quran library.

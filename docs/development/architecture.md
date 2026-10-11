@@ -162,7 +162,7 @@ acceptance or release readiness.
 
 Core Athan scheduling must not require Home Assistant or a cloud service. Internet may be used for initial/periodic time sync, Quran streaming, firmware downloads, or optional services.
 
-The generic ESPHome package does not configure Wi-Fi. Reference firmware provides USB provisioning, while ESPHome integrators keep their existing network configuration. The current reference build needs internet time synchronization after a cold boot; saved settings cannot establish the current time. The [Waveshare development profile](waveshare-box-v2.md#rtc-and-offline-restart) can restore previously initialized RTC time after a powered reset; physical qualification is pending. With a valid clock, prayer calculation and stored-recording playback remain local.
+The generic ESPHome package does not configure Wi-Fi. Reference firmware provides USB provisioning, while ESPHome integrators keep their existing network configuration. Atom needs internet time synchronization after a cold boot; saved settings cannot establish the current time. The [Waveshare profile](waveshare-box-v2.md#rtc-and-offline-restart) can restore previously initialized RTC time after a powered reset. [Attended RTC RESET validation](waveshare-rtc-validation-2026-10-10.md#attended-powered-reset-validation) passed; retention while unplugged remains unverified. With a valid clock, prayer calculation and stored-recording playback remain local.
 
 ## Public website boundary
 

@@ -2,8 +2,8 @@
 
 This report preserves the dated development measurements and device observations
 below. They are not current release sizes or a statement of today's pending work.
-For v0.3.0 production, media and public-installer status, see the
-[2026-10-04 release summary](release-validation-2026-10-04.md).
+For v0.5.0 production sizes, hardware qualification and public-installer status,
+see the [2026-10-10 release summary](release-validation-2026-10-10.md).
 
 **The compile-time capacity target passed.** ESPHome, released Adhan C++, and
 the shared audio adapter fit comfortably in each 2 MiB OTA slot. Both supplied

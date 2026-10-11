@@ -83,5 +83,6 @@ and a new long soak were not repeated in this focused volume session. Clean-imag
 runtime heap/fragmentation/PSRAM remains unmeasured. Earlier button and scheduled
 playback evidence remains separate, as do unresolved intermittent HTTP timeouts.
 These results establish focused development acceptance; they do not qualify the
-later [v0.5.0 production candidate](v0.5.0-preparation-2026-10-10.md), its production
-storage, signed updates or recovery.
+later v0.5.0 production storage, signed updates or recovery. Those separate
+checks are recorded in the [release qualification report](release-validation-2026-10-10.md),
+which reuses this listening evidence within its tested source and scope.
