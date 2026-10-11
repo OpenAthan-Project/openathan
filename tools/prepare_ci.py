@@ -31,6 +31,11 @@ def prepare(output_dir):
     with targets[2].open("ab") as handle:
         for key, value in qualification.items():
             handle.write(f"qualification_{key}: {value!r}\n".encode())
+    from quran_qualification import initialize as initialize_quran
+    quran = initialize_quran(output_dir / "quran-qualification", "192.168.1.2")
+    with targets[3].open("ab") as handle:
+        for key, value in quran.items():
+            handle.write(f"quran_qualification_{key}: {value!r}\n".encode())
     payloads = [b"".join(hashlib.sha256(f"{name}-{i}".encode()).digest()
                         for i in range(256)) for name in ("normal", "fajr")]
     image, _ = build_image(*payloads)

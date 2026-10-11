@@ -26,7 +26,7 @@ jobs:
       - name: Install host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++ libssl-dev
+          sudo apt-get install -y cmake ninja-build g++ libssl-dev ffmpeg
           python -m pip install -r firmware/esphome/requirements.txt
       - name: Build and test core with UBSan
         run: |
@@ -49,7 +49,7 @@ jobs:
       - name: Validate developer configurations
         run: |
           python tools/prepare_ci.py --output-dir "$RUNNER_TEMP/audio-fixture"
-          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation upgrades/qualification waveshare/production waveshare/audio waveshare/development waveshare/diagnostics; do
+          for config in feasibility/baseline feasibility/calculations feasibility/shared-audio scheduler/development scheduler/device scheduler/validation openathan provisioning/validation upgrades/qualification waveshare/production waveshare/audio waveshare/development waveshare/diagnostics waveshare/quran-qualification; do
             python -m esphome config "firmware/esphome/$config.yaml" > "$RUNNER_TEMP/config.log" 2>&1 || { cat "$RUNNER_TEMP/config.log"; exit 1; }
           done
 
@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [device, validation, reference, provisioning-validation, upgrade-qualification, upgrade-startup-failure, waveshare-production, waveshare-audio, waveshare-display, waveshare-diagnostics]
+        configuration: [device, validation, reference, provisioning-validation, upgrade-qualification, upgrade-startup-failure, waveshare-production, waveshare-audio, waveshare-display, waveshare-diagnostics, quran-qualification]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,13 +101,16 @@ jobs:
           elif [ "$CONFIGURATION" = waveshare-production ]; then
             config=firmware/esphome/waveshare/production.yaml
             image=openathan
-          elif [ "$CONFIGURATION" = waveshare-audio ] || [ "$CONFIGURATION" = waveshare-display ] || [ "$CONFIGURATION" = waveshare-diagnostics ]; then
+          elif [ "$CONFIGURATION" = waveshare-audio ] || [ "$CONFIGURATION" = waveshare-display ] || [ "$CONFIGURATION" = waveshare-diagnostics ] || [ "$CONFIGURATION" = quran-qualification ]; then
             config=firmware/esphome/waveshare/audio.yaml
             if [ "$CONFIGURATION" = waveshare-display ]; then
               config=firmware/esphome/waveshare/development.yaml
             fi
             if [ "$CONFIGURATION" = waveshare-diagnostics ]; then
               config=firmware/esphome/waveshare/diagnostics.yaml
+            fi
+            if [ "$CONFIGURATION" = quran-qualification ]; then
+              config=firmware/esphome/waveshare/quran-qualification.yaml
             fi
             image=openathan-test
           else

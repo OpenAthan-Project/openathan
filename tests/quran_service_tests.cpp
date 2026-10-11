@@ -6,7 +6,8 @@
 #include <cassert>
 #include <iostream>
 
-int64_t esp_timer_get_time() { return 1000000; }
+int64_t clock_us = 1000000;
+int64_t esp_timer_get_time() { return clock_us; }
 using namespace esphome::openathan_device;
 struct Audio : openathan::Playback {
   bool active{}, available{true}; uint32_t epoch{}; std::string url;
@@ -27,7 +28,49 @@ int request_play(Quran &service, JsonDocument &selection, std::string &error) {
   return service.action("play", selection.as<JsonObjectConst>(), error);
 }
 void execute(Quran &service) { run_worker(); service.loop(true, false); assert(live_http_clients == 0); }
+void failure_cases() {
+  const std::string metadata_url = "https://www.mp3quran.net/api/v3/reciters?language=eng&reciter=1";
+  const std::string valid = R"({"reciters":[{"id":1,"moshaf":[{"id":9,"name":"Fixture","surah_list":"1","server":"https://cdn.mp3quran.net/example/"}]}]})";
+  for (const auto failure : {HttpFailure::INIT, HttpFailure::OPEN, HttpFailure::HEADERS}) {
+    Audio audio; esphome::openathan_component::OpenAthan athan; athan.audio=&audio;
+    Quran service; service.begin(&athan,"failure");service.loop(true,false);reset_http();
+    http_replies[metadata_url]={200,"",valid};http_failure=failure;http_failure_url=metadata_url;
+    auto play=input(R"({"reciter":1,"edition":9,"surah":1})");std::string error;
+    assert(request_play(service,play,error)==200);execute(service);
+    JsonDocument state;service.snapshot(state.to<JsonObject>());
+    assert(state["state"]=="error"&&!audio.active&&last_bundle);
+    // Time/loop changes cannot retry a failed request. A fresh explicit Play can.
+    const auto count=http_requests.size();for(int i=0;i<10;++i){clock_us+=10000000;service.loop(true,false);}
+    assert(http_requests.size()==count&&!audio.active);
+    http_failure=HttpFailure::NONE;assert(request_play(service,play,error)==200);execute(service);assert(audio.active);
+  }
+  for (unsigned scenario=0;scenario<7;++scenario) {
+    reset_http();clock_us=1000000;
+    Audio audio;esphome::openathan_component::OpenAthan athan;athan.audio=&audio;
+    Quran service;service.begin(&athan,"failure");service.loop(true,false);
+    auto &reply=http_replies[metadata_url];reply.data=valid;
+    if(scenario==0)reply.data=R"({"reciters":[{"id":)";
+    if(scenario==1){reply.data=valid.substr(0,20);reply.incomplete=true;}
+    if(scenario==2)reply.read_steps={8,-1};
+    if(scenario==3){reply.read_steps={8,0};reply.incomplete=true;}
+    if(scenario==4){reply.read_steps=std::vector<int>(10,1);on_each_read=[](){clock_us+=10000000;};}
+    if(scenario==5){reply.read_steps=std::vector<int>(10,1);
+      on_each_read=[&](){athan.stop();service.loop(true,false);on_each_read=nullptr;};}
+    if(scenario==6)reply.status=503;
+    auto play=input(R"({"reciter":1,"edition":9,"surah":1})");std::string error;
+    assert(request_play(service,play,error)==200);execute(service);
+    JsonDocument state;service.snapshot(state.to<JsonObject>());
+    assert(!audio.active&&audio.url.empty());assert(state["state"]==(scenario==5?"idle":"error"));
+    if(scenario==4)assert(clock_us<=41000000); // Absolute deadline stops slow trickles.
+    const auto calls=http_requests.size();for(int i=0;i<10;++i){clock_us+=10000000;service.loop(true,false);}
+    assert(http_requests.size()==calls);
+    on_each_read=nullptr;reply={200,"",valid};clock_us=1000000;
+    assert(request_play(service,play,error)==200);execute(service);assert(audio.active);
+  }
+  reset_http();
+}
 int main() {
+  failure_cases();
   assert(quran_audio_url("https://cdn.mp3quran.net/audio/example/001.mp3"));
   assert(quran_audio_url("https://server15.mp3quran.net/example/001.mp3"));
   for (const char *url : {"http://cdn.mp3quran.net/a.mp3", "https://cdn.mp3quran.net.evil/a.mp3",

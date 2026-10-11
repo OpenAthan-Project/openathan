@@ -5,7 +5,7 @@ repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation
 for the six developer configurations, the provisioning reference configuration,
 the isolated provisioning-validation configuration, and the isolated upgrade
-qualification configuration.
+qualification configuration and the isolated Quran qualification configuration.
 Waveshare V2 audio, display and attended diagnostic development configurations
 are also generated and compiled. These require isolated storage and disable every
 public update transport. Capacity inspection checks their 16 MiB headers explicitly;
@@ -22,6 +22,8 @@ Separate jobs compile `scheduler/device.yaml`, `scheduler/validation.yaml` and
 the 1.5 MiB application budget and factory/OTA payload consistency. Two additional
 jobs build healthy upgrade qualification and forced startup-failure variants.
 Their generated test CA and signing key are ephemeral and never enter releases.
+An additional Waveshare Quran qualification job compiles the private-fixture
+transport and runtime observations, with isolated storage and updates disabled.
 The device build also tests the production settings JSON bridge with the exact resolved
 ArduinoJson library. The host suite exercises interrupted settings writes and
 the bridge against pinned ESPHome timezone conversion code. Additional host tests
@@ -49,9 +51,9 @@ header sender with the SDK header implementation against a host transport. It
 checks that complete requests are transmitted, including the header-space
 boundary; it does not establish device TLS or runtime memory headroom.
 
-Qualification C++ is a separate component compiled only into the two maintainer
-variants. Host checks reject its inclusion in production or incomplete test
-profiles. Capacity checks require generated definitions and verify component
+Upgrade and Quran qualification C++ live in separate components compiled only
+into their maintainer variants. Host checks reject inclusion in production or
+incomplete test profiles. Capacity checks require generated definitions and verify component
 exclusion in production/ordinary isolated builds; release tests reject both
 qualification instrumentation and isolated storage markers in publishable images.
 
@@ -85,7 +87,8 @@ the workflow or removing matrix entries, preserving all existing check names.
 ## Reproduce from a clean checkout
 
 Use a fresh disposable checkout and a Python 3.13 virtual environment. Install
-CMake, a C++20 compiler and OpenSSL development headers (Linux only), then run:
+CMake, a C++20 compiler, FFmpeg and OpenSSL development headers (Linux only),
+then run:
 
 ```sh
 python -m pip install -r firmware/esphome/requirements.txt
@@ -117,6 +120,10 @@ ESPHOME_BUILD_PATH=/tmp/openathan-ci-upgrade-failure python -m esphome \
 
 Use the [upgrade runbook](../../firmware/esphome/upgrades/VALIDATION.md) for actual
 recordings, private trust setup, source-bound artifacts and attended hardware work.
+Compile `waveshare/quran-qualification.yaml` separately for controlled Quran
+failures; its image name is `openathan-test`. The
+[Quran failure runbook](../../docs/development/quran-failure-qualification.md)
+covers private trust, approved real recordings and attended recovery.
 
 CI establishes source/build behavior, not audible playback or hardware recovery.
 See the [dated device results](../../docs/development/feasibility-report.md).
@@ -125,4 +132,8 @@ The device job also runs `tools/check_quran.py --arduinojson` against its
 resolved ArduinoJson headers. This compiles the production metadata worker and
 shared redirect policy under UBSan with deterministic HTTP/task adapters. It
 checks cancellation, Athan priority, URL restrictions, paging/search, malformed
-responses and unavailable recordings; it does not establish physical streaming.
+responses, transport failures, stalled/disconnected reads, fresh-Play recovery
+and unavailable recordings. A separate UBSan executable checks qualification
+routing and the original logical redirect policy. Python tests exercise real
+local TLS rejection, served faults and profile/release exclusion. These checks
+do not establish physical streaming or device TLS acceptance.

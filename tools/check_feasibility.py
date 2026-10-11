@@ -17,18 +17,31 @@ from audio_image import ROOT, validate_partitions
 def inspect_build_profile(build_dir, app):
     from release_artifacts import reject_test_material
     defines = (build_dir / "src/esphome/core/defines.h").read_text()
-    qualification = "#define OPENATHAN_UPGRADE_QUALIFICATION\n" in defines
+    upgrade = "#define OPENATHAN_UPGRADE_QUALIFICATION\n" in defines
+    quran = "#define OPENATHAN_QURAN_QUALIFICATION\n" in defines
+    qualification = upgrade or quran
     isolated = "#define OPENATHAN_PROVISIONING_TEST_STORAGE\n" in defines
-    component = build_dir / "src/esphome/components/openathan_upgrade_qualification"
-    compiled = "/openathan_upgrade_qualification/qualification.cpp" in (build_dir / "build/compile_commands.json").read_text()
-    if qualification:
-        if not isolated:
-            raise ValueError("Qualification capacity checks require isolated storage")
-        if not component.is_dir() or not compiled:
-            raise ValueError("Qualification build must compile its separate component")
-    elif (component.exists() or compiled or
-          re.search(r"^#define (?:OPENATHAN_UPGRADE_QUALIFICATION|OPENATHAN_QUALIFICATION_\w+|USE_OPENATHAN_UPGRADE_QUALIFICATION)\b", defines, re.M)):
-        raise ValueError("Production/ordinary builds must exclude the qualification component and definitions")
+    if upgrade and quran:
+        raise ValueError("Qualification profiles are mutually exclusive")
+    if ((not upgrade and b"OPENATHAN_QUALIFICATION_V1" in app) or
+            (not quran and b"OPENATHAN_QURAN_QUALIFICATION_V1" in app)):
+        raise ValueError("Qualification identity must match the build profile")
+    commands = (build_dir / "build/compile_commands.json").read_text()
+    for kind, enabled, family in (("upgrade", upgrade, "OPENATHAN_QUALIFICATION_"),
+                                  ("quran", quran, "OPENATHAN_QURAN_QUALIFICATION_")):
+        component = build_dir / f"src/esphome/components/openathan_{kind}_qualification"
+        compiled = f"/openathan_{kind}_qualification/qualification.cpp" in commands
+        if enabled:
+            if not isolated:
+                raise ValueError("Qualification capacity checks require isolated storage")
+            if not component.is_dir() or not compiled:
+                raise ValueError("Qualification build must compile its separate component")
+        elif (component.exists() or compiled or re.search(
+                rf"^#define (?:OPENATHAN_{kind.upper()}_QUALIFICATION|{family}\w+|USE_OPENATHAN_{kind.upper()}_QUALIFICATION)\b", defines, re.M)):
+            raise ValueError("Production/ordinary builds must exclude the qualification component and definitions")
+    if quran and ('#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines or
+                  b"OPENATHAN_QURAN_QUALIFICATION_V1" not in app):
+        raise ValueError("Quran qualification requires disabled updates and its identity marker")
     reject_test_material(app, allow_qualification=qualification, allow_isolated=isolated)
     return qualification, isolated
 
@@ -78,7 +91,7 @@ def inspect_firmware(build_dir, log, root=ROOT):
     qualification, isolated = inspect_build_profile(build_dir, app)
     defines = (build_dir / "src/esphome/core/defines.h").read_text()
     waveshare = '#define OPENATHAN_HARDWARE "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"' in defines
-    if waveshare and isolated and (qualification or '#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines):
+    if waveshare and isolated and ('#define OPENATHAN_UPGRADE_QUALIFICATION\n' in defines or '#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines):
         raise ValueError("Waveshare capacity inspection requires isolated development with updates disabled")
     flash_bytes = 0x1000000 if waveshare else 0x800000
     validate_firmware_images(factory, app, allow_qualification=qualification, allow_isolated=isolated,

@@ -100,7 +100,7 @@ def esp_image(data, exact=False, *, flash_bytes=0x800000):
         raise ValueError("Truncated ESP image") from error
 
 
-QUALIFICATION_MARKERS = (b"OPENATHAN_QUALIFICATION_V1", b"before_boot_selection\0",
+QUALIFICATION_MARKERS = (b"OPENATHAN_QUALIFICATION_V1", b"OPENATHAN_QURAN_QUALIFICATION_V1", b"before_boot_selection\0",
                          b"after_boot_selection\0", b"Qualification baseline", b"worker_stack_min_free\0")
 ISOLATED_STORAGE_MARKERS = (b"oa_test\0", b"oa_setup_test\0", b"oa_network_test\0", b"oa_upgrade_test\0")
 

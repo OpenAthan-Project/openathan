@@ -127,6 +127,9 @@ void Quran::worker_(void *context) {
   std::unique_ptr<std::pair<Quran *, std::shared_ptr<Job>>> work(
       static_cast<std::pair<Quran *, std::shared_ptr<Job>> *>(context));
   work->first->fetch_(*work->second);
+#ifdef OPENATHAN_QURAN_QUALIFICATION
+  openathan_quran_qualification::worker_finished(uxTaskGetStackHighWaterMark(nullptr));
+#endif
   work->second->done = true;
   work.reset();
   vTaskDelete(nullptr);
@@ -220,6 +223,9 @@ void Quran::loop(bool connected, bool blocked) {
 }
 void Quran::shutdown() { if (job_) job_->cancel = true; resolving_ = false; }
 void Quran::snapshot(JsonObject root) {
+#ifdef OPENATHAN_QURAN_QUALIFICATION
+  openathan_quran_qualification::snapshot(root);
+#endif
   auto *playback = athan_ ? athan_->playback() : nullptr;
   root["supported"] = playback && playback->stream_supported();
   root["playback_token"] = playback_token_();

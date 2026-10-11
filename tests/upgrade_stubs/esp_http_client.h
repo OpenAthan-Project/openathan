@@ -5,18 +5,20 @@
 #include <cassert>
 #include <map>
 #include <vector>
+#include <functional>
 using esp_err_t=int;
 constexpr int HTTP_EVENT_ON_HEADER=1;
 struct esp_http_client_event_t{int event_id;char *header_key,*header_value;void *user_data;};
 struct esp_http_client_config_t{const char *url;const char *cert_pem;int(*crt_bundle_attach)(void *);int timeout_ms;bool disable_auto_redirect;int buffer_size,buffer_size_tx;int(*event_handler)(esp_http_client_event_t *);void *user_data;};
-struct HttpReply{int status{200};std::string location,data;};
+struct HttpReply{int status{200};std::string location,data;std::vector<int> read_steps;bool incomplete{};std::string content_type;};
 struct HttpRequest{std::string url;int tx,rx,timeout;bool auto_redirect_disabled;};
-struct Http{std::string data;size_t offset{};HttpReply reply;esp_http_client_config_t config;std::string url;};
+struct Http{std::string data;size_t offset{};HttpReply reply;esp_http_client_config_t config;std::string url;size_t read_calls{};};
 using esp_http_client_handle_t=Http *;
 inline std::string descriptor_response,application_response;
 inline bool transfer_fail=false;
 inline void (*on_read)()=nullptr;
 inline void (*on_open)()=nullptr;
+inline std::function<void()> on_each_read;
 inline std::string last_url,last_ca;
 inline bool last_bundle{};
 inline std::map<std::string,HttpReply> http_replies;
@@ -25,7 +27,7 @@ enum class HttpFailure{NONE,INIT,OPEN,HEADERS};
 inline HttpFailure http_failure=HttpFailure::NONE;
 inline std::string http_failure_url;
 inline unsigned live_http_clients{},http_cleanups{},live_http_tx_bytes{},peak_http_tx_bytes{};
-inline void reset_http(){assert(live_http_clients==0 && live_http_tx_bytes==0);http_replies.clear();http_requests.clear();http_failure=HttpFailure::NONE;http_failure_url.clear();http_cleanups=peak_http_tx_bytes=0;}
+inline void reset_http(){assert(live_http_clients==0 && live_http_tx_bytes==0);http_replies.clear();http_requests.clear();http_failure=HttpFailure::NONE;http_failure_url.clear();http_cleanups=peak_http_tx_bytes=0;transfer_fail=false;on_read=on_open=nullptr;on_each_read=nullptr;}
 inline bool http_fails(HttpFailure stage,const std::string &url){return http_failure==stage && http_failure_url==url;}
 inline Http *esp_http_client_init(const esp_http_client_config_t *c){
   last_url=c->url;last_ca=c->cert_pem?c->cert_pem:"";last_bundle=c->crt_bundle_attach!=nullptr;
@@ -56,10 +58,23 @@ inline int esp_http_client_fetch_headers(Http *h){
     esp_http_client_event_t event{HTTP_EVENT_ON_HEADER,key,h->reply.location.data(),h->config.user_data};
     h->config.event_handler(&event);
   }
+  if(!h->reply.content_type.empty()){
+    char key[]="Content-Type";
+    esp_http_client_event_t event{HTTP_EVENT_ON_HEADER,key,h->reply.content_type.data(),h->config.user_data};
+    h->config.event_handler(&event);
+  }
   return h->data.size();
 }
 inline int esp_http_client_get_status_code(Http *h){return h->reply.status;}
 inline int esp_http_client_set_user_data(Http *h,void *value){h->config.user_data=value;return 0;}
 inline int esp_http_client_get_content_length(Http *h){return h->data.size();}
-inline int esp_http_client_read(Http *h,char *out,int size){if(on_read){auto callback=on_read;on_read=nullptr;callback();}if(transfer_fail)return -1;size=std::min<size_t>(size,h->data.size()-h->offset);memcpy(out,h->data.data()+h->offset,size);h->offset+=size;return size;}
-inline bool esp_http_client_is_complete_data_received(Http *h){return h->offset==h->data.size();}
+inline int esp_http_client_read(Http *h,char *out,int size){
+  if(on_read){auto callback=on_read;on_read=nullptr;callback();}
+  if(on_each_read){auto callback=on_each_read;callback();}
+  if(transfer_fail)return -1;
+  if(h->read_calls<h->reply.read_steps.size()){
+    const int step=h->reply.read_steps[h->read_calls++];if(step<=0)return step;size=std::min(size,step);
+  }
+  size=std::min<size_t>(size,h->data.size()-h->offset);memcpy(out,h->data.data()+h->offset,size);h->offset+=size;return size;
+}
+inline bool esp_http_client_is_complete_data_received(Http *h){return !h->reply.incomplete&&h->offset==h->data.size();}
