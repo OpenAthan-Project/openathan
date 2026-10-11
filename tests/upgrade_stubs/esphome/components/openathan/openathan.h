@@ -14,6 +14,9 @@ class OpenAthan {
   Clock clock;
   Status sample;
   Settings settings;
+  ::openathan::Playback *audio{};
+  ::openathan::Playback *playback() const { return audio; }
+  void stop() { if (audio) audio->stop(); }
   Status status() const {return sample;}
   Clock read() const {return clock;}
   Settings *settings_service(){return &settings;}

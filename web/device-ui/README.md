@@ -18,6 +18,7 @@ highlight stays on that occurrence when skipped. An occurrence outside today’s
 timetable has a dated hero and no highlighted row. Connection loss freezes the
 last observed information and marks it stale; it does not assert playback stopped.
 Stop stays reachable from Today and Settings while playback is reported active.
+The optional Quran view also exposes Stop while a recording is resolving/loading.
 The current row matches the device's next prayer and UTC instant, rather than
 prayer name or browser time alone. Only the confirmed Today timetable has a
 highlight; preview and setup-review tables do not.
@@ -183,8 +184,14 @@ credential-recovery tool, with a separately gated preserving USB updater for
 capable firmware. While a USB request is active, the local Updates group displays
 transfer, interruption or owner power-handoff status and hides network cancellation;
 firmware rejects competing mutations. See the [USB protocol](../../docs/development/usb-firmware-updates.md).
-Quran/adhkar and owner-facing audio replacement remain
-future work.
+The development Quran view loads MP3Quran's live reciters with search and paging,
+then recording editions and available surahs. Catalog and playback feedback stay
+independent. Browser storage remembers selections; Play and Stop do not change
+prayer settings. One surah plays on the speaker even after the page closes;
+Athan interrupts without automatic resume. An uncertain Play is read back rather
+than automatically repeated. See the [streaming contract](../../docs/development/quran-streaming.md)
+for APIs, bounds and physical qualification gates. Adhkar and owner-facing stored
+audio replacement remain future work.
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
 retains integration evidence. The [holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)

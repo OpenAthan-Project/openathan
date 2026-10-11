@@ -140,6 +140,17 @@ for serial ownership, authentication, persistence, and hardware acceptance limit
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 
+### Quran streaming
+
+The product layer's optional Quran service resolves MP3Quran reciter, edition and
+surah identifiers on a bounded background task. Playback adapters expose optional
+streaming, source/state and session-epoch methods; the portable scheduler has no
+provider or network dependency. The existing announcement pipeline plays both
+stored Athan and streamed Quran, with Athan taking priority and no automatic
+Quran resume. The shared-audio partition is unchanged. See the
+[streaming contract](quran-streaming.md) for HTTPS restrictions, local APIs,
+the pinned reader patch and separate hardware qualification gates.
+
 ### Upgrade qualification boundary
 
 The production updater remains the single update engine. The separately selected

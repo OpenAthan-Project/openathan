@@ -4,6 +4,10 @@
 #include <mbedtls/sha256.h>
 #include <algorithm>
 #include <cmath>
+#include "quran_policy.h"
+#ifdef OPENATHAN_QURAN
+#include "esphome/core/hal.h"
+#endif
 
 namespace esphome::openathan_audio {
 static const char *const TAG = "openathan_audio";
@@ -78,6 +82,10 @@ bool PartitionAudio::play(::openathan::Track track) {
     return false;
   }
   player_->play_file(&files_[id - 1], true, false);
+  ++epoch_;
+  source_ = ::openathan::PlaybackSource::ATHAN;
+  stream_state_ = ::openathan::StreamState::IDLE;
+  observed_playing_ = false;
   ESP_LOGI(TAG, "Playback queued: track=%u", id);
   return true;
 }
@@ -87,6 +95,10 @@ bool PartitionAudio::playing() const {
                      player_->state == media_player::MEDIA_PLAYER_STATE_ANNOUNCING);
 }
 void PartitionAudio::stop() {
+  ++epoch_;
+  source_ = ::openathan::PlaybackSource::NONE;
+  stream_state_ = ::openathan::StreamState::IDLE;
+  observed_playing_ = false;
   if (!player_ || !player_->is_ready()) return;
   // Stop both pipelines. Commands and the subsequent file request share a FIFO.
   for (bool announcement : {false, true}) {
@@ -94,6 +106,43 @@ void PartitionAudio::stop() {
     call.set_command(media_player::MEDIA_PLAYER_COMMAND_STOP);
     call.set_announcement(announcement);
     call.perform();
+  }
+}
+bool PartitionAudio::start_stream(const std::string &url) {
+#ifdef OPENATHAN_QURAN
+  if (!ready() || !openathan_device::quran_audio_url(url)) return false;
+  stop();
+  auto call = player_->make_call();
+  call.set_media_url(url);
+  call.set_announcement(true);
+  call.perform();
+  source_ = ::openathan::PlaybackSource::QURAN;
+  stream_state_ = ::openathan::StreamState::LOADING;
+  stream_started_ = millis();
+  return true;
+#else
+  return false;
+#endif
+}
+void PartitionAudio::loop() {
+  if (source_ == ::openathan::PlaybackSource::QURAN) {
+#ifdef OPENATHAN_QURAN
+    const auto state = player_->announcement_state();
+    if (state == speaker::AudioPipelineState::ERROR_READING || state == speaker::AudioPipelineState::ERROR_DECODING ||
+        (!observed_playing_ && millis() - stream_started_ >= 30000)) {
+      stop();
+      stream_state_ = ::openathan::StreamState::ERROR;
+    } else if (state == speaker::AudioPipelineState::PLAYING) {
+      observed_playing_ = true;
+      stream_state_ = ::openathan::StreamState::PLAYING;
+    } else if (observed_playing_ && !playing()) {
+      source_ = ::openathan::PlaybackSource::NONE;
+      stream_state_ = ::openathan::StreamState::IDLE;
+    }
+#endif
+  } else if (source_ == ::openathan::PlaybackSource::ATHAN) {
+    if (playing()) observed_playing_ = true;
+    else if (observed_playing_) source_ = ::openathan::PlaybackSource::NONE;
   }
 }
 bool PartitionAudio::start(::openathan::Track track) {

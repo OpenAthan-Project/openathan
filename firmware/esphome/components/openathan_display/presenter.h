@@ -16,6 +16,7 @@ struct Inputs {
   bool round{};
   std::optional<Event> visual_next;
   int64_t utc{};
+  bool quran{};
 };
 struct Frame {
   std::array<char, 9> clock{};
@@ -67,7 +68,7 @@ inline Frame present(const Inputs &in) {
   } else if (!in.setup_complete) {
     text(f.heading, "Setup"); text(f.main, "Needed"); text(f.detail, "Use phone setup");
   } else if (in.status.playing) {
-    text(f.heading, "Athan"); text(f.main, "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
+    text(f.heading, in.quran ? "Quran" : "Athan"); text(f.main, "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
   } else if (!in.clock_valid) {
     text(f.heading, "Time"); text(f.main, "Waiting"); text(f.detail, in.wifi_connected ? "Syncing clock" : "Connect Wi-Fi");
   } else if (!in.prayers_enabled && !in.round) {

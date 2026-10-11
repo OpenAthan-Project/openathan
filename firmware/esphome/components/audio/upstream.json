@@ -1,0 +1,26 @@
+{
+  "version": "2026.9.0",
+  "source": "https://github.com/esphome/esphome/tree/2026.9.0/esphome/components",
+  "sha256": {
+    "audio/audio_reader.h": "68fccd34a2f6d44005dff8a1d7c543c6027d5d21d4c1fb217a379a94f6edd833",
+    "audio/audio_reader.cpp": "ff8d8ccc509f7d8445fe7aeab414d62be79fd5dfeee0ac7d7bf9b0d311f8cf77",
+    "audio/audio_resampler.h": "0ab374e42151ff89fdede0aec34c6263d44d9a0c24272f9a067eaf9fdcd3171c",
+    "audio/audio_decoder.cpp": "13e0b532f97188709a231436b5775f432c27150a33b2cfaad5f67035a3e603aa",
+    "audio/audio_resampler.cpp": "f53b8c4fddc582e693963be6ead994ace19899177076ba3bd7aca7bdb137789d",
+    "audio/audio.cpp": "f1733737ce5edd49342c7ad9cda5038fa6d39229aacdb61bed1087413fc1e5fb",
+    "audio/audio_transfer_buffer.cpp": "cadbfc7b569e8bb30076b7475fee54f0bc637532990c002b55ed72e03dd5b255",
+    "audio/__init__.py": "2827cfd296c207484e4818500203da25fd9163eb0ab65dae3a30c82e5bcd645a",
+    "audio/audio.h": "266932072fd7438e299323a2d72a07299e856d5f22d42d794118c35233c53fe9",
+    "audio/audio_transfer_buffer.h": "20522231f7b535c6c2368ea12d20b5267ed5ff7615ca0ef0aea9e2cece838a2a",
+    "audio/audio_decoder.h": "a2af44a56593f4b130732ac4232a77bf0cd7266bb7ca6d610992337a06cecffd",
+    "speaker/__init__.py": "a77ec9a37ddf8274b2b934fcbc1a9d358559a10998013043cd47c27f99d94cb0",
+    "speaker/automation.h": "5e736ee324ed88951dcfa4bf9af4b8a7298f7d64deda11c80e6f663a521e50b3",
+    "speaker/speaker.h": "fe852c5ebad730ac93799e0cf055213c9ce137484efed598a87e143abe81c826",
+    "speaker/media_player/speaker_media_player.cpp": "af0af73e2f3e774b77443b0ed6640de88ea3c029a958972ee85eb8faac332eba",
+    "speaker/media_player/audio_pipeline.h": "13abb2c86474c3c67d8308e5f8920621ace88a853d5bb0613f22ae7486cc5e5d",
+    "speaker/media_player/__init__.py": "267539a827e29db915365e0f0da840dc8b2854df0dc289eb0c841eeddcf708a6",
+    "speaker/media_player/automation.h": "e58215b9e360c30a7f07cf56a0e94a3e612e69290538b7b0a9193a7d03dd31e7",
+    "speaker/media_player/audio_pipeline.cpp": "be6401bd69577b98cc5fbca4b11669653775ed7b04dfb285aa0c80f58ad4985a",
+    "speaker/media_player/speaker_media_player.h": "3d4364971cc67e1ff8652adba35b8e49f089590127e0c1eb80fdbc552cd1ff60"
+  }
+}

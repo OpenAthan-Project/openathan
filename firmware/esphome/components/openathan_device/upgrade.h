@@ -42,6 +42,7 @@ class Upgrade : public UpgradeApi {
   uint8_t usb_command(uint8_t command, const std::vector<std::string> &fields, std::vector<std::string> &reply);
   bool usb_chunk(const ::openathan::usb_upgrade::Chunk &chunk);
   bool usb_busy() const { return usb_token_ || usb_request_; }
+  bool streaming_blocked() const { return usb_busy() || active_ || state_ == "queued" || state_ == "installing"; }
  private:
   static void worker_(void *argument);
   void run_();

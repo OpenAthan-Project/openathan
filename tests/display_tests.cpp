@@ -196,6 +196,10 @@ int main(int argc, char **argv) {
   CHECK(equal(present(in).detail, "Button to stop"));
   CHECK(equal(present(in).main, "Playing") && equal(present(in).footer, ""));
   capture("playback", present(in), directory);
+  CHECK(equal(present(in).heading, "Athan"));
+  in.quran = true;
+  CHECK(equal(present(in).heading, "Quran") && equal(present(in).main, "Playing"));
+  in.quran = false;
   in.status.playing = false; in.status.skip = key;
   CHECK(equal(present(in).detail, "Will be skipped")); capture("skip", present(in), directory, true);
   in.status.skip = EventKey{key.day, Prayer::FAJR};

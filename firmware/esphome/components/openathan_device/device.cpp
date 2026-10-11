@@ -68,6 +68,8 @@ const char* http_status(int code) {
 void Device::setup() {
   api_ = std::make_unique<LocalApi>(athan_, zones_, zone_count_);
   api_->set_upgrade(&upgrade_);
+  quran_.begin(athan_);
+  api_->set_quran(&quran_);
   hostname_ = std::string(App.get_name().c_str()) + ".local";
   realm_ = "OpenAthan-" + get_mac_address();
   wifi_record_ = store_.load_wifi(saved_wifi_);
@@ -284,6 +286,7 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
 }
 void Device::loop() {
   upgrade_.loop(wifi::global_wifi_component->is_connected());
+  quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || upgrade_.streaming_blocked());
   const auto now = now_ms();
   if (wifi_attempt_.active()) {
     auto* wifi = wifi::global_wifi_component;

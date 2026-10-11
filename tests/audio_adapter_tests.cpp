@@ -1,4 +1,5 @@
 #include "partition_audio.h"
+#include "esphome/core/hal.h"
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -65,6 +66,25 @@ int main(int argc, char **argv) {
   player.commands.clear();
   check(valid.start(Track::FAJR));
   check(player.commands == std::vector<std::string>{"stop media", "stop announcement", "play"});
+  auto epoch = valid.playback_epoch();
+  check(!valid.start_stream("http://cdn.mp3quran.net/test/001.mp3"));
+  check(valid.playback_epoch() == epoch);
+  check(valid.start_stream("https://cdn.mp3quran.net/audio/test/001.mp3"));
+  check(valid.source() == openathan::PlaybackSource::QURAN);
+  check(valid.playback_epoch() != epoch);
+  player.pipeline_state = esphome::speaker::AudioPipelineState::ERROR_DECODING;
+  valid.loop();
+  check(valid.stream_state() == openathan::StreamState::ERROR);
+  player.pipeline_state = esphome::speaker::AudioPipelineState::STOPPED;
+  check(valid.start_stream("https://cdn.mp3quran.net/audio/test/001.mp3"));
+  esphome::mock_millis += 30000;
+  valid.loop();
+  check(valid.stream_state() == openathan::StreamState::ERROR && valid.source() == openathan::PlaybackSource::NONE);
+  epoch = valid.playback_epoch();
+  check(valid.start(Track::NORMAL));
+  check(valid.source() == openathan::PlaybackSource::ATHAN && valid.playback_epoch() != epoch);
+  valid.stop();
+  check(valid.source() == openathan::PlaybackSource::NONE);
   player.state = esphome::media_player::MEDIA_PLAYER_STATE_ANNOUNCING;
   check(valid.playing());
   player.initialized = false;

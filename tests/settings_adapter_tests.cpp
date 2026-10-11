@@ -627,6 +627,35 @@ static void light_api() {
   nvs_test::fail_commit=false;
   f.device.set_light_output(nullptr); CHECK(call("POST",body()).code==404);
 }
+static void local_api_quran() {
+  using namespace esphome::openathan_device;
+  struct Probe : QuranApi {
+    unsigned calls{}; int code{200}; std::string last;
+    void snapshot(JsonObject root) override { root["supported"]=true;root["state"]="loading"; }
+    void catalog_snapshot(JsonObject root) override { root["state"]="ready";root["request"]=7; }
+    int action(const std::string &action,JsonObjectConst,std::string &error) override {
+      ++calls;last=action;error="Provider unavailable";return code;
+    }
+  } probe;
+  Fixture f;f.begin();LocalApi api(&f.device,nullptr,0);api.set_quran(&probe);
+  const auto records=nvs_test::committed;
+  const auto writes=nvs_test::writes;
+  auto call=[&](const char *method,const char *uri,const char *body="") {
+    ApiExchange request;request.method=method;request.uri=uri;request.body=body;api.handle(request);return request;
+  };
+  JsonDocument response;
+  auto catalog=call("GET","/api/quran/catalog");CHECK(catalog.code==200&&!deserializeJson(response,catalog.response));
+  CHECK(response["request"]==7&&probe.calls==0);
+  CHECK(call("POST","/api/quran/catalog",R"({"kind":"reciters","offset":0,"query":""})").code==200&&probe.last=="catalog");
+  auto play=call("POST","/api/quran/play",R"({"reciter":1,"edition":9,"surah":18})");
+  CHECK(play.code==200&&probe.last=="play"&&!deserializeJson(response,play.response));
+  CHECK(response["quran"]["state"]=="loading"&&response["playback_source"]=="none");
+  const auto calls=probe.calls;
+  CHECK(call("POST","/api/quran/play","[]").code==400&&probe.calls==calls);
+  CHECK(call("POST","/api/quran/play-extra","{}").code==404&&probe.calls==calls);
+  probe.code=503;CHECK(call("POST","/api/quran/play","{}").code==503);
+  CHECK(nvs_test::committed==records&&nvs_test::writes==writes);
+}
 static void local_api_stop() {
   using namespace esphome::openathan_device;
   Fixture f; f.begin(); f.device.utc=epoch({2026,9,25},5)-1; f.device.update(); f.device.step(1);
@@ -891,6 +920,6 @@ int main() {
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_date(); local_api_coordinates();
+  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
 #endif
 }
