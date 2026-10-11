@@ -180,7 +180,17 @@ void I2SAudioSpeaker::run_speaker_task() {
   if (successful_setup) {
     // Register the on_sent callback BEFORE enabling the channel so the very first transmitted buffer
     // generates a queued event that pairs with the first preloaded silence record.
-    const i2s_event_callbacks_t callbacks = {.on_sent = i2s_on_sent_cb};
+    i2s_event_callbacks_t callbacks = {.on_sent = i2s_on_sent_cb};
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+    if (volume_fence_enabled_) {
+      // Full preload leaves IDF's descriptor queue empty. Its capacity is N-1.
+      portENTER_CRITICAL(&volume_mutex_);
+      volume_completed_descriptors_ = 0;
+      volume_completion_capacity_ = DMA_BUFFERS_COUNT - 1;
+      portEXIT_CRITICAL(&volume_mutex_);
+      callbacks.on_send_q_ovf = i2s_on_send_q_ovf_cb;
+    }
+#endif
     if (i2s_channel_register_event_callback(this->tx_handle_, &callbacks, this) != ESP_OK)
       successful_setup = false;
 
@@ -191,6 +201,9 @@ void I2SAudioSpeaker::run_speaker_task() {
   }
 
   if (!successful_setup) {
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+    if (volume_fence_enabled_) fail_volume_fence_();
+#endif
     xEventGroupSetBits(this->event_group_, SpeakerEventGroupBits::ERR_ESP_NO_MEM);
   } else {
     bool stop_gracefully = false;
@@ -215,6 +228,9 @@ void I2SAudioSpeaker::run_speaker_task() {
     // so the lockstep invariant is preserved without burning CPU.
     while (this->pause_state_ || !this->timeout_.has_value() ||
            (millis() - last_data_received_time) <= this->timeout_.value()) {
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+      if (volume_fence_enabled_ && !volume_fence_healthy()) break;
+#endif
       uint32_t event_group_bits = xEventGroupGetBits(this->event_group_);
 
       if (event_group_bits & SpeakerEventGroupBits::COMMAND_STOP) {
@@ -244,6 +260,7 @@ void I2SAudioSpeaker::run_speaker_task() {
       VolumeFenceToken completed_token{};
       if (volume_fence_enabled_ && uxQueueMessagesWaiting(i2s_event_queue_) >
           uxQueueMessagesWaiting(write_records_queue_)) {
+        fail_volume_fence_();
         xEventGroupSetBits(event_group_, ERR_LOCKSTEP_DESYNC);
         break;
       }
@@ -285,6 +302,9 @@ void I2SAudioSpeaker::run_speaker_task() {
         }
       }
       if (lockstep_broken) {
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+        if (volume_fence_enabled_) fail_volume_fence_();
+#endif
         break;
       }
 
@@ -311,6 +331,8 @@ void I2SAudioSpeaker::run_speaker_task() {
       // output-format bytes so it tracks how full the DMA buffer is regardless of any narrowing.
 #ifdef USE_OPENATHAN_VOLUME_FENCE
       const VolumeGain buffer_gain = volume_gain_snapshot_();
+      // Reuse the existing silence buffer as a complete descriptor staging area.
+      if (volume_fence_enabled_) memset(silence_buffer, 0, dma_buffer_bytes);
 #endif
       size_t bytes_written_total = 0;
       uint32_t real_frames_total = 0;
@@ -360,7 +382,14 @@ void I2SAudioSpeaker::run_speaker_task() {
           this->swap_esp32_mono_samples_(chunk, output_bytes);
 
           size_t bw = 0;
-          esp_err_t write_error = i2s_channel_write(this->tx_handle_, chunk, output_bytes, &bw, WRITE_TIMEOUT_TICKS);
+          esp_err_t write_error = ESP_OK;
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+          if (volume_fence_enabled_) {
+            memcpy(silence_buffer + bytes_written_total, chunk, output_bytes);
+            bw = output_bytes;
+          } else
+#endif
+            write_error = i2s_channel_write(this->tx_handle_, chunk, output_bytes, &bw, WRITE_TIMEOUT_TICKS);
           if (write_error != ESP_OK || bw != output_bytes) {
             // A short real-audio write breaks DMA descriptor alignment for every subsequent event;
             // the only safe recovery is to restart the task.
@@ -382,8 +411,24 @@ void I2SAudioSpeaker::run_speaker_task() {
         break;
       }
 
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+      if (volume_fence_enabled_) {
+        size_t bw = 0;
+        if (!volume_fence_healthy() ||
+            i2s_channel_write(tx_handle_, silence_buffer, dma_buffer_bytes, &bw, WRITE_TIMEOUT_TICKS) != ESP_OK ||
+            bw != dma_buffer_bytes) {
+          fail_volume_fence_();
+          xEventGroupSetBits(event_group_, ERR_PARTIAL_WRITE);
+          break;
+        }
+      }
+#endif
       const size_t silence_bytes = dma_buffer_bytes - bytes_written_total;
-      if (silence_bytes > 0) {
+      bool write_silence = silence_bytes > 0;
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+      write_silence = write_silence && !volume_fence_enabled_;
+#endif
+      if (write_silence) {
         size_t bw = 0;
         esp_err_t write_error = i2s_channel_write(this->tx_handle_, silence_buffer, silence_bytes, &bw, WRITE_TIMEOUT_TICKS);
         if (write_error != ESP_OK || bw != silence_bytes) {
@@ -403,10 +448,21 @@ void I2SAudioSpeaker::run_speaker_task() {
       if (volume_fence_enabled_) record = &fenced_record;
 #endif
       if (xQueueSend(this->write_records_queue_, record, 0) != pdTRUE) {
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+        if (volume_fence_enabled_) fail_volume_fence_();
+#endif
         ESP_LOGV(TAG, "Exiting: write records queue full");
         xEventGroupSetBits(this->event_group_, SpeakerEventGroupBits::ERR_LOCKSTEP_DESYNC);
         break;
       }
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+      if (volume_fence_enabled_) {
+        portENTER_CRITICAL(&volume_mutex_);
+        if (!volume_completed_descriptors_) volume_fence_.fail();
+        else --volume_completed_descriptors_;
+        portEXIT_CRITICAL(&volume_mutex_);
+      }
+#endif
       if (real_frames_total > 0) {
         pending_real_buffers++;
       }

@@ -19,15 +19,20 @@ inline int64_t now{};
 inline bool allocation_failure{}, partial_write{}, drop_events{}, callback_failure{}, channel_failure{}, invalid_dma_layout{};
 inline bool ring_allocation_failure{}, source_allocation_failure{}, task_creation_failure{}, preload_partial{}, enable_failure{};
 inline std::function<void()> on_write, on_fill, on_disable;
+inline std::function<void(size_t)> on_receive;
 inline void (*task)(void *); inline void *task_arg{};
 inline std::deque<std::vector<uint8_t>> dma;
 inline std::vector<std::vector<uint8_t>> transmitted;
-inline size_t dma_bytes = 8, written{};
+inline size_t dma_bytes = 8, written{}, next_transmit{}, current_write{};
+inline bool current_valid{};
+inline std::deque<size_t> free_descriptors;
+inline std::function<void(size_t, const std::vector<uint8_t> &)> on_transmit;
+inline bool (*overflow_callback)(void *, i2s_event_data_t *, void *);
 inline bool (*callback)(void *, i2s_event_data_t *, void *); inline void *context{};
 inline void reset() {
- now=0; defer_isr_bits=false; allocation_failure=partial_write=drop_events=callback_failure=channel_failure=invalid_dma_layout=false;queues.clear();
+ now=0; dma_bytes=8; defer_isr_bits=false; allocation_failure=partial_write=drop_events=callback_failure=channel_failure=invalid_dma_layout=false;queues.clear();
  ring_allocation_failure=source_allocation_failure=task_creation_failure=preload_partial=enable_failure=false;
- on_write={}; on_fill={}; on_disable={}; task=nullptr; dma.clear(); transmitted.clear(); written=0; callback=nullptr;
+ on_write={}; on_fill={}; on_disable={}; on_receive={}; on_transmit={}; free_descriptors.clear(); next_transmit=current_write=0; current_valid=false; overflow_callback=nullptr; task=nullptr; dma.clear(); transmitted.clear(); written=0; callback=nullptr;
 }
 }
 using TickType_t = uint32_t; using BaseType_t = int; using EventBits_t = uint32_t;
@@ -56,7 +61,8 @@ inline int xQueueSend(QueueHandle_t q,const void *data,TickType_t) {
 }
 inline int xQueueReceive(QueueHandle_t q,void *data,TickType_t) {
  if(q->entries.empty())return pdFALSE;
- std::memcpy(data,q->entries.front().data(),q->width);q->entries.pop_front();return pdTRUE;
+ std::memcpy(data,q->entries.front().data(),q->width);q->entries.pop_front();
+ if(fake_i2s::on_receive)fake_i2s::on_receive(q->width);return pdTRUE;
 }
 inline size_t uxQueueMessagesWaiting(QueueHandle_t q){return q->entries.size();}
 inline int xQueueIsQueueFullFromISR(QueueHandle_t q){return q->entries.size()==q->capacity;}

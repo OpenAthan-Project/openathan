@@ -108,6 +108,10 @@ class I2SAudioSpeakerBase : public I2SAudioOut, public speaker::Speaker, public 
   void fail_volume_fence_();
   void begin_volume_session_();
   void end_volume_session_();
+  // ISR completions not yet reclaimed by a committed whole-descriptor write.
+  uint32_t volume_completed_descriptors_{};
+  uint32_t volume_completion_capacity_{};
+  static bool i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx);
   bool volume_fence_enabled_{};
   portMUX_TYPE volume_mutex_ = portMUX_INITIALIZER_UNLOCKED;
   VolumeFenceState volume_fence_;

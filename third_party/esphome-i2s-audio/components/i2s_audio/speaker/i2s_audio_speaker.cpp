@@ -401,6 +401,18 @@ bool IRAM_ATTR I2SAudioSpeakerBase::i2s_on_sent_cb(i2s_chan_handle_t handle, i2s
 
   I2SAudioSpeakerBase *this_speaker = (I2SAudioSpeakerBase *) user_ctx;
 
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+  if (this_speaker->volume_fence_enabled_) {
+    portENTER_CRITICAL_ISR(&this_speaker->volume_mutex_);
+    // Check before publishing the event: IDF invokes on_sent before its own
+    // queue-overflow callback, and another core can consume this event at once.
+    if (this_speaker->volume_completed_descriptors_ >= this_speaker->volume_completion_capacity_)
+      this_speaker->volume_fence_.fail();
+    else
+      ++this_speaker->volume_completed_descriptors_;
+    portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
+  }
+#endif
   if (xQueueIsQueueFullFromISR(this_speaker->i2s_event_queue_)) {
     // Queue is full, so discard the oldest event. Once we drop a completion event, ``i2s_event_queue_``
     // and any per-buffer record queue maintained by the task are permanently desynced, so the task
@@ -434,6 +446,19 @@ bool IRAM_ATTR I2SAudioSpeakerBase::i2s_on_sent_cb(i2s_chan_handle_t handle, i2s
 
   return need_yield1 | need_yield2 | need_yield3;
 }
+
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+bool IRAM_ATTR I2SAudioSpeakerBase::i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx) {
+  auto *speaker = static_cast<I2SAudioSpeakerBase *>(user_ctx);
+  if (!speaker->volume_fence_enabled_) return false;
+  portENTER_CRITICAL_ISR(&speaker->volume_mutex_);
+  speaker->volume_fence_.fail();
+  portEXIT_CRITICAL_ISR(&speaker->volume_mutex_);
+  BaseType_t need_yield = pdFALSE;
+  xEventGroupSetBitsFromISR(speaker->event_group_, ERR_LOCKSTEP_DESYNC | COMMAND_STOP, &need_yield);
+  return need_yield;
+}
+#endif
 
 void I2SAudioSpeakerBase::apply_software_volume_(uint8_t *data, size_t bytes_read) {
   apply_volume_factor_(data, bytes_read, q31_volume_factor_);

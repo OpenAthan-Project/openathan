@@ -92,3 +92,67 @@ and fault handling. Check cold restart and runtime memory separately. Register
 verification and simulated FIFO completion do not establish physical silence,
 analog transients, distortion, comfortable maximum output or release readiness.
 Merge, release, website work and installation remain separate actions.
+
+## PR #44 review regression fixes — 2026-10-11
+
+The review found two gaps in the earlier fence validation: independent circular
+DMA completions could break FIFO ordering while the speaker task stalled, and
+Quran interpreted a healthy muted gain transition as a speaker failure.
+Fenced playback now stages a complete descriptor in the existing silence buffer
+and submits one full-buffer write. An ISR counter tracks completed descriptors
+awaiting reuse independently of drained application events; exceeding the driver's
+four-entry queue capacity fails before publication. The driver overflow callback
+also latches failure synchronously. Short writes, registration failures and ordering
+faults cannot acknowledge gain through cleanup.
+
+`Playback::healthy()` defaults to `ready()` for existing adapters. The Atom adapter
+keeps health true during a subsequent healthy transition, while new starts and
+applied-volume readback remain gated. The production Quran controller checks this
+health when deciding whether to stop an active stream; real faults still stop it.
+Volume calibration, defaults, storage/migration and HTTP contracts are unchanged.
+
+### New automated evidence
+
+- All 20 UBSan CTests, 120 pinned Python tests and 13 configuration schemas passed;
+  the maintained patch reverses to the original upstream hashes.
+- The transport models five circular DMA descriptors, a separate four-entry driver
+  queue, callback ordering, automatic clearing and independently advancing DMA.
+  Reference-sized 882-byte descriptors cover safe backlog and six/seven-completion
+  stalls. Lost ordering keeps both gates closed and fails without old-gain output.
+  Deferred ISR faults during acknowledgement, fragmented input, partial writes,
+  pause/restart and ordinary unfenced playback are covered.
+- The actual Quran controller and Atom adapter preserve stream ownership/epoch
+  during zero, rapid and ordinary gain changes. Stop, disconnection, maintenance
+  and hardware failures still revoke playback; metadata completing during pending
+  gain cannot start a new stream. Production worker/HTTPS regressions also pass.
+- Restoring either the old DMA implementation or Quran readiness check makes its
+  new regression fail. The earlier browser results above were not repeated locally
+  for this correction; no device-UI assets changed.
+
+### Measurements for the review fixes
+
+Before is PR head `12231c9`: retained measurements whose compiled source inputs
+were verified against that commit. All ten fixed variants were rebuilt with the
+same compile-only settings/audio, ESPHome 2026.9.0, ESP-IDF 5.5.5 and compiler
+`esp-14.2.0_20260121`. Dependency hashes match every pair and capacity checks pass.
+
+| Variant | Before OTA bytes | After OTA bytes | Delta | Remaining 1.5 MiB budget | Static RAM delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Atom reference | 1,305,296 | 1,305,920 | +624 | 266,944 | +136 |
+| Atom real schedule | 1,123,808 | 1,124,368 | +560 | 448,496 | +136 |
+| Atom synthetic timetable | 1,141,344 | 1,141,920 | +576 | 430,944 | +136 |
+| Atom provisioning validation | 1,307,040 | 1,307,632 | +592 | 265,232 | +136 |
+| Atom upgrade qualification | 1,311,824 | 1,312,400 | +576 | 260,464 | +136 |
+| Atom startup-failure qualification | 1,311,824 | 1,312,400 | +576 | 260,464 | +136 |
+| Waveshare production | 1,309,872 | 1,309,936 | +64 | 262,928 | +0 |
+| Waveshare audio | 1,238,352 | 1,238,416 | +64 | 334,448 | +0 |
+| Waveshare display | 1,288,080 | 1,288,160 | +80 | 284,704 | +0 |
+| Waveshare diagnostics | 1,374,928 | 1,374,992 | +64 | 197,872 | +0 |
+
+Reference slot headroom is 791,232 bytes. Both 2 MiB application slots and the
+separate 3.5 MiB shared audio partition remain intact. Reusing the existing scratch
+buffer adds no PCM buffer, audio task or queue; the backlog bookkeeping adds two
+32-bit fields. The shared playback interface also changes the Waveshare control
+images slightly. Static RAM and compile success do not establish runtime heap,
+fragmentation, stack or PSRAM headroom. No hardware access, installation, playback,
+merge or release occurred; attended acceptance above remains pending.

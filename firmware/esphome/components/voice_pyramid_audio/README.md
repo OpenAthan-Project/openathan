@@ -23,3 +23,8 @@ package without selecting calibration.
 See the [calibration contract and dated build evidence](../../../../docs/development/atom-volume-calibration-2026-10-11.md)
 for the gain curve, settings compatibility, amplifier gating and outstanding
 physical acceptance.
+
+A healthy active Quran stream survives muted volume transitions. Playback health
+is separate from readiness to start new audio: new starts and applied-volume
+readback stay gated until the current fence completes. Real hardware or transport
+faults still stop playback and keep the output gates closed.

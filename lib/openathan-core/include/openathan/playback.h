@@ -10,6 +10,8 @@ class Playback {
  public:
   virtual ~Playback() = default;
   virtual bool ready() const = 0;
+  // Active playback health may remain true while new starts are temporarily gated.
+  virtual bool healthy() const { return ready(); }
   virtual bool playing() const = 0;
   // Replace current audio; true means the request was accepted, not audibly played.
   virtual bool start(Track track) = 0;

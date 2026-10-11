@@ -245,7 +245,7 @@ static void dma_fence() {
    f.audio.loop();
    if(!f.audio.ready())assert(!f.enabled()&&f.dac.mute==0x60);
    else completed=true;
-   if(!fake_i2s::dma.empty()) {int16_t sample{};std::memcpy(&sample,fake_i2s::dma.front().data(),2);
+   if(!fake_i2s::dma.empty()) {int16_t sample{};std::memcpy(&sample,fake_i2s::dma[fake_i2s::next_transmit].data(),2);
     if(sample==20000){old_tail=true;assert(!f.enabled());}}
   }
   if(buffers==24)f.speaker.stop();
@@ -351,5 +351,137 @@ static void dma_faults_and_deadline() {
  i2s_audio::VolumeFenceTestAccess::exhaust(state);assert(!state.request(1,INT32_MAX).generation&&state.failed());
  i2s_audio::VolumeFenceState session;i2s_audio::VolumeFenceTestAccess::exhaust_session(session);assert(!session.begin_session()&&session.failed());
 }
-int main() { curves(); storage(); interrupted_saves(); isolated_storage();amplifier_control();
- adapter_idle_and_faults();streaming_handoff();dma_fence();rapid_pause_stop_restart();superseded_deadline();dma_faults_and_deadline(); }
+static void independent_dma_stalls() {
+ for (unsigned completions : {0U, 3U, 4U, 6U, 7U}) {
+  Fixture f;fake_i2s::dma_bytes=882;f.apply(100);unsigned writes=0, fills=0;bool fault=false;
+  fake_i2s::defer_isr_bits=true;
+  const int16_t pcm[4]={20000,20000,20000,20000};
+  fake_i2s::on_transmit=[&](size_t,const auto &buffer){
+   f.audio.loop();
+   if(f.audio.volume_percent()==50 && f.enabled()) {
+    for(size_t i=0;i<buffer.size();i+=2) {int16_t sample{};std::memcpy(&sample,buffer.data()+i,2);assert(sample<20000);}
+   }
+  };
+  fake_i2s::on_fill=[&]{
+   f.speaker.loop();f.speaker.play(reinterpret_cast<const uint8_t*>(pcm),sizeof(pcm));
+   if(++fills==1) {
+    assert(f.audio.request_volume_percent(50));f.audio.loop();
+    for(unsigned i=0;i<completions;++i)fake_i2s::advance();
+    fault=!f.speaker.volume_fence_healthy();
+    if(completions>4) {
+     assert(fault);f.audio.loop();assert(f.audio.is_failed()&&!f.enabled()&&f.dac.mute==0x60);
+    }
+   }
+  };
+  fake_i2s::on_write=[&]{f.speaker.loop();f.audio.loop();if(++writes==20)f.speaker.stop();};
+  f.run();f.audio.loop();
+  if(completions>4)assert(fault&&f.audio.is_failed()&&!f.enabled());
+  else assert(!fault&&!f.audio.is_failed()&&f.audio.volume_percent()==50);
+ }
+ // A concurrent driver fault while the task drains acknowledgements cannot
+ // authorize unmute, even when ISR event-group delivery is deferred.
+ {
+  Fixture f;f.apply(100);unsigned writes=0;bool injected=false;
+  fake_i2s::on_write=[&]{
+   f.speaker.loop();
+   if(++writes==8){assert(f.audio.request_volume_percent(20));f.audio.loop();}
+   f.audio.loop();
+  };
+  fake_i2s::on_receive=[&](size_t width){
+   if(writes>=9&&!injected&&width==sizeof(i2s_audio::VolumeDmaRecord)) {
+    injected=true;fake_i2s::defer_isr_bits=true;
+    fake_i2s::overflow_callback(nullptr,nullptr,fake_i2s::context);
+    f.audio.loop();assert(!f.enabled()&&f.dac.mute==0x60);
+   }
+  };
+  f.run();f.audio.loop();assert(injected&&f.audio.is_failed()&&!f.enabled());
+ }
+ // A dropped driver descriptor must latch failure even without deferred event bits.
+ Fixture f;f.apply(100);f.speaker.start();f.speaker.loop();
+ fake_i2s::on_write=[&]{
+  assert(fake_i2s::overflow_callback);fake_i2s::defer_isr_bits=true;
+  fake_i2s::overflow_callback(nullptr,nullptr,fake_i2s::context);
+  assert(!f.speaker.volume_fence_healthy());f.audio.loop();assert(!f.enabled());
+ };
+ try{fake_i2s::task(fake_i2s::task_arg);}catch(const fake_i2s::Exit&){}
+ f.speaker.loop();f.audio.loop();assert(f.audio.is_failed());
+}
+static void unfenced_transport_control() {
+ Fixture f;f.speaker.set_volume_fence(false);unsigned writes=0;
+ const int16_t pcm[4]={20000,20000,20000,20000};
+ fake_i2s::on_fill=[&]{f.speaker.loop();f.speaker.play(reinterpret_cast<const uint8_t*>(pcm),sizeof(pcm));};
+ fake_i2s::on_write=[&]{f.speaker.loop();if(++writes==12)f.speaker.stop();};
+ f.run();assert(!f.speaker.is_failed()&&!fake_i2s::overflow_callback);
+ bool heard=false;
+ for(const auto &buffer:fake_i2s::transmitted)for(size_t i=0;i<buffer.size();i+=2){
+  int16_t sample{};std::memcpy(&sample,buffer.data()+i,2);if(sample==20000)heard=true;
+ }
+ assert(heard);
+}
+#ifdef OPENATHAN_QURAN_VOLUME_INTEGRATION
+#include "quran.h"
+void prepare_volume_quran_metadata();
+void finish_volume_quran_metadata();
+static void quran_volume_continuity() {
+ for (unsigned target : {0U, 20U, 100U}) {
+  Fixture f;f.apply(64);assert(f.audio.start_stream("https://cdn.mp3quran.net/example/018.mp3"));
+  openathan_component::OpenAthan athan;athan.audio=&f.audio;
+  openathan_device::Quran service;service.begin(&athan,"volume-test");service.loop(true,false);
+  const auto epoch=f.audio.playback_epoch();unsigned writes=0;bool pending_seen=false;
+  fake_i2s::on_write=[&]{
+   ++writes;f.speaker.loop();
+   if(writes==8){assert(f.audio.request_volume_percent(50));f.audio.loop();
+    assert(f.audio.request_volume_percent(target));f.audio.loop();
+    assert(f.audio.healthy()&&!f.audio.ready()&&!f.audio.volume_percent());
+    assert(!f.audio.start_stream("https://cdn.mp3quran.net/example/001.mp3"));pending_seen=true;}
+   f.audio.loop();service.loop(true,false);
+   assert(f.audio.source()==::openathan::PlaybackSource::QURAN&&f.audio.playback_epoch()==epoch);
+   JsonDocument state;service.snapshot(state.to<JsonObject>());assert(state["state"]=="playing");
+   if(writes==24)f.speaker.stop();
+  };
+  f.run();assert(pending_seen&&f.audio.volume_percent()==target&&f.playback.starts==1);
+  if(!target)assert(!f.enabled()&&f.dac.mute==0x60);
+  // Disconnection, maintenance and genuine hardware faults still revoke playback.
+  if(target==0)service.loop(false,false);
+  else if(target==20)service.loop(true,true);
+  else {f.playback.available=false;service.loop(true,false);}
+  assert(f.audio.source()==::openathan::PlaybackSource::NONE);
+ }
+ Fixture f;f.apply(64);assert(f.audio.start_stream("https://cdn.mp3quran.net/example/018.mp3"));
+ openathan_component::OpenAthan athan;athan.audio=&f.audio;
+ openathan_device::Quran service;service.begin(&athan,"stop-test");service.loop(true,false);
+ unsigned writes=0;
+ fake_i2s::on_write=[&]{f.speaker.loop();
+  if(++writes==8){assert(f.audio.request_volume_percent(20));f.audio.loop();f.audio.stop();}
+  f.audio.loop();service.loop(true,false);
+ };
+ f.run();f.audio.loop();f.audio.loop();assert(!f.audio.playing()&&f.playback.starts==1&&f.audio.volume_percent()==20);
+ // A metadata job completing while a gain change is pending cannot start audio.
+ {
+  Fixture f;f.apply(64);
+  openathan_component::OpenAthan athan;athan.audio=&f.audio;
+  openathan_device::Quran service;service.begin(&athan,"pending-job");service.loop(true,false);
+  prepare_volume_quran_metadata();JsonDocument selection,state;
+  selection["reciter"]=1;selection["edition"]=9;selection["surah"]=18;
+  service.snapshot(state.to<JsonObject>());selection["expected_playback_token"]=state["playback_token"];
+  std::string error;assert(service.action("play",selection.as<JsonObjectConst>(),error)==200);
+  f.speaker.loop(); // Process Play's Stop before starting the transport fixture.
+  unsigned writes=0;bool rejected=false;
+  fake_i2s::on_write=[&]{f.speaker.loop();
+   if(++writes==8){assert(f.audio.request_volume_percent(20));f.audio.loop();assert(!f.audio.ready());
+    finish_volume_quran_metadata();service.loop(true,false);
+    service.snapshot(state.to<JsonObject>());assert(state["state"]=="error");
+    assert(state["error"]=="The speaker could not start Quran playback");
+    assert(f.playback.starts==0);rejected=true;f.speaker.stop();}
+  };
+  f.run();assert(rejected&&f.playback.starts==0);
+ }
+
+}
+#endif
+int main() {
+#ifdef OPENATHAN_QURAN_VOLUME_INTEGRATION
+ quran_volume_continuity();
+#endif
+ curves(); storage(); interrupted_saves(); isolated_storage();amplifier_control();
+ adapter_idle_and_faults();streaming_handoff();dma_fence();rapid_pause_stop_restart();superseded_deadline();dma_faults_and_deadline();independent_dma_stalls();unfenced_transport_control(); }

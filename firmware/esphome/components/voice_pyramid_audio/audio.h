@@ -58,7 +58,8 @@ class Audio : public Component, public ::openathan::Playback {
     if (dac_) codec_mute_(true);
     if (amplifier_) amplifier_->set_pa_enabled(false);
   }
-  bool ready() const override { return hardware_healthy_() && phase_ == Phase::IDLE && applied_.has_value(); }
+  bool healthy() const override { return hardware_healthy_() && applied_.has_value(); }
+  bool ready() const override { return healthy() && phase_ == Phase::IDLE; }
   bool playing() const override { return playback_ && playback_->playing(); }
   bool start(::openathan::Track track) override { return ready() && playback_->start(track); }
   bool stream_supported() const override { return playback_ && playback_->stream_supported(); }

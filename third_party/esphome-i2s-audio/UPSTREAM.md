@@ -25,10 +25,16 @@ and only a fully cleaned-up stopped speaker can acknowledge without DMA.
 Each DMA descriptor uses one synchronized gain/generation snapshot, with gain
 applied to consumed raw PCM before bit-depth narrowing. The existing FIFO record
 carries its session/generation, including preloaded and padded silence. A complete
-matching descriptor confirms that older FIFO buffers drained. Completion batches
+matching descriptor confirms that older FIFO buffers drained. Fenced playback
+composes one complete descriptor in the existing silence scratch buffer and
+submits it in one write, preventing partial-buffer abandonment under driver backlog. Completion batches
 are validated before publishing an acknowledgement. Allocation, callback, DMA
 layout, write, overflow and queue faults latch failure through task cleanup;
 logical readback and elapsed time cannot complete a fence.
+An ISR counter tracks completed descriptors awaiting a committed buffer write,
+independently of drained application events. Exceeding the driver's N-1 queue
+capacity fails before event publication; the driver overflow callback also fails
+closed. This covers ESP-IDF 5.5.5 invoking on_sent before overflow handling.
 ISR queue failures latch under the same ESP-IDF critical-section lock immediately,
 without waiting for deferred event-group updates. Driver teardown rechecks faults
 before clearing events or allowing a stopped speaker to complete a fence.
