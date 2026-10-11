@@ -11,6 +11,9 @@ class Clock : public Component, public i2c::I2CDevice {
 class Amplifier : public Component, public i2c::I2CDevice {
  public:
   void setup() override;
+  bool ready() const { return ready_ && !is_failed(); }
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
+ private:
+  bool ready_{};
 };
 }  // namespace esphome::voice_pyramid

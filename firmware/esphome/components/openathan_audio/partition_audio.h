@@ -30,6 +30,9 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   bool start_stream(const std::string &url) override;
   std::optional<unsigned> volume_percent() const override;
   bool request_volume_percent(unsigned percent) override;
+  // Hardware adapters may split attenuation between the codec and software.
+  std::optional<float> volume_level() const;
+  bool request_volume_level(float level);
  protected:
   speaker::SpeakerMediaPlayer *player_{};
   std::string partition_;

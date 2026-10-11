@@ -34,7 +34,9 @@ void Amplifier::setup() {
     if (!write_byte(0x00, 0xFF) || !write_byte(0x01, 0x78)) {
       ESP_LOGE("voice_pyramid", "AW87559 setup failed");
       mark_failed();
+      return;
     }
+    ready_ = true;
   });
 }
 }  // namespace esphome::voice_pyramid

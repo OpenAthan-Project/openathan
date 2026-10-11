@@ -51,6 +51,9 @@ openathan_validation:
   id: validation
   scheduler_id: athan_scheduler
 
+voice_pyramid_audio:
+  validation_id: validation
+
 button:
   - platform: template
     name: Start test sequence
@@ -60,11 +63,11 @@ button:
   - platform: template
     name: Play normal
     on_press:
-      - lambda: id(athan_audio).start(openathan::Track::NORMAL);
+      - lambda: id(pyramid_audio).start(openathan::Track::NORMAL);
   - platform: template
     name: Play Fajr
     on_press:
-      - lambda: id(athan_audio).start(openathan::Track::FAJR);
+      - lambda: id(pyramid_audio).start(openathan::Track::FAJR);
   - platform: template
     name: Stop audio
     on_press:

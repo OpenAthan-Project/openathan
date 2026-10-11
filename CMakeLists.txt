@@ -108,6 +108,19 @@ target_include_directories(waveshare_adapter_tests PRIVATE tests/waveshare_stubs
   firmware lib/openathan-core/include)
 add_test(NAME waveshare_power_and_backlight COMMAND waveshare_adapter_tests)
 
+foreach(mode IN ITEMS production isolated)
+  add_executable(pyramid_volume_${mode}_tests tests/pyramid_volume_tests.cpp
+    firmware/esphome/components/voice_pyramid/voice_pyramid.cpp
+    firmware/esphome/components/openathan/nvs_settings_store.cpp)
+  target_include_directories(pyramid_volume_${mode}_tests PRIVATE tests/pyramid_stubs tests/waveshare_stubs tests/stubs
+    firmware lib/openathan-core/include)
+  target_link_libraries(pyramid_volume_${mode}_tests PRIVATE openathan_core)
+  if(mode STREQUAL "isolated")
+    target_compile_definitions(pyramid_volume_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)
+  endif()
+  add_test(NAME pyramid_volume_${mode} COMMAND pyramid_volume_${mode}_tests)
+endforeach()
+
 add_executable(rtc_adapter_tests tests/rtc_adapter_tests.cpp
   firmware/esphome/components/waveshare_box_rtc/rtc.cpp)
 target_include_directories(rtc_adapter_tests PRIVATE tests/rtc_stubs tests/stubs firmware)

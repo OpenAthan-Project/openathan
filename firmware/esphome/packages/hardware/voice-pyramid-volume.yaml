@@ -1,0 +1,32 @@
+# Product-only volume calibration; the reusable hardware package retains its
+# normal ESPHome DAC binding for integrations with different player/scheduler IDs.
+substitutions:
+  athan_playback_id: pyramid_audio
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [voice_pyramid_audio]
+
+switch:
+  - id: !extend pyramid_speaker_enable
+    restore_mode: ALWAYS_OFF
+
+speaker:
+  - id: !extend pyramid_speaker
+    audio_dac: !remove
+
+media_player:
+  - id: !extend athan_player
+    volume_initial: 0%
+    volume_max: 100%
+
+voice_pyramid_audio:
+  id: pyramid_audio
+  playback_id: athan_audio
+  dac_id: pyramid_dac
+  enable_id: pyramid_speaker_enable
+  clock_id: pyramid_clock
+  amplifier_id: pyramid_amplifier
+  scheduler_id: athan_scheduler

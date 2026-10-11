@@ -60,6 +60,12 @@ an ongoing drag retains its edited value. Feedback and recovery stay beside the
 affected group, distinguishing unsaved input, saving, confirmed storage, applying,
 unavailable output and failure.
 
+Volume is relative to the installed hardware. The calibrated Atom/Voice Pyramid
+profile converts an older saved percentage to keep near-equivalent output, so
+an old 80% appears as 64% after upgrade. The new maximum is higher; see the
+[calibration report](../../docs/development/atom-volume-calibration-2026-10-11.md)
+for its acceptance limits.
+
 ### Prayer drafts and first-run setup
 
 Location, timezone, calculation conventions, high-latitude rules and offsets remain

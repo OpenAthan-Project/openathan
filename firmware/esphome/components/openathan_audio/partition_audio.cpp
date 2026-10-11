@@ -13,14 +13,21 @@ namespace esphome::openathan_audio {
 static const char *const TAG = "openathan_audio";
 
 std::optional<unsigned> PartitionAudio::volume_percent() const {
-  if (!player_ || !player_->is_ready() || !std::isfinite(player_->volume) ||
-      player_->volume < 0 || player_->volume > 1) return {};
-  return player_->is_muted() ? 0U : static_cast<unsigned>(std::lround(player_->volume * 100));
+  const auto level = volume_level();
+  return level ? std::optional<unsigned>(static_cast<unsigned>(std::lround(*level * 100))) : std::nullopt;
 }
 bool PartitionAudio::request_volume_percent(unsigned percent) {
-  if (!player_ || !player_->is_ready() || percent > 100) return false;
+  return percent <= 100 && request_volume_level(percent / 100.0f);
+}
+std::optional<float> PartitionAudio::volume_level() const {
+  if (!player_ || !player_->is_ready() || !std::isfinite(player_->volume) ||
+      player_->volume < 0 || player_->volume > 1) return {};
+  return player_->is_muted() ? 0.0f : player_->volume;
+}
+bool PartitionAudio::request_volume_level(float level) {
+  if (!player_ || !player_->is_ready() || !std::isfinite(level) || level < 0 || level > 1) return false;
   auto call = player_->make_call();
-  call.set_volume(percent / 100.0f);
+  call.set_volume(level);
   call.perform();  // ESPHome may drop a full-queue request; caller must check readback.
   return true;
 }

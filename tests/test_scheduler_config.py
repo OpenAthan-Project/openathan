@@ -1,5 +1,6 @@
 """Validate the real ESPHome schema, when run in the pinned build environment."""
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -75,6 +76,20 @@ interval:
           id: athan_test_scheduler
 """
         self.validate(config, True)
+
+    def test_generic_hardware_retains_dac_volume_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "test.yaml"
+            config.write_text(self.config())
+            result = subprocess.run([sys.executable, "-m", "esphome", "compile", "--only-generate", str(config)],
+                                    env=dict(os.environ, ESPHOME_BUILD_PATH=str(root / "build")),
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            source = (root / "build/scheduler-schema-test/src/main.cpp").read_text()
+            self.assertIn("pyramid_speaker->set_audio_dac(pyramid_dac)", source)
+            self.assertIn("athan_test_scheduler->set_playback(athan_test_audio)", source)
+            self.assertNotIn("voice_pyramid_audio::Audio", source)
 
     def test_explicit_timezone_required(self):
         self.validate(self.config(timezone=""), False, "explicit timezone")

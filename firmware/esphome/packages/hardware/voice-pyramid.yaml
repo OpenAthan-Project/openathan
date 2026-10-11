@@ -25,9 +25,11 @@ switch:
 
 voice_pyramid:
   clock:
+    id: pyramid_clock
     i2c_id: pyramid_bus
     address: 0x60
   amplifier:
+    id: pyramid_amplifier
     i2c_id: pyramid_bus
     address: 0x5B
 

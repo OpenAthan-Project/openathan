@@ -8,7 +8,7 @@ static const char *const TAG = "oa_validation";
 void Validation::setup() {
   scheduler_->set_calculator(this);
   scheduler_->set_state_store(this);
-  scheduler_->set_settings_store(&settings_store_);
+  scheduler_->set_settings_store(settings_source_);
   if (nvs_open("oa_validation", NVS_READWRITE, &metadata_) != ESP_OK) return;
   char record[80]{};
   size_t size = sizeof(record);

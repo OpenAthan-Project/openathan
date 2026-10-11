@@ -10,6 +10,11 @@ The extracted implementation passed full-recording playback and scheduler
 validation on the reference unit; see the
 [device results](../../../../docs/development/feasibility-report.md#integrated-device-validation--2026-09-24).
 
+Product volume calibration lives in the separate
+[Voice Pyramid audio adapter](../voice_pyramid_audio/README.md). Its new maximum
+output has build and host-test coverage; physical listening acceptance remains
+pending. The generic hardware package keeps its ordinary ESPHome DAC binding.
+
 No third-party M5Stack component checkout is required. The register settings
 come from the verified diagnostic; the reusable implementation is OpenAthan
 code. Optional LEDs use the STM32 controller through checked I2C writes; see the

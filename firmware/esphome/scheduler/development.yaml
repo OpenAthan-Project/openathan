@@ -2,6 +2,7 @@
 packages:
   baseline: !include ../feasibility/baseline.yaml
   openathan: !include ../packages/openathan.yaml
+  volume: !include ../packages/hardware/voice-pyramid-volume.yaml
 
 external_components:
   - source:
@@ -21,7 +22,7 @@ openathan_audio:
 openathan:
   id: athan_scheduler
   time_id: athan_clock
-  playback_id: athan_audio
+  playback_id: pyramid_audio
   latitude: !secret athan_latitude
   longitude: !secret athan_longitude
   method: !secret athan_method

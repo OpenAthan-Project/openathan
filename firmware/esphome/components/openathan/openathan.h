@@ -37,6 +37,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void set_state_store(::openathan::StateStore *store) { state_store_ = store; }
   void set_settings_store(::openathan::SettingsStore *store) { settings_store_ = store; }
   void set_default_timezone(const std::string &name) { timezone_name_ = name; }
+  void set_default_volume(unsigned percent) { default_volume_ = percent; }
   void require_setup() { setup_gate_ = std::make_unique<SetupStore>(); }
   const char *setup_state() const;
   bool activated() const { return !maintenance_ && (!setup_gate_ || setup_gate_->active()); }
@@ -114,6 +115,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   std::unique_ptr<SetupStore> setup_gate_;
   std::string timezone_name_;
   bool volume_applied_{false}, request_ok_{false};
+  unsigned default_volume_{70};
   bool maintenance_{false};
   unsigned volume_attempts_{};
   uint64_t next_volume_check_{};
