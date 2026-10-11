@@ -96,8 +96,9 @@ class WaveshareCapacityTests(unittest.TestCase):
     def test_volume_routes_for_each_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            # Included diagnostic profiles fall back to the main config's secrets.
-            (root / 'secrets.yaml').write_text('diagnostic_api_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=\n')
+            # Included profiles fall back to the main config's public placeholders.
+            # This must work before prepare_ci creates any repository secrets.
+            (root / 'secrets.yaml').write_bytes((ROOT / 'firmware/esphome/compile-secrets.example.yaml').read_bytes())
             for profile in ('waveshare/audio', 'waveshare/development',
                             'waveshare/diagnostics', 'openathan', 'scheduler/validation'):
                 with self.subTest(profile=profile):
