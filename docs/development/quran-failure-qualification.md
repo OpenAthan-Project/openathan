@@ -139,7 +139,13 @@ For TLS faults, stop the server, keep the same origin/embedded CA, and restart
 with `--tls-mode untrusted` or `--tls-mode wrong-host`. Both must fail before any
 HTTP request is logged. Restart with `--tls-mode trusted` for recovery. An
 unfinished handshake on one connection must not block other clients; the server
-bounds workers to eight and handshake timeouts to five seconds.
+bounds workers to eight and handshake and request-read timeouts to five seconds.
+Response bodies use 4 KiB writes, each with a five-second timeout. There is no
+total recording-duration limit: normal transfers can continue while bounded
+writes succeed. A blocked write or disconnected client closes the connection and
+releases its worker without retrying. Intentional stall cases still send their
+short prefix, wait the selected stall duration, and close; that wait is separate
+from the socket timeout.
 
 After **each** failure, observe at least 30 seconds of silence and stable state
 without another HTTP/audio start. Select `normal` with the approved recording,

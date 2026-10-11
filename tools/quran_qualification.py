@@ -30,6 +30,8 @@ CASES = ("normal", "metadata-status", "metadata-malformed", "metadata-oversize",
          "audio-redirect-http", "audio-redirect-host", "audio-redirect-loop")
 MEDIA_CASES = ("normal", "audio-truncate", "audio-stall")
 MAX_MEDIA = 32 * 1024 * 1024
+SOCKET_TIMEOUT_SECONDS = 5
+BODY_CHUNK_BYTES = 4096
 
 
 def initialize(directory, address, port=8443):
@@ -110,6 +112,14 @@ def handler(directory):
         def log_message(self, *args):
             pass  # Never record credentials, arbitrary headers or client addresses.
 
+        def _write_body(self, data, limit):
+            # Each bounded write gets the socket timeout; an entire recording
+            # may take longer while its reader continues making progress.
+            with memoryview(data) as view:
+                for offset in range(0, limit, BODY_CHUNK_BYTES):
+                    self.wfile.write(view[offset:min(offset + BODY_CHUNK_BYTES, limit)])
+            self.wfile.flush()
+
         def do_GET(self):
             try:
                 require(self.path.startswith(PREFIX) and len(self.path) <= 1024, "Unknown route")
@@ -157,7 +167,7 @@ def handler(directory):
                 stall = case == phase + "-stall"
                 partial = max(1, len(data)//2)
                 limit = partial if truncate else min(1024, partial) if stall else len(data)
-                self.wfile.write(data[:limit]); self.wfile.flush()
+                self._write_body(data, limit)
                 if stall: time.sleep(control["stall_seconds"])
             except (OSError, ValueError, KeyError, TypeError):
                 self.close_connection = True
@@ -172,7 +182,7 @@ def tls_server(address, directory, context):
         slots = threading.BoundedSemaphore(8)
 
         def get_request(self):
-            connection, peer = super().get_request(); connection.settimeout(5)
+            connection, peer = super().get_request(); connection.settimeout(SOCKET_TIMEOUT_SECONDS)
             return connection, peer
 
         def process_request(self, connection, peer):
@@ -187,6 +197,8 @@ def tls_server(address, directory, context):
                 try: secured = context.wrap_socket(connection, server_side=True)
                 except (OSError, ssl.SSLError):
                     connection.close(); return
+                # Bound request reads and each body chunk after TLS negotiation.
+                secured.settimeout(SOCKET_TIMEOUT_SECONDS)
                 super().process_request_thread(secured, peer)
             finally:
                 self.slots.release()

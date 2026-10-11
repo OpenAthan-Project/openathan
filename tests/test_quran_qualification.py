@@ -1,5 +1,6 @@
 """Private Quran fixtures, verified TLS, profile isolation and release exclusion."""
 import asyncio
+import hashlib
 import importlib.util
 import json
 import os
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -31,11 +33,21 @@ class QuranFixtures(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.directory = self.root / "feed"
         qualification.initialize(self.directory, "192.168.1.2")
+        self.servers = {}
 
-    def tls_feed(self, mode="trusted"):
+    def tls_feed(self, mode="trusted", constrained=False):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(self.directory / f"server-{mode}.pem", self.directory / "server-key.pem")
         server = qualification.tls_server(("127.0.0.1", 0), self.directory, context)
+        if constrained:
+            get_request = server.get_request
+            def constrained_request():
+                connection, peer = get_request()
+                connection.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 16384)
+                connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                return connection, peer
+            server.get_request = constrained_request
+        self.servers[server.server_address] = server
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
@@ -53,6 +65,124 @@ class QuranFixtures(unittest.TestCase):
                     chunks.append(chunk)
         header, body = b"".join(chunks).split(b"\r\n\r\n", 1)
         return header, body
+
+    def large_media(self):
+        # Valid host-only transport fixture; never install or play on a device.
+        media = self.root / "host-only.mp3"
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+                        "anullsrc=r=44100:cl=stereo", "-t", "120", "-c:a", "libmp3lame",
+                        "-b:a", "320k", str(media)], check=True, timeout=30, capture_output=True)
+        self.assertGreaterEqual(media.stat().st_size, 4 * 1024 * 1024)
+        qualification.select(self.directory, "normal", media)
+        return media.read_bytes()
+
+    def audio_connection(self, address):
+        context = ssl.create_default_context(cafile=str(self.directory / "ca.pem"))
+        raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.addCleanup(raw.close)
+        raw.settimeout(3)
+        # Set the receive window before TCP negotiation; shrinking it afterward
+        # can leave queued data larger than the newly selected buffer.
+        raw.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16384)
+        raw.connect(address)
+        connection = context.wrap_socket(raw, server_hostname="192.168.1.2")
+        self.addCleanup(connection.close)
+        connection.sendall(f"GET {AUDIO} HTTP/1.0\r\nHost: 192.168.1.2\r\n\r\n".encode())
+        response = bytearray()
+        while b"\r\n\r\n" not in response:
+            chunk = connection.recv(4096)
+            self.assertTrue(chunk, "Connection closed before audio response headers")
+            response.extend(chunk)
+        header, body = response.split(b"\r\n\r\n", 1)
+        self.assertTrue(header.startswith(b"HTTP/1.0 200 "), header)
+        self.assertIn(b"Content-Type: audio/mpeg", header)
+        declared = int(next(line.split(b": ", 1)[1] for line in header.split(b"\r\n")
+                            if line.startswith(b"Content-Length:")))
+        return connection, declared, body
+
+    @staticmethod
+    def available_workers(server):
+        acquired = 0
+        try:
+            while acquired < 8 and server.slots.acquire(blocking=False):
+                acquired += 1
+            return acquired
+        finally:
+            for _ in range(acquired):
+                server.slots.release()
+
+    def wait_for_workers(self, address, timeout):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.available_workers(self.servers[address]) == 8:
+                return
+            time.sleep(0.01)
+        self.fail("Fixture worker was not released within its timeout")
+
+    def assert_one_audio_request(self):
+        requests = [json.loads(line) for line in (self.directory / "requests.jsonl").read_text().splitlines()]
+        self.assertEqual(sum(row["logical_url"] == "https://cdn.mp3quran.net/qualification/001.mp3"
+                             for row in requests), 1)
+
+    def test_normal_recording_survives_slow_reader(self):
+        expected = self.large_media()
+        address = self.tls_feed(constrained=True)
+        connection, declared, body = self.audio_connection(address)
+        self.assertEqual(declared, len(expected))
+        started = time.monotonic()
+        while time.monotonic() - started < 8:
+            chunk = connection.recv(16384)
+            if not chunk:
+                break
+            body.extend(chunk)
+            # TLS record sizes vary, and some kernels grow requested buffers.
+            # Pace bytes so both writers get the same progressing slow reader.
+            time.sleep(len(chunk) / (128 * 1024))
+        while chunk := connection.recv(65536):
+            body.extend(chunk)
+        self.assertEqual(len(body), declared, "Normal fixture was truncated under backpressure")
+        self.assertEqual(body, expected)
+        self.assertEqual(hashlib.sha256(body).digest(), hashlib.sha256(expected).digest())
+        self.assertGreaterEqual(time.monotonic() - started, 8)
+        connection.close()
+        self.wait_for_workers(address, 2)
+        self.assert_one_audio_request()
+
+    def test_nonreading_client_times_out_and_releases_worker(self):
+        expected = self.large_media()
+        address = self.tls_feed(constrained=True)
+        connection, declared, body = self.audio_connection(address)
+        self.assertEqual(declared, len(expected))
+        started = time.monotonic()
+        self.assertEqual(self.available_workers(self.servers[address]), 7)
+        # Another worker must remain usable while audio cannot make progress.
+        header, metadata = self.fetch(address)
+        self.assertIn(b"200", header)
+        self.assertEqual(json.loads(metadata)["reciters"][0]["id"], 1)
+        self.wait_for_workers(address, max(0, 7 - (time.monotonic() - started)))
+        self.assertLessEqual(time.monotonic() - started, 7)
+        while chunk := connection.recv(65536):
+            body.extend(chunk)
+        self.assertLess(len(body), declared)
+        connection.close()
+        header, _ = self.fetch(address)
+        self.assertIn(b"200", header)
+        self.wait_for_workers(address, 2)
+        self.assert_one_audio_request()
+
+    def test_disconnected_client_releases_worker(self):
+        self.large_media()
+        address = self.tls_feed(constrained=True)
+        connection, _, _ = self.audio_connection(address)
+        # Let the small socket buffers fill while the body remains unread.
+        time.sleep(0.25)
+        self.assertEqual(self.available_workers(self.servers[address]), 7)
+        connection.close()
+        self.wait_for_workers(address, 2)
+        header, _ = self.fetch(address)
+        self.assertIn(b"200", header)
+        self.wait_for_workers(address, 2)
+        self.assert_one_audio_request()
 
     def test_private_files_and_fresh_initialization(self):
         self.assertEqual(self.directory.stat().st_mode & 0o777, 0o700)
