@@ -5,7 +5,93 @@ cover metadata resolution, cancellation, Athan priority and local controls.
 Physical streaming, audible output and concurrent runtime memory remain
 unqualified. This report does not establish release readiness.
 
-## Verification of review fixes — 2026-10-11
+## Verification of playback request race fixes — 2026-10-11
+
+These fixes compare PR #43 at `aebc1d094ddf6dfb2287c790a5062a4c03c508dc`
+with final firmware, UI and regression source
+`7e1d505c5d9b9151875a6f85085ab8dbdad9774a`, rebased onto unchanged main
+`e4304465de98c925c34820b945b2549854a4bd63`. All 409 tracked measured source
+files were verified against that final revision. This report update changes
+documentation only; the earlier review and original implementation results below
+remain historical comparisons.
+
+Play now requires the transient `quran.playback_token` observed from the device.
+The per-boot identifier and playback counter reject delayed requests invalidated
+by Stop, a new Athan or reboot before altering audio or allocating work. Missing
+or stale tokens return HTTP 409; malformed payloads return HTTP 400. Older cached
+clients must reload. `/api/stop` and durable storage are unchanged.
+
+The browser owns playback intent separately from catalog loading. Stop stays
+reachable in Today, Settings and Quran while Play is pending or unconfirmed, and
+supersedes Play callbacks. Every current Play/Stop outcome triggers a new status
+read; earlier polls cannot confirm the command or replace its later playback
+observation. Concurrent settings and Skip observations retain their own ordering.
+An uncertain Play is never repeated, and unchanged-token idle cannot resolve it.
+Stop confirmation requires inactive playback and invalidation of a pending Play
+token. Missing playback fields keep Play pending until fresh state or Stop resolves
+it. Browser storage remembers selection IDs only.
+
+| Check | Result |
+| --- | --- |
+| CMake/CTest host suite under UBSan | 18/18 passed. |
+| Complete pinned Python suite | 113/113 passed without skips. |
+| Complete browser suites | Chromium 266/266 and WebKit 266/266 passed with Node 24.19.0, Playwright 1.62.1 and the production Digest bridge. |
+| Final focused browser regressions | 82/82 passed across Chromium and WebKit. |
+| Production Quran worker and HTTPS helper under UBSan | Passed token validation, simulated physical/other-client Stop, reboot invalidation, counter wrap, pending/active Athan priority and existing worker cancellation checks. |
+| Production and isolated local API tests | Passed token forwarding/status exposure, HTTP 409 propagation and durable-record preservation. |
+| ESPHome configuration checks | All 13 CI configurations passed. |
+| Pinned installer contract | Both hardware profiles passed without device access. |
+| Resolved ESP-IDF HTTP formatter | Complete request-line/header transmission regressions passed. |
+
+Browser regressions cover Stop arriving before a delayed Play from all three
+views, the actual five-second idle poll before Play acknowledgement, delayed
+pre-acknowledgement reads, obsolete successful replies, malformed/lost Play and
+Stop replies, incomplete or failed readback and reconnect. They assert visible
+controls and feedback, final simulated device state, no automatic repeat Play,
+and no corrective Stop that could interrupt a newly due Athan.
+
+Both original race scenarios fail against exact baseline UI assets in Chromium
+and WebKit. The temporary comparison fixture accepts the baseline three-ID Play
+API: a delayed Play is admitted after Stop, and an idle poll removes Stop while
+Play remains pending. Bypassing only that early visibility assertion also proves
+the later acknowledgement cannot replace the baseline's idle observation. The
+permanent regression assertions remain intact on the fixed source.
+
+### OTA comparison for playback request race fixes
+
+All ten before/after variants use identical Python 3.13.5, ESPHome 2026.9.0,
+tzdata 2026.4, ESP-IDF 5.5.5, source/build paths, configurations, substitutions,
+compile-only settings and resolved dependencies. Each actual `firmware.ota.bin`
+passed the existing capacity checker. Both 2,097,152-byte application slots and
+the separate 3,670,016-byte shared-audio partition are retained. Synthetic audio
+fixtures were used only for compilation and must not be installed or played.
+
+| Variant | Unfixed OTA bytes | Fixed OTA bytes | Fix delta | Budget remaining | Slot free | Static RAM bytes (fix delta) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Atom reference | 1,299,248 | 1,301,456 | +2,208 | 271,408 | 795,696 | 115,675 (+24) |
+| Waveshare production | 1,307,232 | 1,309,696 | +2,464 | 263,168 | 787,456 | 116,171 (+24) |
+| Scheduler device | 1,121,520 | 1,121,520 | 0 | 451,344 | 975,632 | 113,231 (0) |
+| Scheduler validation | 1,139,056 | 1,139,056 | 0 | 433,808 | 958,096 | 113,943 (0) |
+| Provisioning validation | 1,300,688 | 1,302,992 | +2,304 | 269,872 | 794,160 | 115,675 (+24) |
+| Upgrade qualification | 1,305,536 | 1,307,840 | +2,304 | 265,024 | 789,312 | 115,747 (+24) |
+| Upgrade startup failure | 1,305,536 | 1,307,840 | +2,304 | 265,024 | 789,312 | 115,747 (+24) |
+| Waveshare audio | 1,235,904 | 1,238,208 | +2,304 | 334,656 | 858,944 | 113,747 (+24) |
+| Waveshare display | 1,285,632 | 1,287,920 | +2,288 | 284,944 | 809,232 | 116,171 (+24) |
+| Waveshare diagnostics | 1,372,464 | 1,374,768 | +2,304 | 198,096 | 722,384 | 116,831 (+24) |
+
+The smallest remaining application budget is 198,096 bytes against the existing
+1,572,864-byte limit. Quran-enabled OTA images grow by 2,208–2,464 bytes; the two
+generic scheduler images are unchanged. Embedded gzip assets total 26,342 bytes
+versus 25,494 bytes on the unfixed baseline, +848 bytes. No dependencies or
+recordings were added. Static RAM grows by 24 bytes on affected variants; this
+does not establish runtime heap, fragmentation, PSRAM or stack headroom.
+
+No firmware was installed and no hardware was accessed. Physical streaming,
+audible output, real device TLS/decoding, long-surah behavior, physical Stop/Athan
+interruption and concurrent runtime-memory measurements remain separate release
+gates. These automated checks do not establish release readiness.
+
+## Verification of earlier review fixes — 2026-10-11
 
 The baseline for these fixes is PR #43 at
 `36fd0a5db639a4ee10ddb3be7e415ae609c6dab5`. Final firmware, UI and regression
