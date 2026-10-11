@@ -732,9 +732,11 @@ function render() {
     $(id).hidden = !playbackActive();
     $(id).disabled = !connected || stopBusy;
   }
-  $("settings-playing").hidden = !state?.playing;
+  $("settings-playing").hidden = !playbackActive();
+  $("settings-playing").querySelector("strong").textContent = state?.quran?.state === "loading" ? "Starting Quran" : "Playing";
   $("settings-playing").querySelector(".hint").textContent = connected
-    ? state?.playback_source === "quran" ? "Quran is playing on the speaker." : "Playback is active on the speaker."
+    ? state?.quran?.state === "loading" ? "Quran is starting on the speaker."
+      : state?.playback_source === "quran" ? "Quran is playing on the speaker." : "Playback is active on the speaker."
     : "Last observed playing · connection lost.";
   const skipKey = state?.skip,
     skipName = skipKey ? title(prayers[skipKey.prayer]) : next?.name;

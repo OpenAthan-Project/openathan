@@ -9,9 +9,9 @@
 int64_t esp_timer_get_time() { return 1000000; }
 using namespace esphome::openathan_device;
 struct Audio : openathan::Playback {
-  bool active{}; uint32_t epoch{}; std::string url;
+  bool active{}, available{true}; uint32_t epoch{}; std::string url;
   openathan::PlaybackSource kind{openathan::PlaybackSource::NONE};
-  bool ready() const override { return true; }
+  bool ready() const override { return available; }
   bool playing() const override { return active; }
   bool stream_supported() const override { return true; }
   uint32_t playback_epoch() const override { return epoch; }
@@ -54,11 +54,21 @@ int main() {
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
   athan.stop(); execute(service); assert(audio.url.empty()); // Stop while resolving.
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  service.loop(false, false); execute(service); assert(audio.url.empty()); // Reconnect cannot revive a canceled job.
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  service.shutdown(); execute(service); assert(audio.url.empty());
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  service.loop(true, true); execute(service); assert(audio.url.empty()); // Maintenance beats late results.
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
   audio.start(openathan::Track::NORMAL); execute(service); assert(audio.url.empty()); // Athan beats late result.
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
   audio.stop();
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
   execute(service); assert(audio.url == "https://cdn.mp3quran.net/example/018.mp3");
+  service.loop(false, false);assert(!audio.active && audio.kind==openathan::PlaybackSource::NONE);
+  service.loop(true, false);assert(!audio.active);
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);execute(service);
+  audio.available=false;service.loop(true, false);assert(!audio.active);audio.available=true;
   audio.stop(); audio.url.clear();
   auto unavailable = input(R"({"reciter":1,"edition":9,"surah":2})");
   assert(service.action("play", unavailable.as<JsonObjectConst>(), error) == 200); execute(service);
@@ -94,7 +104,9 @@ int main() {
   state.clear(); service.catalog_snapshot(state.to<JsonObject>());
   assert(state["data"]["reciters"].size() == 5 && state["data"]["next_offset"].isNull());
   catalog["offset"] = 0; catalog["query"] = "RECITER 25";
+  audio.start_stream("https://cdn.mp3quran.net/example/018.mp3");const auto epoch=audio.epoch;
   assert(service.action("catalog", catalog.as<JsonObjectConst>(), error) == 200); execute(service);
+  assert(audio.active&&audio.epoch==epoch); // Catalog browsing cannot stop current audio.
   state.clear(); service.catalog_snapshot(state.to<JsonObject>());
   assert(state["data"]["total"] == 1 && state["data"]["reciters"][0]["id"] == 25);
   // Redirect destination is rejected before opening its connection.
@@ -109,6 +121,12 @@ int main() {
   http_replies[redirected] = {200, "", "mp3"};
   { QuranHttp response; assert(response.open(audio_url, true)); }
   assert(http_requests.size() == 2 && live_http_clients == 0);
+  { QuranHttp response; assert(response.open(redirected,true));auto *client=response.release();
+    assert(client->config.user_data==nullptr);
+    char key[]="Content-Type",value[]="audio/mpeg";
+    esp_http_client_event_t event{HTTP_EVENT_ON_HEADER,key,value,client->config.user_data};
+    assert(client->config.event_handler(&event)==0);esp_http_client_cleanup(client);
+  }
   reset_http();
   for (const auto &destination : {"http://cdn.mp3quran.net/example/018.mp3", "https://evil.example/018.mp3"}) {
     http_replies[audio_url] = {302, destination, ""};
