@@ -52,8 +52,10 @@ Wi-Fi and a valid clock for TLS. Updates, USB maintenance and shutdown cancel it
 Bounds are 1 MiB per metadata response, 16 KiB per object, 1,024 reciters,
 20 reciters per returned page, 32 editions per reciter, 114 distinct surahs,
 256 bytes per name, 128 bytes per search and 32 KiB per normalized response.
-Metadata requests have four-second I/O timeouts and a 30-second per-response
-deadline. Names and IDs come from the provider; malformed or oversized responses
+Metadata requests have four-second I/O timeouts and a 30-second parsing/read-loop
+deadline. Redirect opening and an in-flight blocking call finish within their
+I/O timeouts before cancellation takes effect. Names and IDs come from the
+provider; malformed or oversized responses
 fail without substituting another recording. Search uses the English catalog and
 ASCII case folding. An edition is playable only if its selected surah is listed.
 

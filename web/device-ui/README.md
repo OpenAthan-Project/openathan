@@ -32,10 +32,11 @@ date. No playing-prayer identity, playback history or device-accurate countdown
 is inferred. Skip/Restore keep the reported day/prayer key and settings revision.
 
 Stop bypasses the preference-write scheduler. An HTTP-successful response that
-still reports `playing:true` remains pending; only authoritative `playing:false`
-confirms completion. A failed response triggers readback. Failed readback reports
-an unconfirmed Stop and warns that playback may remain active. Today and Settings
-share that pending, confirmed or unconfirmed feedback.
+still reports `playing:true` or Quran loading remains pending; authoritative
+`playing:false` without Quran loading confirms completion. A failed response
+triggers readback. Failed readback reports an unconfirmed Stop and warns that
+playback may remain active. Today and Settings
+share that pending, confirmed or unconfirmed feedback with the Quran view.
 
 ### Everyday preferences
 
