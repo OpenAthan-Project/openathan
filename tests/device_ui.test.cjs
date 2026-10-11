@@ -143,9 +143,9 @@ async function loseSkipResponseAndRestoreContact(f,page){
 function quranReciters(id=1,name='Alpha',next=null,total=1){
  return {reciters:[{id,name}],surahs:[{id:18,name:'Al-Kahf'}],next_offset:next,total};
 }
-async function quranRequestStarted(signal){
+async function requestStarted(signal){
  let timer;
- try{await Promise.race([signal.promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Quran request did not start')),10000);})]);}
+ try{await Promise.race([signal.promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Device request did not start')),10000);})]);}
  finally{clearTimeout(timer);}
 }
 async function quranControls(page){
@@ -175,7 +175,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     else await route.fulfill({status:409,json:{error:'Playback changed; check status'}});
    });
    await page.route('**/api/stop',route=>{stops++;stopQuran(f.state.device);return route.fulfill({json:structuredClone(f.state.device)});});
-   await quranControls(page);await page.locator('#quran-play').click();await quranRequestStarted(started);
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
    if(stopView!=='quran')await page.locator(`[data-view=${stopView}]`).click();
    const id=stopView==='quran'?'quran-stop':stopView==='settings'?'settings-stop':'stop';
    assert.ok(await page.locator('#'+id).isVisible());await page.locator('#'+id).click();
@@ -197,10 +197,10 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await page.route('**/api/status',async route=>{const raw=structuredClone(f.state.device);if(raw.quran.state==='idle')idlePolls++;
     if(delayRead){delayRead=false;oldStarted.resolve();await oldRead.promise;}await route.fulfill({json:raw});
    });
-   await quranControls(page);await page.locator('#quran-play').click();await quranRequestStarted(started);
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
    const poll=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/status');await page.clock.runFor(5000);await (await poll).finished();
    assert.equal(idlePolls,1);assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
-   delayRead=true;await page.clock.runFor(5000);await quranRequestStarted(oldStarted);
+   delayRead=true;await page.clock.runFor(5000);await requestStarted(oldStarted);
    gate.resolve();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
    oldRead.resolve();await requestsFinished(page);
    assert.equal(f.state.device.quran.state,'loading');assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
@@ -261,7 +261,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await mockQuranCatalog(page);
    await page.route('**/api/quran/play',async route=>{assert.ok(admitQuran(f.state.device,route.request().postDataJSON()));const raw=structuredClone(f.state.device);started.resolve();await gate.promise;await route.fulfill({json:raw});});
    await page.route('**/api/stop',route=>{stops++;stopQuran(f.state.device);return route.fulfill({json:structuredClone(f.state.device)});});
-   await quranControls(page);await page.locator('#quran-play').click();await quranRequestStarted(started);await page.locator('#quran-stop').click();
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);await page.locator('#quran-stop').click();
    await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent==='Playback stopped');
    stopQuran(f.state.device);f.state.device.playing=true;f.state.device.playback_source='athan';
    gate.resolve();await requestsFinished(page);await page.clock.runFor(5000);await requestsFinished(page);
@@ -289,7 +289,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    });
    await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
    await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
-   await page.locator('#quran-reciter').selectOption('1');await quranRequestStarted(started);
+   await page.locator('#quran-reciter').selectOption('1');await requestStarted(started);
    await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
    assert.ok(await page.locator('#quran-search').isEnabled());
    await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
@@ -315,10 +315,10 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     await route.fulfill({json:{state:'ready',request:n,data:quranReciters(n===1?1:n===2?9:2,n===2?'Obsolete result':n===3?'Latest Beta':'Alpha')}});
    });
    await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
-   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);await quranRequestStarted(oldStarted);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);await requestStarted(oldStarted);
    await page.locator('#quran-search').fill('Gamma');await page.clock.runFor(400);
    await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);
-   oldGate.resolve();await quranRequestStarted(latestStarted);
+   oldGate.resolve();await requestStarted(latestStarted);
    assert.equal(await page.locator('#quran-reciter option[value="9"]').count(),0);
    assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),1);
    latestGate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
@@ -336,7 +336,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     await route.fulfill({json:{state:'ready',request:posts.length,data:p.query?quranReciters(21,'Beta'):quranReciters(1,'Alpha',20,25)}});
    });
    await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
-   await page.locator('#quran-search').fill('Beta');await page.locator('#quran-more').click();await quranRequestStarted(started);
+   await page.locator('#quran-search').fill('Beta');await page.locator('#quran-more').click();await requestStarted(started);
    await page.clock.runFor(500);assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
    gate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
    assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),0);
@@ -377,7 +377,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
     plays++;f.state.device.quran={supported:true,playback_token:'boot:1',state:'loading',reciter:1,edition:9,surah:18};started.resolve();await gate.promise;
     await route.fulfill(uncertain?{status:200,contentType:'application/json',body:'{'}:{json:structuredClone(f.state.device)});
    });
-   await quranControls(page);await page.locator('#quran-play').click();await quranRequestStarted(started);
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
    await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
    await page.locator('#quran-search').fill('Beta');await page.clock.runFor(500);assert.equal(posts.length,2);
    gate.resolve();await requestsFinished(page);await page.clock.runFor(2000);await requestsFinished(page);
@@ -1637,11 +1637,14 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
  });
  for(const restore of [false,true])for(const readback of [false,true]){
   test(`${browserName}: an older ${restore?'Restore':'Skip'} ${readback?'readback':'reply'} keeps the newer prayer occurrence`,async()=>{
-   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r),path=restore?'cancel-skip':'skip';let reads=0;
+   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r),path=restore?'cancel-skip':'skip';let reads=0,stopping=false;const stopRead=deferred(),stopReadStarted=deferred();
    try{
-    await page.route('**/api/'+path,async route=>{if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};if(readback){await route.fulfill({status:200,contentType:'application/json',body:'{'});return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});if(readback)await page.route('**/api/status',async route=>{if(++reads!==1){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#skip').click();await started;
-    const next=f.state.device.schedule.times[4];f.state.device.next={day:20721,prayer:3,name:'Maghrib',local:next.local,utc:next.utc};delete f.state.device.skip;await page.locator('#stop').click();await page.waitForFunction(()=>document.getElementById('next-name').textContent==='Maghrib');release();await page.waitForFunction(()=>!actionBusy,{},{timeout:3000});assert.equal(await page.locator('#next-name').textContent(),'Maghrib');assert.equal(await page.locator('#next-time').textContent(),'18:20');assert.equal(await page.locator('#skip').textContent(),'Skip Maghrib today');assert.match(await page.locator('#action-feedback').textContent(),/current prayer/);assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'maghrib');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());
-   }finally{release();await o.close();}
+    await page.route('**/api/'+path,async route=>{if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};if(readback){await route.fulfill({status:200,contentType:'application/json',body:'{'});return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.route('**/api/status',async route=>{
+     if(readback&&++reads===1){const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});return;}
+     if(stopping){stopReadStarted.resolve();await stopRead.promise;}await route.continue();
+    });await page.locator('#skip').click();await started;
+    const next=f.state.device.schedule.times[4];f.state.device.next={day:20721,prayer:3,name:'Maghrib',local:next.local,utc:next.utc};delete f.state.device.skip;stopping=true;await page.locator('#stop').click();await requestStarted(stopReadStarted);await page.waitForFunction(()=>document.getElementById('next-name').textContent==='Maghrib');assert.ok(await page.locator('#stop').isVisible());stopRead.resolve();await page.waitForFunction(()=>document.getElementById('stop').hidden);release();await page.waitForFunction(()=>!actionBusy,{},{timeout:3000});assert.equal(await page.locator('#next-name').textContent(),'Maghrib');assert.equal(await page.locator('#next-time').textContent(),'18:20');assert.equal(await page.locator('#skip').textContent(),'Skip Maghrib today');assert.match(await page.locator('#action-feedback').textContent(),/current prayer/);assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'maghrib');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());
+   }finally{release();stopRead.resolve();await o.close();}
   });
  }
  for(const waiting of [false,true]){
