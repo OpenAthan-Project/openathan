@@ -21,6 +21,11 @@ struct Audio : openathan::Playback {
   bool start_stream(const std::string &value) override { url = value; active = true; kind = openathan::PlaybackSource::QURAN; return true; }
 };
 JsonDocument input(const char *text) { JsonDocument doc; assert(!deserializeJson(doc, text)); return doc; }
+int request_play(Quran &service, JsonDocument &selection, std::string &error) {
+  JsonDocument state; service.snapshot(state.to<JsonObject>());
+  selection["expected_playback_token"] = state["playback_token"];
+  return service.action("play", selection.as<JsonObjectConst>(), error);
+}
 void execute(Quran &service) { run_worker(); service.loop(true, false); assert(live_http_clients == 0); }
 int main() {
   assert(quran_audio_url("https://cdn.mp3quran.net/audio/example/001.mp3"));
@@ -45,44 +50,78 @@ int main() {
   assert(!accepted);
   Audio audio;
   esphome::openathan_component::OpenAthan athan; athan.audio = &audio;
-  Quran service; service.begin(&athan); service.loop(true, false);
+  Quran service; service.begin(&athan, "boot-a"); service.loop(true, false);
   const std::string base = "https://www.mp3quran.net/api/v3/";
   const std::string entry = R"({"id":1,"name":"Example","moshaf":[{"id":9,"name":"Edition","server":"https://cdn.mp3quran.net/example/","surah_list":"1,18,114"}]})";
   http_replies[base + "reciters?language=eng&reciter=1"] = {200, "", "{\"reciters\":[" + entry + "]}"};
   std::string error;
   auto play = input(R"({"reciter":1,"edition":9,"surah":18})");
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  // Reject a Play that arrives after Stop without allocating a worker or
+  // disturbing current playback. A token is required even for older clients.
+  const auto attempts = task_attempts;
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  JsonDocument before; service.snapshot(before.to<JsonObject>());
+  play["expected_playback_token"] = before["playback_token"];
+  audio.stop();
+  const auto stopped_epoch = audio.epoch;
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(audio.epoch == stopped_epoch && task_attempts == attempts && !pending_worker);
+  play["expected_playback_token"] = 1;
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 400);
+  play["expected_playback_token"] = std::string(60, 'x');
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 400);
+  play["expected_playback_token"] = before["playback_token"];
+  play["unexpected"] = true;
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 400);
+  play.remove("unexpected");
+  audio.start(openathan::Track::NORMAL);
+  const auto athan_epoch = audio.epoch;
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(audio.epoch == athan_epoch && audio.kind == openathan::PlaybackSource::ATHAN && task_attempts == attempts);
+  audio.stop(); // Even after Athan ends, an older Play cannot revive.
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  service.snapshot(before.to<JsonObject>());
+  play["expected_playback_token"] = before["playback_token"];
+  service.begin(&athan, "boot-b");
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  audio.epoch = UINT32_MAX;
+  service.snapshot(before.to<JsonObject>());
+  play["expected_playback_token"] = before["playback_token"];
+  audio.stop();
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(audio.epoch == 0 && task_attempts == attempts);
+  assert(request_play(service, play, error) == 200);
   athan.stop(); execute(service); assert(audio.url.empty()); // Stop while resolving.
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  assert(request_play(service, play, error) == 200);
   service.loop(false, false); execute(service); assert(audio.url.empty()); // Reconnect cannot revive a canceled job.
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  assert(request_play(service, play, error) == 200);
   service.shutdown(); execute(service); assert(audio.url.empty());
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  assert(request_play(service, play, error) == 200);
   service.loop(true, true); execute(service); assert(audio.url.empty()); // Maintenance beats late results.
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  assert(request_play(service, play, error) == 200);
   audio.start(openathan::Track::NORMAL); execute(service); assert(audio.url.empty()); // Athan beats late result.
   audio.active = false; // Athan has reserved ownership while its Stop is still draining.
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(request_play(service, play, error) == 409);
   service.loop(true, false);
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(request_play(service, play, error) == 409);
   audio.active = true; // The reservation must remain protected after playback starts.
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  assert(request_play(service, play, error) == 409);
   audio.stop();
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
+  assert(request_play(service, play, error) == 200);
   execute(service); assert(audio.url == "https://cdn.mp3quran.net/example/018.mp3");
   service.loop(false, false);assert(!audio.active && audio.kind==openathan::PlaybackSource::NONE);
   service.loop(true, false);assert(!audio.active);
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);execute(service);
+  assert(request_play(service, play, error) == 200);execute(service);
   audio.available=false;service.loop(true, false);assert(!audio.active);audio.available=true;
   audio.stop(); audio.url.clear();
   auto unavailable = input(R"({"reciter":1,"edition":9,"surah":2})");
-  assert(service.action("play", unavailable.as<JsonObjectConst>(), error) == 200); execute(service);
+  assert(request_play(service, unavailable, error) == 200); execute(service);
   JsonDocument state; service.snapshot(state.to<JsonObject>()); assert(state["state"] == "error" && audio.url.empty());
-  service.loop(true, true); assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
-  service.loop(false, false); assert(service.action("play", play.as<JsonObjectConst>(), error) == 503);
+  service.loop(true, true); assert(request_play(service, play, error) == 409);
+  service.loop(false, false); assert(request_play(service, play, error) == 503);
   service.loop(true, false);
   task_available = false;
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 503); task_available = true;
+  assert(request_play(service, play, error) == 503); task_available = true;
   // The catalog is scanned entry by entry; pagination and search cover all rows.
   audio.stop(); reset_http();
   std::string reciters = "{\"reciters\":[";
@@ -117,7 +156,7 @@ int main() {
   // Redirect destination is rejected before opening its connection.
   reset_http();
   http_replies[base + "reciters?language=eng&reciter=1"] = {302, "https://evil.example/reciters", ""};
-  assert(service.action("play", play.as<JsonObjectConst>(), error) == 200); execute(service);
+  assert(request_play(service, play, error) == 200); execute(service);
   assert(http_requests.size() == 1 && last_bundle && http_requests[0].auto_redirect_disabled);
   reset_http();
   const std::string audio_url = "https://cdn.mp3quran.net/example/018.mp3";

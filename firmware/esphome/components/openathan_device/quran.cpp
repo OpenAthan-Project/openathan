@@ -131,6 +131,10 @@ void Quran::worker_(void *context) {
   work.reset();
   vTaskDelete(nullptr);
 }
+std::string Quran::playback_token_() const {
+  const auto *playback = athan_ ? athan_->playback() : nullptr;
+  return boot_id_ + ":" + std::to_string(playback ? playback->playback_epoch() : 0);
+}
 int Quran::action(const std::string &action, JsonObjectConst input, std::string &error) {
   auto *playback = athan_ ? athan_->playback() : nullptr;
   if (!playback || !playback->stream_supported()) { error = "Quran streaming is unavailable"; return 503; }
@@ -141,11 +145,25 @@ int Quran::action(const std::string &action, JsonObjectConst input, std::string 
   if (blocked_ || job_ || playback->source() == ::openathan::PlaybackSource::ATHAN) {
     error = "Wait for Athan, the current request or firmware maintenance to finish"; return 409;
   }
-  auto job = std::make_shared<Job>();
+  std::shared_ptr<Job> job;
   if (action == "play") {
-    if (input.size() != 3 || !input["reciter"].is<unsigned>() || !input["edition"].is<unsigned>() ||
+    if ((input.size() != 3 && input.size() != 4) || !input["reciter"].is<unsigned>() || !input["edition"].is<unsigned>() ||
         !input["surah"].is<unsigned>() || !input["reciter"].as<unsigned>() || !input["edition"].as<unsigned>() ||
         !input["surah"].as<unsigned>() || input["surah"].as<unsigned>() > 114) { error = "Select a reciter, edition and surah"; return 400; }
+    if (input["expected_playback_token"].isUnbound()) {
+      if (input.size() != 3) { error = "Invalid Play request"; return 400; }
+      error = "Reload the page and check playback before pressing Play"; return 409;
+    }
+    if (input.size() != 4 || !input["expected_playback_token"].is<const char *>() ||
+        input["expected_playback_token"].as<std::string>().size() > 59) {
+      error = "Invalid playback token"; return 400;
+    }
+    // Main-loop admission and Stop share the adapter epoch. This also rejects
+    // requests that arrive after physical Stop, Athan or a device restart.
+    if (input["expected_playback_token"].as<std::string>() != playback_token_()) {
+      error = "Playback changed; reload playback status before pressing Play"; return 409;
+    }
+    job = std::make_shared<Job>();
     job->kind = "play"; job->reciter = input["reciter"]; job->edition = input["edition"]; job->surah = input["surah"];
   } else {
     const auto kind = input["kind"].as<std::string>();
@@ -155,6 +173,7 @@ int Quran::action(const std::string &action, JsonObjectConst input, std::string 
         (kind == "editions" && (!input["reciter"].is<unsigned>() || !input["reciter"].as<unsigned>()))) {
       error = "Invalid catalog request"; return 400;
     }
+    job = std::make_shared<Job>();
     job->kind = kind; job->offset = input["offset"] | 0U; job->reciter = input["reciter"] | 0U;
     job->query = input["query"] | std::string{};
     for (auto &c : job->query) c = std::tolower(static_cast<unsigned char>(c));
@@ -203,6 +222,7 @@ void Quran::shutdown() { if (job_) job_->cancel = true; resolving_ = false; }
 void Quran::snapshot(JsonObject root) {
   auto *playback = athan_ ? athan_->playback() : nullptr;
   root["supported"] = playback && playback->stream_supported();
+  root["playback_token"] = playback_token_();
   const auto state = playback ? playback->stream_state() : ::openathan::StreamState::IDLE;
   const bool pending = resolving_ && job_ && playback && job_->epoch == playback->playback_epoch();
   root["state"] = pending ? "loading" : !playback_error_.empty() || state == ::openathan::StreamState::ERROR ? "error" :

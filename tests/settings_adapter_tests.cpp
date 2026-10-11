@@ -630,11 +630,11 @@ static void light_api() {
 static void local_api_quran() {
   using namespace esphome::openathan_device;
   struct Probe : QuranApi {
-    unsigned calls{}; int code{200}; std::string last;
-    void snapshot(JsonObject root) override { root["supported"]=true;root["state"]="loading"; }
+    unsigned calls{}; int code{200}; std::string last, token;
+    void snapshot(JsonObject root) override { root["supported"]=true;root["state"]="loading";root["playback_token"]="boot:1"; }
     void catalog_snapshot(JsonObject root) override { root["state"]="ready";root["request"]=7; }
-    int action(const std::string &action,JsonObjectConst,std::string &error) override {
-      ++calls;last=action;error="Provider unavailable";return code;
+    int action(const std::string &action,JsonObjectConst input,std::string &error) override {
+      ++calls;last=action;token=input["expected_playback_token"] | std::string{};error="Provider unavailable";return code;
     }
   } probe;
   Fixture f;f.begin();LocalApi api(&f.device,nullptr,0);api.set_quran(&probe);
@@ -647,9 +647,11 @@ static void local_api_quran() {
   auto catalog=call("GET","/api/quran/catalog");CHECK(catalog.code==200&&!deserializeJson(response,catalog.response));
   CHECK(response["request"]==7&&probe.calls==0);
   CHECK(call("POST","/api/quran/catalog",R"({"kind":"reciters","offset":0,"query":""})").code==200&&probe.last=="catalog");
-  auto play=call("POST","/api/quran/play",R"({"reciter":1,"edition":9,"surah":18})");
+  auto play=call("POST","/api/quran/play",R"({"reciter":1,"edition":9,"surah":18,"expected_playback_token":"boot:0"})");
   CHECK(play.code==200&&probe.last=="play"&&!deserializeJson(response,play.response));
   CHECK(response["quran"]["state"]=="loading"&&response["playback_source"]=="none");
+  CHECK(probe.token=="boot:0"&&response["quran"]["playback_token"]=="boot:1");
+  probe.code=409;CHECK(call("POST","/api/quran/play","{}").code==409);
   const auto calls=probe.calls;
   CHECK(call("POST","/api/quran/play","[]").code==400&&probe.calls==calls);
   CHECK(call("POST","/api/quran/play-extra","{}").code==404&&probe.calls==calls);

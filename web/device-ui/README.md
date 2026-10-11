@@ -19,6 +19,8 @@ timetable has a dated hero and no highlighted row. Connection loss freezes the
 last observed information and marks it stale; it does not assert playback stopped.
 Stop stays reachable from Today and Settings while playback is reported active.
 The optional Quran view also exposes Stop while a recording is resolving/loading.
+All three views keep Stop reachable during pending or unconfirmed Play requests,
+including while the device still reports idle.
 The current row matches the device's next prayer and UTC instant, rather than
 prayer name or browser time alone. Only the confirmed Today timetable has a
 highlight; preview and setup-review tables do not.
@@ -31,10 +33,12 @@ clients tolerate its absence and hide the header rather than use the browser's
 date. No playing-prayer identity, playback history or device-accurate countdown
 is inferred. Skip/Restore keep the reported day/prayer key and settings revision.
 
-Stop bypasses the preference-write scheduler. An HTTP-successful response that
-still reports `playing:true` or Quran loading remains pending; authoritative
-`playing:false` without Quran loading confirms completion. A failed response
-triggers readback. Failed readback reports an unconfirmed Stop and warns that
+Stop bypasses the preference-write scheduler and supersedes pending Play feedback.
+Every Play or Stop response, including an uncertain failure, triggers a new status
+read. Earlier polls cannot settle the command or overwrite its subsequent playback
+observation. `playing:true` or Quran loading keeps Stop pending; authoritative
+`playing:false` without Quran loading confirms completion only after any pending
+Play token is invalidated. Failed readback reports an unconfirmed Stop and warns that
 playback may remain active. Today and Settings
 share that pending, confirmed or unconfirmed feedback with the Quran view.
 
@@ -189,8 +193,12 @@ The development Quran view loads MP3Quran's live reciters with search and paging
 then recording editions and available surahs. Catalog and playback feedback stay
 independent. Browser storage remembers selections; Play and Stop do not change
 prayer settings. One surah plays on the speaker even after the page closes;
-Athan interrupts without automatic resume. An uncertain Play is read back rather
-than automatically repeated. See the [streaming contract](../../docs/development/quran-streaming.md)
+Athan interrupts without automatic resume. Play carries the current device playback
+token, so a delayed request cannot restart audio after Stop or reboot. An uncertain
+Play is read back rather than automatically repeated; idle with an unchanged token
+keeps Play blocked and Stop reachable. Tokens remain in memory, while browser
+storage remembers selection IDs only. A missing token requires page reload and
+firmware compatibility checking. See the [streaming contract](../../docs/development/quran-streaming.md)
 for APIs, bounds and physical qualification gates. Adhkar and owner-facing stored
 audio replacement remain future work.
 

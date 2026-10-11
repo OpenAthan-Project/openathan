@@ -7,7 +7,7 @@
 namespace esphome::openathan_device {
 class Quran : public QuranApi {
  public:
-  void begin(openathan_component::OpenAthan *athan) { athan_ = athan; }
+  void begin(openathan_component::OpenAthan *athan, const std::string &boot_id) { athan_ = athan; boot_id_ = boot_id; }
   void loop(bool connected, bool blocked);
   void shutdown();
   void snapshot(JsonObject root) override;
@@ -22,7 +22,9 @@ class Quran : public QuranApi {
   };
   static void worker_(void *context);
   void fetch_(Job &job);
+  std::string playback_token_() const;
   openathan_component::OpenAthan *athan_{};
+  std::string boot_id_;
   std::shared_ptr<Job> job_;
   std::string catalog_state_{"idle"}, catalog_response_, catalog_error_, playback_error_;
   uint32_t request_{}, catalog_request_{};

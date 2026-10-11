@@ -16,7 +16,8 @@ surah. Stop remains available while resolving or loading a recording.
 Scheduled Athan replaces Quran using the existing single announcement pipeline.
 Quran never resumes automatically after Athan, Stop, reboot, loss of Wi-Fi,
 speaker failure or firmware maintenance. A late metadata result cannot restart a
-session invalidated by Stop or Athan. Another Play replaces the previous Quran
+session invalidated by Stop or Athan. A playback token also rejects a Play request
+that reaches the device after Stop, Athan or a restart. Another Play replaces the previous Quran
 session; Play is refused during Athan or another outstanding metadata request.
 The physical Stop control uses the same playback adapter.
 
@@ -24,9 +25,15 @@ The UI distinguishes catalog feedback from authoritative playback feedback.
 `loading` means the device is resolving or starting a request; `playing` observes
 the player pipeline and is not proof of audible output. Decoder/reader failures
 report an error; a queued request that never starts times out after 30 seconds.
-An uncertain Play response triggers status readback and is never automatically
-repeated. A Stop is confirmed only after both active playback and Quran loading
-are absent from a fresh accepted status.
+Every Play or Stop response is followed by a new status read. Earlier polls cannot
+settle that command or replace its subsequent playback observation. An uncertain
+Play is never automatically repeated: idle with its original token still valid
+does not prove cancellation. Stop remains available from Today, Settings and
+Quran, including before Play reaches the device. Another Play stays disabled until
+the current request is resolved. A Stop is confirmed only after both active
+playback and Quran loading are absent from fresh accepted status and any pending
+Play token has been invalidated. Obsolete Play replies cannot undo Stop feedback
+or send a second Stop that could interrupt a newly due Athan.
 
 Browser storage remembers selection identifiers, without writing prayer settings,
 consumption history or shared audio. Pause, seek, bookmarks, schedules, offline
@@ -108,7 +115,7 @@ checks and main-loop exchange. Errors use the existing JSON `error` field.
 | `POST /api/quran/catalog` | `{"kind":"reciters","offset":0,"query":""}` | Catalog state and request ID; starts bounded catalog/search loading. |
 | `POST /api/quran/catalog` | `{"kind":"editions","reciter":1}` | Catalog state and request ID; loads that reciter's editions. |
 | `GET /api/quran/catalog` | None | `idle`, `loading`, `ready` or `error`, request ID, error and completed data when available. |
-| `POST /api/quran/play` | `{"reciter":1,"edition":9,"surah":18}` | Full device status; starts fresh identifier resolution. The example IDs illustrate the shape only. |
+| `POST /api/quran/play` | `{"reciter":1,"edition":9,"surah":18,"expected_playback_token":"<token from status>"}` | Full device status; starts fresh identifier resolution only if the token still matches. The example IDs illustrate the shape only. |
 | `POST /api/stop` | `{}` | Full status after invalidating pending and active playback. |
 
 Reciter data includes `reciters:[{id,name}]`, `surahs:[{id,name}]`, `total`,
@@ -118,11 +125,20 @@ another client's catalog request must not be accepted as their own result.
 No complete catalog is cached across requests or reboots.
 
 `GET /api/status` adds `playback_source` (`none`, `athan`, `quran`) and optional
-`quran:{supported,state,error,reciter,edition,surah}`. The Quran state is `idle`,
+`quran:{supported,state,error,reciter,edition,surah,playback_token}`. The Quran state is `idle`,
 `loading`, `playing` or `error`. IDs describe the selected session, including
 after it ends. These fields are transient observations, without durable revision
-numbers; clients must preserve newer request observations. A successful Play
-acknowledgment does not confirm playback. Unsupported builds can omit `quran`.
+numbers; clients must preserve newer request observations. `playback_token` is an
+opaque, transient string of at most 59 bytes, combining a per-boot identifier and
+the adapter's playback counter. Stop and new starts advance that counter; reboot
+changes the identifier. Clients use exact equality, never interpret or persist
+the token, and obtain a new observation after each command settles. It is a Play
+precondition, not a complete playback-state revision or authentication credential.
+Missing or stale Play tokens return HTTP 409 before altering audio or starting a
+worker. Invalid payload types, unexpected keys or oversized tokens return HTTP
+400. This development API requires the precondition immediately: cached older
+pages must reload, and pages without a token cannot submit Play. A successful
+Play acknowledgment does not confirm playback. Unsupported builds can omit `quran`.
 
 ## Provider and licensing
 
