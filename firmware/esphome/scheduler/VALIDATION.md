@@ -56,6 +56,13 @@ flash restore also restores historical consumption; it is not normal settings
 or Wi-Fi recovery. The dated [validation report](../../../docs/development/feasibility-report.md)
 records what was actually observed for each firmware milestone.
 
+The calibrated Atom/Voice Pyramid profiles convert saved volume to preserve
+near-equivalent output; for example, old 80% becomes 64%. Recheck the live
+percentage after updating. The new 100% removes the old digital ceiling and
+requires attended listening in gradual steps. This mapping and its pending
+physical checks are recorded in the
+[volume report](../../../docs/development/atom-volume-calibration-2026-10-11.md).
+
 1. Recheck stable compatible dependencies; run host tests and capacity checks.
    Record exact firmware hashes and dependency locks. ESPHome 2026.9.0 pins the
    diagnostic encryption libraries noise-c 0.1.30 and libsodium 1.10021.11.

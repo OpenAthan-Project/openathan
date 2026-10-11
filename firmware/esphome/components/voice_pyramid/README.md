@@ -5,10 +5,20 @@ Audio clock and amplifier adapter for the M5Stack Voice Pyramid A167.
 Implements the 44.1 kHz Si5351 CLK1 configuration (11.2896 MHz from a 27 MHz
 crystal) with register readback, and the AW87559 reset/SYSCTRL initialization
 used in the private 2026-09-24 audio diagnostics. The reference hardware
-package supplies the ESPHome ES8311 DAC, I2S speaker, and GPIO expander enable.
+package supplies the ESPHome ES8311 DAC, I2S speaker, and checked AW87559 PA
+control. Generic amplifier startup remains enabled;
+calibrated profiles select `enable_on_startup: false`. PA transitions change only
+SYSCTRL bit `0x08` and verify the resulting register.
 The extracted implementation passed full-recording playback and scheduler
 validation on the reference unit; see the
 [device results](../../../../docs/development/feasibility-report.md#integrated-device-validation--2026-09-24).
+Those dated results cover the original initialization; checked PA transitions
+and the DMA fence still require physical acceptance.
+
+Product volume calibration lives in the separate
+[Voice Pyramid audio adapter](../voice_pyramid_audio/README.md). Its new maximum
+output has build and host-test coverage; physical listening acceptance remains
+pending. The generic hardware package keeps its ordinary ESPHome DAC binding.
 
 No third-party M5Stack component checkout is required. The register settings
 come from the verified diagnostic; the reusable implementation is OpenAthan

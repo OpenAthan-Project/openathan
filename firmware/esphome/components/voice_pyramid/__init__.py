@@ -13,7 +13,8 @@ CONFIG_SCHEMA = cv.Schema({
         .extend(cv.COMPONENT_SCHEMA).extend(i2c.i2c_device_schema(0x1A)),
     cv.Required("clock"): cv.Schema({cv.GenerateID(): cv.declare_id(Clock)})
         .extend(cv.COMPONENT_SCHEMA).extend(i2c.i2c_device_schema(0x60)),
-    cv.Required("amplifier"): cv.Schema({cv.GenerateID(): cv.declare_id(Amplifier)})
+    cv.Required("amplifier"): cv.Schema({cv.GenerateID(): cv.declare_id(Amplifier),
+        cv.Optional("enable_on_startup", default=True): cv.boolean})
         .extend(cv.COMPONENT_SCHEMA).extend(i2c.i2c_device_schema(0x5B)),
 })
 
@@ -27,3 +28,5 @@ async def to_code(config):
         var = cg.new_Pvariable(config[key][CONF_ID])
         await cg.register_component(var, config[key])
         await i2c.register_i2c_device(var, config[key])
+        if key == "amplifier":
+            cg.add(var.set_enable_on_startup(config[key]["enable_on_startup"]))

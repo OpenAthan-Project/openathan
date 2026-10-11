@@ -23,14 +23,14 @@ void OpenAthan::setup() {
   ::openathan::DeviceSettings defaults{settings_,
       {timezone_name_, tz.std_offset_seconds, tz.has_dst() ? tz.dst_offset_seconds : 0,
        stored_rule(tz.dst_start), stored_rule(tz.dst_end)},
-      static_cast<uint8_t>(playback_->volume_percent().value_or(70))};
+      static_cast<uint8_t>(playback_->volume_percent().value_or(default_volume_))};
   // Load independently: a settings upgrade must never overwrite consumption.
   bool gate_ok = true;
   if (setup_gate_) {
     ::openathan::SavedSettings existing;
     ::openathan::DurableState history;
     gate_ok = setup_gate_->begin(settings_store_->load(existing), state_store_->load(history));
-    defaults.volume = 70;
+    defaults.volume = default_volume_;
   }
   const bool settings_ok = gate_ok && settings_service_->begin(defaults);
   scheduler_->begin(settings_ok ? settings_service_->saved()->value.prayer : settings_);

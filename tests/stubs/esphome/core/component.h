@@ -1,6 +1,7 @@
 #pragma once
+#include <functional>
 namespace esphome {
-namespace setup_priority { constexpr float AFTER_WIFI = 200; constexpr float LATE = -100; constexpr float HARDWARE = 800; constexpr float DATA = 600; constexpr float BEFORE_CONNECTION = 220; }
+namespace setup_priority { constexpr float IO = 900; constexpr float AFTER_WIFI = 200; constexpr float LATE = -100; constexpr float HARDWARE = 800; constexpr float DATA = 600; constexpr float BEFORE_CONNECTION = 220; }
 class Component {
  public:
   virtual ~Component() = default;
@@ -10,6 +11,7 @@ class Component {
   virtual float get_setup_priority() const { return 0; }
   void mark_failed() { failed_ = true; }
   bool is_failed() const { return failed_; }
+  void set_timeout(unsigned, std::function<void()> callback) { callback(); }
  private:
   bool failed_{false};
 };

@@ -199,7 +199,7 @@ void Quran::loop(bool connected, bool blocked) {
   auto *playback = athan_ ? athan_->playback() : nullptr;
   if (!playback) return;
   if (job_ && (!connected || blocked || job_->epoch != playback->playback_epoch())) job_->cancel = true;
-  if ((!connected || !playback->ready()) && playback->source() == ::openathan::PlaybackSource::QURAN) {
+  if ((!connected || !playback->healthy()) && playback->source() == ::openathan::PlaybackSource::QURAN) {
     athan_->stop(); playback_error_ = !connected ? "Wi-Fi disconnected. Press Play after reconnecting." : "The speaker is unavailable. Check the device before retrying.";
   }
   if (blocked && (resolving_ || playback->source() == ::openathan::PlaybackSource::QURAN)) athan_->stop();

@@ -6,6 +6,7 @@ namespace esphome::openathan_validation {
 class Validation : public Component, public ::openathan::DayCalculator, public ::openathan::StateStore {
  public:
   void set_scheduler(openathan_component::OpenAthan *scheduler) { scheduler_ = scheduler; }
+  void set_settings_store(::openathan::SettingsStore *store) { settings_source_ = store; }
   float get_setup_priority() const override { return setup_priority::LATE + 1; }
   void setup() override;
   bool start_test();
@@ -16,6 +17,7 @@ class Validation : public Component, public ::openathan::DayCalculator, public :
   openathan_component::OpenAthan *scheduler_{};
   openathan_component::NvsStateStore store_{"oa_validation"};
   openathan_component::NvsSettingsStore settings_store_{"oa_validation"};
+  ::openathan::SettingsStore *settings_source_{&settings_store_};
   nvs_handle_t metadata_{};
   bool healthy_{false};
   int32_t day_{};

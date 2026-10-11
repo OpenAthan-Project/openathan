@@ -1,0 +1,518 @@
+--- a/components/i2s_audio/speaker/__init__.py
++++ b/components/i2s_audio/speaker/__init__.py
+@@ -0,0 +1 @@
++# Modified by OpenAthan, 2026-10-11: opt-in DMA volume fence; see UPSTREAM.md.
+@@ -47,0 +49 @@
++CONF_VOLUME_FENCE = "volume_fence"
+@@ -198,0 +201 @@
++                    cv.Optional(CONF_VOLUME_FENCE, default=False): cv.boolean,
+@@ -216,0 +220,2 @@
++    if config.get(CONF_VOLUME_FENCE) and (config.get(CONF_SPDIF_MODE) or config.get("audio_dac")):
++        raise cv.Invalid("volume_fence requires standard I2S with software gain owned by its adapter")
+@@ -250,0 +256,4 @@
++    if config.get(CONF_VOLUME_FENCE):
++        cg.add_define("USE_OPENATHAN_VOLUME_FENCE")
++        cg.add(var.set_volume_fence(True))
++
+--- a/components/i2s_audio/speaker/i2s_audio_speaker.cpp
++++ b/components/i2s_audio/speaker/i2s_audio_speaker.cpp
+@@ -0,0 +1 @@
++// Modified by OpenAthan, 2026-10-11: opt-in DMA volume fence; see UPSTREAM.md.
+@@ -36,0 +38,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_) request_volume_with_fence(0.0f);
++#endif
+@@ -55,0 +60,5 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  // Latch faults before cleanup clears event bits. Keep loop running to release
++  // the task, ring buffer and I2S channel; mark_failed() would skip that cleanup.
++  if (volume_fence_enabled_) volume_fence_healthy();
++#endif
+@@ -60,0 +70,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    end_volume_session_();
++#endif
+@@ -63,0 +76,7 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    if (volume_fence_enabled_ && !volume_fence_healthy()) {
++      xEventGroupClearBits(event_group_, SpeakerEventGroupBits::COMMAND_START);
++      return;
++    }
++    begin_volume_session_();
++#endif
+@@ -100,0 +120,6 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    // Driver teardown quiesces callbacks. Capture faults raised after loop's
++    // initial snapshot before clearing event bits or completing an idle fence.
++    if (volume_fence_enabled_) volume_fence_healthy();
++    end_volume_session_();
++#endif
+@@ -123,0 +149,10 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      if (volume_fence_enabled_ && !volume_fence_healthy() && speaker_task_handle_ == nullptr) {
++        // Failed initialization/task creation already releases the parent lock.
++        // Only a still-live channel leaves this speaker owning the bus.
++        if (tx_handle_ != nullptr) stop_i2s_driver_();
++        end_volume_session_();
++        state_ = speaker::STATE_STOPPED;
++        break;
++      }
++#endif
+@@ -134,0 +170,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        fail_volume_fence_();
++#endif
+@@ -143,0 +182,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        fail_volume_fence_();
++#endif
+@@ -155,0 +197,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_) return;  // Calibrated owner, including restored player preferences.
++#endif
+@@ -180,0 +225,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_) return;
++#endif
+@@ -202,0 +250,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_ && !volume_fence_healthy()) return 0;
++#endif
+@@ -248,0 +299,4 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_ && !volume_fence_healthy()) return;
++  begin_volume_session_();
++#endif
+@@ -259,0 +314,7 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_) {
++    portENTER_CRITICAL(&volume_mutex_);
++    volume_fence_.cancel();
++    portEXIT_CRITICAL(&volume_mutex_);
++  }
++#endif
+@@ -296 +357,5 @@
+-    this->write_records_queue_ = xQueueCreate(event_queue_size, sizeof(uint32_t));
++    size_t record_size = sizeof(uint32_t);
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    if (volume_fence_enabled_) record_size = sizeof(VolumeDmaRecord);
++#endif
++    this->write_records_queue_ = xQueueCreate(event_queue_size, record_size);
+@@ -338,0 +404,12 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (this_speaker->volume_fence_enabled_) {
++    portENTER_CRITICAL_ISR(&this_speaker->volume_mutex_);
++    // Check before publishing the event: IDF invokes on_sent before its own
++    // queue-overflow callback, and another core can consume this event at once.
++    if (this_speaker->volume_completed_descriptors_ >= this_speaker->volume_completion_capacity_)
++      this_speaker->volume_fence_.fail();
++    else
++      ++this_speaker->volume_completed_descriptors_;
++    portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
++  }
++#endif
+@@ -344,0 +422,9 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    // Event-group updates from ISR are deferred to FreeRTOS's timer task.
++    // Latch under the same ISR-safe lock before any fence acknowledgement.
++    if (this_speaker->volume_fence_enabled_) {
++      portENTER_CRITICAL_ISR(&this_speaker->volume_mutex_);
++      this_speaker->volume_fence_.fail();
++      portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
++    }
++#endif
+@@ -352 +438,8 @@
+-  xQueueSendToBackFromISR(this_speaker->i2s_event_queue_, &now, &need_yield3);
++  const BaseType_t sent = xQueueSendToBackFromISR(this_speaker->i2s_event_queue_, &now, &need_yield3);
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (this_speaker->volume_fence_enabled_ && sent != pdTRUE) {
++    portENTER_CRITICAL_ISR(&this_speaker->volume_mutex_);
++    this_speaker->volume_fence_.fail();
++    portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
++  }
++#endif
+@@ -356,0 +450,13 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++bool IRAM_ATTR I2SAudioSpeakerBase::i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx) {
++  auto *speaker = static_cast<I2SAudioSpeakerBase *>(user_ctx);
++  if (!speaker->volume_fence_enabled_) return false;
++  portENTER_CRITICAL_ISR(&speaker->volume_mutex_);
++  speaker->volume_fence_.fail();
++  portEXIT_CRITICAL_ISR(&speaker->volume_mutex_);
++  BaseType_t need_yield = pdFALSE;
++  xEventGroupSetBitsFromISR(speaker->event_group_, ERR_LOCKSTEP_DESYNC | COMMAND_STOP, &need_yield);
++  return need_yield;
++}
++#endif
++
+@@ -358 +464,5 @@
+-  if (this->q31_volume_factor_ == INT32_MAX) {
++  apply_volume_factor_(data, bytes_read, q31_volume_factor_);
++}
++
++void I2SAudioSpeakerBase::apply_volume_factor_(uint8_t *data, size_t bytes_read, int32_t factor) {
++  if (factor == INT32_MAX) {
+@@ -365 +475 @@
+-  esp_audio_libs::gain::apply(data, data, this->q31_volume_factor_, len, bytes_per_sample);
++  esp_audio_libs::gain::apply(data, data, factor, len, bytes_per_sample);
+@@ -382,0 +493,70 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++VolumeFenceToken I2SAudioSpeakerBase::request_volume_with_fence(float level) {
++  if (!volume_fence_enabled_ || !std::isfinite(level) || level < 0 || level > 1) return {};
++  const int32_t factor = level >= 1 ? INT32_MAX : level <= 0 ? 0 :
++      esp_audio_libs::gain::db_to_q31(remap<float, float>(level, 0, 1, SOFTWARE_VOLUME_MIN_DB, 0));
++  portENTER_CRITICAL(&volume_mutex_);
++  auto token = volume_fence_.request(level, factor);
++  portEXIT_CRITICAL(&volume_mutex_);
++  return token;
++}
++
++bool I2SAudioSpeakerBase::volume_fence_healthy() {
++  constexpr uint32_t faults = ERR_ESP_NO_MEM | ERR_DROPPED_EVENT | ERR_PARTIAL_WRITE | ERR_LOCKSTEP_DESYNC;
++  if (is_failed() || (event_group_ && (xEventGroupGetBits(event_group_) & faults))) fail_volume_fence_();
++  portENTER_CRITICAL(&volume_mutex_);
++  bool healthy = volume_fence_enabled_ && !volume_fence_.failed();
++  portEXIT_CRITICAL(&volume_mutex_);
++  return healthy;
++}
++
++VolumeFenceStatus I2SAudioSpeakerBase::volume_fence_status(VolumeFenceToken token) {
++  if (!volume_fence_healthy()) return VolumeFenceStatus::FAILED;
++  if (event_group_ && (xEventGroupGetBits(event_group_) & (COMMAND_STOP | COMMAND_STOP_GRACEFULLY |
++                                                         TASK_STOPPING | TASK_STOPPED)))
++    return VolumeFenceStatus::CANCELLED;
++  portENTER_CRITICAL(&volume_mutex_);
++  auto status = volume_fence_.status(token);
++  portEXIT_CRITICAL(&volume_mutex_);
++  return status;
++}
++
++VolumeGain I2SAudioSpeakerBase::volume_gain_snapshot_() {
++  portENTER_CRITICAL(&volume_mutex_);
++  auto gain = volume_fence_.snapshot();
++  portEXIT_CRITICAL(&volume_mutex_);
++  return gain;
++}
++float I2SAudioSpeakerBase::fenced_volume() {
++  portENTER_CRITICAL(&volume_mutex_);
++  float level = volume_fence_.level();
++  portEXIT_CRITICAL(&volume_mutex_);
++  return level;
++}
++void I2SAudioSpeakerBase::complete_volume_fence_(VolumeFenceToken token) {
++  portENTER_CRITICAL(&volume_mutex_);
++  // Records from other sessions are never admissible, even if their gain agrees.
++  if (token.session != volume_fence_.snapshot().token.session) volume_fence_.fail();
++  else volume_fence_.complete(token);
++  portEXIT_CRITICAL(&volume_mutex_);
++}
++void I2SAudioSpeakerBase::fail_volume_fence_() {
++  if (!volume_fence_enabled_) return;
++  portENTER_CRITICAL(&volume_mutex_);
++  volume_fence_.fail();
++  portEXIT_CRITICAL(&volume_mutex_);
++}
++void I2SAudioSpeakerBase::begin_volume_session_() {
++  if (!volume_fence_enabled_) return;
++  portENTER_CRITICAL(&volume_mutex_);
++  if (!volume_fence_.active()) volume_fence_.begin_session();
++  portEXIT_CRITICAL(&volume_mutex_);
++}
++void I2SAudioSpeakerBase::end_volume_session_() {
++  if (!volume_fence_enabled_) return;
++  portENTER_CRITICAL(&volume_mutex_);
++  volume_fence_.end_session();
++  portEXIT_CRITICAL(&volume_mutex_);
++}
++#endif
++
+--- a/components/i2s_audio/speaker/i2s_audio_speaker.h
++++ b/components/i2s_audio/speaker/i2s_audio_speaker.h
+@@ -0,0 +1 @@
++// Modified by OpenAthan, 2026-10-11: opt-in DMA volume fence; see UPSTREAM.md.
+@@ -5,0 +7,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++#include "volume_fence.h"
++#endif
+@@ -91,0 +96,8 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  void set_volume_fence(bool enabled) { volume_fence_enabled_ = enabled; }
++  VolumeFenceToken request_volume_with_fence(float level);
++  VolumeFenceStatus volume_fence_status(VolumeFenceToken token);
++  bool volume_fence_healthy();
++  float fenced_volume();
++#endif
++
+@@ -92,0 +105,14 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  VolumeGain volume_gain_snapshot_();
++  void complete_volume_fence_(VolumeFenceToken token);
++  void fail_volume_fence_();
++  void begin_volume_session_();
++  void end_volume_session_();
++  // ISR completions not yet reclaimed by a committed whole-descriptor write.
++  uint32_t volume_completed_descriptors_{};
++  uint32_t volume_completion_capacity_{};
++  static bool i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx);
++  bool volume_fence_enabled_{};
++  portMUX_TYPE volume_mutex_ = portMUX_INITIALIZER_UNLOCKED;
++  VolumeFenceState volume_fence_;
++#endif
+@@ -134,0 +161 @@
++  void apply_volume_factor_(uint8_t *data, size_t bytes_read, int32_t factor);
+--- a/components/i2s_audio/speaker/i2s_audio_speaker_standard.cpp
++++ b/components/i2s_audio/speaker/i2s_audio_speaker_standard.cpp
+@@ -0,0 +1 @@
++// Modified by OpenAthan, 2026-10-11: opt-in DMA volume fence; see UPSTREAM.md.
+@@ -101,0 +103,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  bool verified_dma_layout = false;
++#endif
+@@ -105,0 +110,4 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    verified_dma_layout = chan_info.total_dma_buf_size % DMA_BUFFERS_COUNT == 0 &&
++        dma_buffer_bytes % this->output_stream_info_.frames_to_bytes(1) == 0;
++#endif
+@@ -109,0 +118,7 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_ && !verified_dma_layout) {
++    // A guessed descriptor size cannot establish FIFO completion boundaries.
++    xEventGroupSetBits(event_group_, ERR_LOCKSTEP_DESYNC | TASK_STOPPING | TASK_STOPPED);
++    while (true) vTaskDelay(pdMS_TO_TICKS(10));
++  }
++#endif
+@@ -151 +166,6 @@
+-      if (xQueueSend(this->write_records_queue_, &zero_real_frames, 0) != pdTRUE) {
++      const void *record = &zero_real_frames;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      VolumeDmaRecord fenced_record{0, volume_gain_snapshot_().token};
++      if (volume_fence_enabled_) record = &fenced_record;
++#endif
++      if (xQueueSend(this->write_records_queue_, record, 0) != pdTRUE) {
+@@ -163,4 +183,15 @@
+-    const i2s_event_callbacks_t callbacks = {.on_sent = i2s_on_sent_cb};
+-    i2s_channel_register_event_callback(this->tx_handle_, &callbacks, this);
+-
+-    if (i2s_channel_enable(this->tx_handle_) != ESP_OK) {
++    i2s_event_callbacks_t callbacks = {.on_sent = i2s_on_sent_cb};
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    if (volume_fence_enabled_) {
++      // Full preload leaves IDF's descriptor queue empty. Its capacity is N-1.
++      portENTER_CRITICAL(&volume_mutex_);
++      volume_completed_descriptors_ = 0;
++      volume_completion_capacity_ = DMA_BUFFERS_COUNT - 1;
++      portEXIT_CRITICAL(&volume_mutex_);
++      callbacks.on_send_q_ovf = i2s_on_send_q_ovf_cb;
++    }
++#endif
++    if (i2s_channel_register_event_callback(this->tx_handle_, &callbacks, this) != ESP_OK)
++      successful_setup = false;
++
++    if (!successful_setup || i2s_channel_enable(this->tx_handle_) != ESP_OK) {
+@@ -172,0 +204,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    if (volume_fence_enabled_) fail_volume_fence_();
++#endif
+@@ -196,0 +231,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      if (volume_fence_enabled_ && !volume_fence_healthy()) break;
++#endif
+@@ -221,0 +259,9 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      VolumeFenceToken completed_token{};
++      if (volume_fence_enabled_ && uxQueueMessagesWaiting(i2s_event_queue_) >
++          uxQueueMessagesWaiting(write_records_queue_)) {
++        fail_volume_fence_();
++        xEventGroupSetBits(event_group_, ERR_LOCKSTEP_DESYNC);
++        break;
++      }
++#endif
+@@ -224 +270,6 @@
+-        if (xQueueReceive(this->write_records_queue_, &real_frames, 0) != pdTRUE) {
++        void *record = &real_frames;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        VolumeDmaRecord fenced_record{};
++        if (volume_fence_enabled_) record = &fenced_record;
++#endif
++        if (xQueueReceive(this->write_records_queue_, record, 0) != pdTRUE) {
+@@ -227,0 +279,11 @@
++          lockstep_broken = true;
++          break;
++        }
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        if (volume_fence_enabled_) {
++          real_frames = fenced_record.real_frames;
++          completed_token = fenced_record.token;
++        }
++#endif
++        if (real_frames > frames_per_dma_buffer || (real_frames && !pending_real_buffers)) {
++          xEventGroupSetBits(event_group_, ERR_LOCKSTEP_DESYNC);
+@@ -243,3 +305,12 @@
+-        break;
+-      }
+-
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        if (volume_fence_enabled_) fail_volume_fence_();
++#endif
++        break;
++      }
++
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      // Publish only after this entire completion batch has validated. A later
++      // missing record in the same batch must not briefly authorize unmute.
++      if (volume_fence_enabled_ && completed_token.generation && volume_fence_healthy())
++        complete_volume_fence_(completed_token);
++#endif
+@@ -260,0 +332,5 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      const VolumeGain buffer_gain = volume_gain_snapshot_();
++      // Reuse the existing silence buffer as a complete descriptor staging area.
++      if (volume_fence_enabled_) memset(silence_buffer, 0, dma_buffer_bytes);
++#endif
+@@ -268 +344,5 @@
+-          if (bytes_read > 0) {
++          bool scale_on_fill = true;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++          scale_on_fill = !volume_fence_enabled_;
++#endif
++          if (bytes_read > 0 && scale_on_fill) {
+@@ -289,0 +370,5 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++          // Leave every staged tail raw. A paused silence fence must not leave
++          // already-scaled louder samples waiting to play after resume.
++          if (volume_fence_enabled_) apply_volume_factor_(chunk, input_bytes, buffer_gain.factor);
++#endif
+@@ -300,2 +385,9 @@
+-          i2s_channel_write(this->tx_handle_, chunk, output_bytes, &bw, WRITE_TIMEOUT_TICKS);
+-          if (bw != output_bytes) {
++          esp_err_t write_error = ESP_OK;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++          if (volume_fence_enabled_) {
++            memcpy(silence_buffer + bytes_written_total, chunk, output_bytes);
++            bw = output_bytes;
++          } else
++#endif
++            write_error = i2s_channel_write(this->tx_handle_, chunk, output_bytes, &bw, WRITE_TIMEOUT_TICKS);
++          if (write_error != ESP_OK || bw != output_bytes) {
+@@ -321,0 +414,12 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      if (volume_fence_enabled_) {
++        size_t bw = 0;
++        if (!volume_fence_healthy() ||
++            i2s_channel_write(tx_handle_, silence_buffer, dma_buffer_bytes, &bw, WRITE_TIMEOUT_TICKS) != ESP_OK ||
++            bw != dma_buffer_bytes) {
++          fail_volume_fence_();
++          xEventGroupSetBits(event_group_, ERR_PARTIAL_WRITE);
++          break;
++        }
++      }
++#endif
+@@ -323 +427,5 @@
+-      if (silence_bytes > 0) {
++      bool write_silence = silence_bytes > 0;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      write_silence = write_silence && !volume_fence_enabled_;
++#endif
++      if (write_silence) {
+@@ -325,2 +433,2 @@
+-        i2s_channel_write(this->tx_handle_, silence_buffer, silence_bytes, &bw, WRITE_TIMEOUT_TICKS);
+-        if (bw != silence_bytes) {
++        esp_err_t write_error = i2s_channel_write(this->tx_handle_, silence_buffer, silence_bytes, &bw, WRITE_TIMEOUT_TICKS);
++        if (write_error != ESP_OK || bw != silence_bytes) {
+@@ -337 +445,9 @@
+-      if (xQueueSend(this->write_records_queue_, &real_frames_total, 0) != pdTRUE) {
++      const void *record = &real_frames_total;
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      const VolumeDmaRecord fenced_record{real_frames_total, buffer_gain.token};
++      if (volume_fence_enabled_) record = &fenced_record;
++#endif
++      if (xQueueSend(this->write_records_queue_, record, 0) != pdTRUE) {
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++        if (volume_fence_enabled_) fail_volume_fence_();
++#endif
+@@ -341,0 +458,8 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++      if (volume_fence_enabled_) {
++        portENTER_CRITICAL(&volume_mutex_);
++        if (!volume_completed_descriptors_) volume_fence_.fail();
++        else --volume_completed_descriptors_;
++        portEXIT_CRITICAL(&volume_mutex_);
++      }
++#endif
+--- /dev/null
++++ b/components/i2s_audio/speaker/volume_fence.h
+@@ -0,0 +1,74 @@
++// OpenAthan additions, 2026-10-11. GPL-3.0-only; see ../../../LICENSE.
++#pragma once
++#include <cstdint>
++#include <limits>
++
++namespace esphome::i2s_audio {
++struct VolumeFenceToken {
++  uint32_t session{}, generation{};
++  bool operator==(const VolumeFenceToken &other) const {
++    return session == other.session && generation == other.generation;
++  }
++};
++enum class VolumeFenceStatus { PENDING, COMPLETE, CANCELLED, FAILED };
++struct VolumeGain {
++  VolumeFenceToken token;
++  int32_t factor{};
++};
++struct VolumeDmaRecord {
++  uint32_t real_frames{};
++  VolumeFenceToken token;
++};
++
++// Caller holds the speaker's critical section. This state allocates no memory.
++// One gain snapshot covers a complete DMA descriptor, whose record travels in
++// the same FIFO as its completion. No timer or logical player state completes it.
++class VolumeFenceState {
++ public:
++  VolumeFenceToken request(float level, int32_t factor) {
++    if (failed_ || !advance_(generation_)) return {};
++    cancelled_ = false;
++    level_ = level;
++    factor_ = factor;
++    completed_ = active_ ? 0 : generation_;
++    return {session_, generation_};
++  }
++  VolumeFenceStatus status(VolumeFenceToken token) const {
++    if (failed_ || !token.generation) return VolumeFenceStatus::FAILED;
++    if (cancelled_ || !(token == snapshot().token)) return VolumeFenceStatus::CANCELLED;
++    return completed_ == generation_ ? VolumeFenceStatus::COMPLETE : VolumeFenceStatus::PENDING;
++  }
++  bool begin_session() {
++    if (failed_ || !advance_(session_)) return false;
++    cancelled_ = false;
++    active_ = true;
++    completed_ = 0;
++    return true;
++  }
++  void end_session() {
++    if (!active_) return;
++    active_ = false;
++    if (advance_(session_)) completed_ = generation_;
++  }
++  void complete(VolumeFenceToken token) {
++    if (!failed_ && token == snapshot().token) completed_ = generation_;
++  }
++  void cancel() { cancelled_ = true; }
++  bool active() const { return active_; }
++  void fail() { failed_ = true; factor_ = 0; level_ = 0; }
++  bool failed() const { return failed_; }
++  VolumeGain snapshot() const { return {{session_, generation_}, factor_}; }
++  float level() const { return level_; }
++ private:
++  bool advance_(uint32_t &counter) {
++    if (counter == std::numeric_limits<uint32_t>::max()) { fail(); return false; }
++    ++counter;
++    return true;
++  }
++  uint32_t session_{}, generation_{}, completed_{};
++  int32_t factor_{};
++  float level_{};
++  friend struct VolumeFenceTestAccess;
++  bool active_{}, failed_{}, cancelled_{};
++};
++}  // namespace esphome::i2s_audio

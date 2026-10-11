@@ -125,7 +125,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing substantial changes.
 
 ## Licensing
 
-- OpenAthan-authored software: [Apache License 2.0](LICENSE).
+- OpenAthan-authored software: [Apache License 2.0](LICENSE), except the
+  [vendored ESPHome I2S audio patch](third_party/esphome-i2s-audio/UPSTREAM.md)
+  (GPLv3 runtime and MIT Python).
 - OpenAthan-authored documentation: [CC BY 4.0](docs/LICENSE.md).
 - Future original hardware design sources: [CERN-OHL-P-2.0](hardware/LICENSE.md), unless stated otherwise.
 - Third-party dependencies, hardware, and media remain under their respective terms.

@@ -110,6 +110,11 @@ and is not a buildable release configuration.
 `DeviceSettings` and `SettingsService` own complete snapshots and revision checks.
 The ESP32 adapter stores one checksummed settings blob at `openathan/settings`;
 the existing `openathan/scheduler` consumption/skip record remains separate.
+The calibrated Voice Pyramid product adapter retains a backward-readable
+settings mirror there and a matching companion at `pyr_volume` for its wider
+volume scale. It supplies the generic `SettingsStore` and `Playback` interfaces;
+the core has no dependency on this hardware. See the
+[volume compatibility contract](atom-volume-calibration-2026-10-11.md).
 Successful saves commit before application or acknowledgment. A write failure
 latches settings writes and automatic playback off for that boot without erasing
 history or stopping current audio.

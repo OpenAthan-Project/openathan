@@ -1,0 +1,7 @@
+{
+  "version": "2026.9.0",
+  "commit": "c6e4c87e525dd343e470d8dea368957a002f6505",
+  "source": "https://github.com/esphome/esphome/tree/2026.9.0/esphome/components/i2s_audio",
+  "license_sha256": "1f312390122725ee382f85af00e3df84f2490cd8fa61b9ea172bc6591cc0ac63",
+  "maintained_patch": "volume-fence.patch"
+}

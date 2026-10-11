@@ -7,27 +7,13 @@ external_components:
       path: ../../components
     components: [voice_pyramid]
 
-pi4ioe5v6408:
-  - id: pyramid_io
-    i2c_id: pyramid_bus
-    address: 0x43
-
-switch:
-  - platform: gpio
-    id: pyramid_speaker_enable
-    internal: true
-    pin:
-      pi4ioe5v6408: pyramid_io
-      number: 0
-      mode:
-        output: true
-    restore_mode: ALWAYS_ON
-
 voice_pyramid:
   clock:
+    id: pyramid_clock
     i2c_id: pyramid_bus
     address: 0x60
   amplifier:
+    id: pyramid_amplifier
     i2c_id: pyramid_bus
     address: 0x5B
 

@@ -20,6 +20,39 @@ def check(arduinojson):
             str(ROOT / "firmware/esphome/components/openathan_device/quran.cpp"),
             "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
+        # Separate translation units retain each production adapter's host environment.
+        worker = Path(directory) / "quran.o"
+        common = [os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined",
+            "-fno-sanitize-recover=all", "-I" + str(ROOT / "tests/pyramid_quran_stubs"),
+            "-I" + str(ROOT / "tests/quran_stubs"), "-I" + arduinojson,
+            "-I" + str(ROOT / "lib/openathan-core/include"),
+            "-I" + str(ROOT / "firmware/esphome/components/openathan_device")]
+        subprocess.run(common + ["-I" + str(ROOT / "tests/upgrade_stubs"),
+            "-I" + str(ROOT / "tests/stubs"), "-c",
+            str(ROOT / "firmware/esphome/components/openathan_device/quran.cpp"),
+            "-o", str(worker)], check=True)
+        worker_controls = Path(directory) / "worker-controls.o"
+        subprocess.run(common + ["-I" + str(ROOT / "tests/upgrade_stubs"),
+            "-I" + str(ROOT / "tests/stubs"), "-c",
+            str(ROOT / "tests/pyramid_quran_worker.cpp"), "-o", str(worker_controls)], check=True)
+        speaker = ROOT / "third_party/esphome-i2s-audio/components/i2s_audio/speaker"
+        integration = Path(directory) / "quran-volume-tests"
+        subprocess.run(common + ["-DUSE_ESP32", "-DUSE_OPENATHAN_VOLUME_FENCE",
+            "-DOPENATHAN_QURAN_VOLUME_INTEGRATION", "-I" + str(ROOT / "tests/i2s_stubs"),
+            "-I" + str(ROOT / "tests/pyramid_stubs"), "-I" + str(ROOT / "tests/waveshare_stubs"),
+            "-I" + str(ROOT / "tests/stubs"),
+            "-I" + str(ROOT / "third_party/esphome-i2s-audio"),
+            "-I" + str(ROOT / "firmware"),
+            "-I" + str(speaker), "-I" + str(ROOT / "third_party/adhan-cpp/include"),
+            str(ROOT / "tests/pyramid_volume_tests.cpp"),
+            str(speaker / "i2s_audio_speaker.cpp"), str(speaker / "i2s_audio_speaker_standard.cpp"),
+            str(ROOT / "firmware/esphome/components/voice_pyramid/voice_pyramid.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan/nvs_settings_store.cpp"),
+            *[str(p) for p in sorted((ROOT / "lib/openathan-core/src").glob("*.cpp"))],
+            *[str(p) for p in sorted((ROOT / "third_party/adhan-cpp/src").glob("*.cpp"))],
+            str(worker), str(worker_controls), "-o", str(integration)], check=True)
+        subprocess.run([str(integration)], check=True)
+        print("Atom volume/Quran continuity, pending admission, zero, rapid changes, Stop and faults passed")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

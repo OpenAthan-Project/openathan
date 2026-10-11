@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iterator>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 static bool present = true;
@@ -58,6 +59,17 @@ int main(int argc, char **argv) {
   check(!valid.request_volume_percent(101));
   check(valid.request_volume_percent(0) && valid.volume_percent() == 0 && player.is_muted());
   check(valid.request_volume_percent(70) && valid.volume_percent() == 70 && !player.is_muted());
+  check(valid.request_volume_level(0.5001f) && valid.volume_level() == 0.5001f && valid.volume_percent() == 50);
+  for (float invalid : {-0.01f, 1.01f, std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::infinity()}) {
+    check(!valid.request_volume_level(invalid) && valid.volume_level() == 0.5001f);
+    player.volume = invalid;
+    check(!valid.volume_level() && !valid.volume_percent());
+    player.volume = 0.5001f;
+  }
+  player.muted = true;
+  check(valid.volume_level() == 0.0f);
+  check(valid.request_volume_percent(70) && !player.is_muted());
   check(valid.play(Track::NORMAL));
   check(player.queued.empty() && valid.source() == openathan::PlaybackSource::ATHAN);
   player.drain_commands(); valid.loop();
@@ -101,6 +113,7 @@ int main(int argc, char **argv) {
   player.initialized = false;
   player.commands.clear();
   check(!valid.ready() && !valid.start(Track::NORMAL));
+  check(!valid.volume_level() && !valid.request_volume_level(0.5f));
   valid.stop();
   check(player.commands.empty());
 

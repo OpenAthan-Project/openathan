@@ -96,10 +96,11 @@ class WaveshareCapacityTests(unittest.TestCase):
     def test_volume_routes_for_each_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            # Included diagnostic profiles fall back to the main config's secrets.
-            (root / 'secrets.yaml').write_text('diagnostic_api_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=\n')
+            # Included profiles fall back to the main config's public placeholders.
+            # This must work before prepare_ci creates any repository secrets.
+            (root / 'secrets.yaml').write_bytes((ROOT / 'firmware/esphome/compile-secrets.example.yaml').read_bytes())
             for profile in ('waveshare/audio', 'waveshare/development',
-                            'waveshare/diagnostics', 'openathan'):
+                            'waveshare/diagnostics', 'openathan', 'scheduler/validation'):
                 with self.subTest(profile=profile):
                     config = root / 'volume.yaml'
                     config.write_text(f"packages:\n  product: !include {ROOT / 'firmware/esphome' / (profile + '.yaml')}\n")
@@ -109,12 +110,22 @@ class WaveshareCapacityTests(unittest.TestCase):
                                             env=dict(os.environ, ESPHOME_BUILD_PATH=str(build)),
                                             capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    name = 'openathan-test' if profile.startswith('waveshare/') else 'openathan'
+                    name = ('openathan-test' if profile.startswith('waveshare/') else
+                            'openathan-feasibility' if profile == 'scheduler/validation' else 'openathan')
                     source = (build / name / 'src/main.cpp').read_text()
                     if profile.startswith('waveshare/'):
                         self.assertIn('athan_player->set_volume_max(1.0f)', source)
                         self.assertIn('waveshare_audio->set_dac(waveshare_dac)', source)
                         self.assertNotIn('waveshare_speaker->set_audio_dac(', source)
                     else:
-                        self.assertIn('athan_player->set_volume_max(0.6f)', source)
-                        self.assertIn('pyramid_speaker->set_audio_dac(pyramid_dac)', source)
+                        self.assertIn('athan_player->set_volume_max(1.0f)', source)
+                        self.assertIn('athan_player->set_volume_initial(0.0f)', source)
+                        self.assertNotIn('pyramid_speaker->set_audio_dac(', source)
+                        self.assertIn('pyramid_audio->set_dac(pyramid_dac)', source)
+                        self.assertIn('athan_scheduler->set_playback(pyramid_audio)', source)
+                        self.assertIn('athan_scheduler->set_settings_store(pyramid_audio->settings_store())', source)
+                        self.assertIn('athan_scheduler->set_default_volume(56)', source)
+                        if profile == 'scheduler/validation':
+                            self.assertIn('new(pyramid_audio) voice_pyramid_audio::Audio("oa_validation")', source)
+                            self.assertIn('validation->set_settings_store(pyramid_audio->settings_store())', source)
+                            self.assertIn('pyramid_audio->start(openathan::Track::NORMAL)', source)
