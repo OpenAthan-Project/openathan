@@ -1,10 +1,13 @@
-# Waveshare V2 RTC implementation — 2026-10-10
+# Waveshare V2 RTC implementation and powered RESET validation — 2026-10-10
 
 The isolated Waveshare profiles include startup restoration from a previously
 initialized PCF85063A and verified UTC writes after SNTP synchronization.
 The [profile](waveshare-box-v2.md#rtc-and-offline-restart) records the protocol,
-source references and fallback behavior. This is development implementation;
-offline restart and RTC operation on physical hardware remain unqualified.
+source references and fallback behavior. Attended offline RESET restoration
+passed on one V2 unit with RTC power retained. Battery-backed retention while
+unplugged, drift and audible scheduled playback using RTC-only time remain
+unqualified. The [v0.5.0 release report](release-validation-2026-10-10.md) records
+reuse of this source-bound evidence in the published production profile.
 
 ## Automated validation
 
@@ -68,28 +71,40 @@ limit remains 1,572,864 bytes; both 2 MiB slots and separate shared audio are
 unchanged. Atom profiles do not include the RTC adapter; no new Atom build or
 browser/hardware acceptance is claimed by these measurements.
 
-## Pending attended acceptance
+## Attended powered RESET validation
 
-1. Follow the [preservation runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md).
-   Reidentify the V2 unit, retain current settings/history/audio and compatible
-   application recovery. Verify the RTC model, `0x51` responder and register layout
-   on GPIO10/11 before allowing the first RTC write; an address response alone
-   does not identify the chip. Stop if the hardware differs from the vendor source.
-2. Prepare a reviewed application-only candidate with real approved recordings,
-   isolated storage and disabled public updates. Retain candidate/source hashes,
-   baseline RTC bytes and the preservation/readback procedure before installation.
-3. With internet available, verify `rtc_save=verified`. Confirm saved settings,
-   consumption history, skip and shared audio remain intact.
-4. Block internet time access while retaining local control connectivity and RTC
-   power. Press RESET; verify `rtc_restore=restored`, correct UTC/local display and
-   automatic readiness before any network time synchronization.
-5. Observe one upcoming scheduled prayer, audible playback and exactly one
-   consumption advance while offline. Reconnect internet and verify RTC refresh
-   without replay. Exercise saved-skip persistence in an agreed isolated scenario.
-6. Record memory/fragmentation/PSRAM during the focused diagnostic run. Restore the
-   reviewed clean candidate, confirm preserved state and record clean-image limits.
+Source `1378dc2f043adaae108059a000e7e54b120f6d3c` includes the network-synchronization
+guard. The verified V2 board and pinned vendor source identify the PCF85063A;
+registers at `0x51` on GPIO10/11 matched its layout and advanced. An address
+response alone was not treated as chip identification.
 
-Do not inject destructive RTC faults on the attended unit or restore historical
-NVS to repeat an occurrence. Backup-power removal, battery retention, drift,
-public release/update qualification and the intermittent HTTP defect are separate
-work. No physical result or runtime-headroom claim is established by host tests.
+Genuine internet synchronization initialized the RTC and verified readback.
+Private test controls then blocked network time while retaining local Wi-Fi and
+USB power. The owner briefly pressed physical RESET and confirmed the correct
+local clock. A fresh boot reported `rtc_restore=restored`, with network time still
+disabled and automatic readiness recovered without SNTP. Fresh clock samples
+differed from the host by at most 1.508 seconds; cached responses were excluded.
+The earlier USB-JTAG restart retained system time and was not counted as RTC
+restoration.
+
+Re-enabling genuine network time verified RTC refresh without replay or changes
+to settings, history, skip, setup or display preferences. Fresh paired reads and
+independent complete-flash readback preserved saved records and shared audio
+through the application-only test installations. The final clean development
+application was 1,262,784 bytes, SHA-256
+`5fb0e90263f6dcaf380da6809d86b3ce59e3531bc87f80b2811b0665333571a3`;
+normal SNTP was enabled and the temporary diagnostic controls were excluded.
+These are dated development results, not the later production application's identity.
+
+## Remaining limits
+
+No scheduled prayer was due during the RTC test, so audible playback using
+RTC-only time and restart with a nonempty saved skip remain untested. The test
+did not remove RTC power, inspect a backup battery, measure long-term drift or
+inject destructive hardware faults. Idle diagnostic measurements do not establish
+clean-production concurrent audio/network headroom or a new long soak. The
+earlier intermittent HTTP issue remains unresolved.
+
+Further hardware work follows the
+[preservation runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md).
+Historical NVS restoration is not a way to repeat a consumed occurrence.

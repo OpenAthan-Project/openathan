@@ -165,7 +165,7 @@ new transport-specific physical qualification and a capable release are availabl
 
 ## Hardware-specific releases
 
-v0.5.0 preparation adds the Waveshare Box V2 production profile. Atom retains
+Published v0.5.0 adds the Waveshare Box V2 production profile. Atom retains
 `upgrade.json` and `firmware.ota.bin`; Waveshare uses
 `waveshare-box-v2.upgrade.json` and `waveshare-box-v2.firmware.ota.bin`. Each
 signed payload binds its hardware identity, and each device discovers only its
@@ -175,4 +175,9 @@ USB firmware INFO accepts the legacy nine fields and appends hardware as a tenth
 field in new builds. USB status also appends `hardware=<identity>` after the
 existing fields/URLs; older website clients ignore it as a non-URL. The new
 installer validates the identity and uses Atom compatibility for older responses.
-Physical Waveshare production update qualification remains pending.
+Attended Waveshare signed-update, pre-selection power-cut recovery and
+failed-startup rollback checks passed using isolated qualification builds.
+Exact production restoration, preserved production records/audio and the real
+public signed-descriptor check also passed. See the
+[release qualification report](release-validation-2026-10-10.md) for the scope;
+these results do not qualify the separate browser USB update transport.

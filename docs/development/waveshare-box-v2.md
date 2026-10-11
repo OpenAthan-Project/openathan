@@ -1,11 +1,13 @@
 # Waveshare Box V2 profiles
 
-The ESP32-S3-Touch-LCD-1.85C-BOX **V2** development profile reuses standalone
-prayer calculations, scheduling, stored recordings, USB provisioning and the
+The ESP32-S3-Touch-LCD-1.85C-BOX **V2** production and development profiles reuse
+standalone prayer calculations, scheduling, stored recordings, USB provisioning and the
 authenticated device-local phone controls. V1 uses different audio hardware and
 is not supported by this profile. Touch, microphones and SD storage are
-deferred. Physical acceptance is recorded in the
-[dated validation report](waveshare-validation-2026-10-09.md).
+deferred. Production is available in [v0.5.0](../releases/v0.5.0.md).
+See the [release qualification report](release-validation-2026-10-10.md) and
+[earlier development validation](waveshare-validation-2026-10-09.md) for physical
+results and their limits.
 
 ## Build and storage
 
@@ -62,7 +64,7 @@ session.
 | Backlight | GPIO5, 5 kHz PWM, saved 1–100%, default 50% |
 | Panel reset | TCA9554 `0x20`, zero-based P1, vendor's one-based EXIO2 |
 | Shared I²C | SCL 10, SDA 11; confirmed on the attended unit |
-| PCF85063A RTC | I²C `0x51` on the shared bus; RTC physical acceptance pending |
+| PCF85063A RTC | I²C `0x51` on the shared bus; powered offline RESET restoration observed on one V2 unit |
 | BOOT button | GPIO0, active-low input with pull-up; stop/skip/cancel observed on the attended V2 unit |
 
 The mappings follow the [manufacturer's V2 audio example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.85C/blob/8ead4a96bf3a278fc4ebd8ef4768657e17fa2880/Arduino/examples/03_audio_out_no_tf/03_audio_out_no_tf.ino),
@@ -101,8 +103,9 @@ after cold restart. Saved settings/history were preserved, and the clean
 development application was restored at 80%. See the
 [volume build and attended validation report](waveshare-volume-build-2026-10-10.md)
 for exact images, size comparisons, diagnostic runtime measurements and remaining
-limits. Clean-image runtime memory, a new real scheduled announcement and the
-later production candidate remain separately unqualified by this session.
+limits. Clean-image runtime memory and a new real scheduled announcement remain
+unmeasured by that session. Later production installation/update qualification
+is recorded separately in the [release report](release-validation-2026-10-10.md).
 
 ### RTC and offline restart
 
@@ -129,10 +132,11 @@ invalid BCD/calendar fields and bus errors leave automatic Athan waiting for SNT
 Writes invalidate the marker first and preserve offset, alarms and timers.
 RTC failures do not invalidate synchronized system time or block audio.
 
-Offline restart support requires the RTC to remain powered. Retention after
-unplugging, battery behavior and drift are not qualified. Hardware acceptance and
-runtime memory checks remain pending; see the
-[RTC implementation report and procedure](waveshare-rtc-validation-2026-10-10.md).
+Offline restart support requires the RTC to remain powered. Attended offline
+RESET restored the clock and automatic readiness without network time on one
+V2 unit. Retention after unplugging, battery behavior, drift and audible
+scheduled playback using RTC-only time remain unqualified. See the
+[RTC implementation and attended validation](waveshare-rtc-validation-2026-10-10.md).
 Existing activation, skip and consumed-prayer records remain authoritative:
 startup and clock corrections do not play missed or consumed occurrences.
 
@@ -152,10 +156,11 @@ BOOT's GPIO0 connection follows the linked V2 schematic; holding it during reset
 or power-on still enters ROM download mode. RESET is wired to the chip reset
 input and retains its hardware restart function. Attended stop, skip, cancel-skip
 and RESET skip-persistence checks passed on one V2 unit, preserving settings,
-history and shared audio. Exact timing boundaries, unassigned gaps and the
-BOOT-held physical download-mode sequence remain untested. See the
+history and shared audio. BOOT-held download mode was subsequently used for
+production installation;
+exact timing boundaries and unassigned gaps remain untested. See the
 [automated and attended validation](waveshare-buttons-validation-2026-10-09.md)
-for source/image identities, capacity and remaining limits.
+and [release report](release-validation-2026-10-10.md) for their separate scopes.
 
 ### Display
 
@@ -212,9 +217,9 @@ cycling from software restart, and queued playback from audible acceptance.
 Prefer compatible application-only recovery after initial partition migration;
 a full-flash restore also restores historical settings and prayer consumption.
 
-## Production release candidate
+## Production release
 
-`firmware/esphome/waveshare/production.yaml` is the v0.5.0 production candidate.
+`firmware/esphome/waveshare/production.yaml` is the published v0.5.0 production profile.
 It uses `openathan` with a MAC suffix, production settings/setup/network/upgrade
 storage, round display, BOOT controls and signed updates. It omits diagnostic and
 isolated-storage components. Existing isolated development records are not migrated.
@@ -226,6 +231,8 @@ approved audio partition with Atom. The website selects matching firmware from
 reported OpenAthan USB hardware identity; unknown firmware requires explicit
 model and erase confirmation. See [release preparation](releases.md).
 
-The [v0.5.0 preparation report](v0.5.0-preparation-2026-10-10.md) separates
-automated evidence from pending production installation, update/recovery and
-new volume-mapping listening qualification. No new physical acceptance is claimed.
+The [v0.5.0 release report](release-validation-2026-10-10.md) records production
+installation, signed-update/interruption/rollback qualification, exact restoration
+and public delivery. Earlier audio, volume, BOOT and powered RTC results are
+reused within their source limits. Preserving browser USB update writes remain
+disabled pending separate transport qualification.

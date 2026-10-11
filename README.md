@@ -2,7 +2,7 @@
 
 OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project. It supports an ordinary-user reference build and a reusable ESPHome integration for people who already have compatible hardware. The reference experience is intended to work without soldering, PCB design, Home Assistant, or embedded-development experience.
 
-> **Project status:** [v0.4.0](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.4.0) is available for AtomS3R C126 + Pyramid A167, with standalone scheduled Athan, a display, phone-friendly setup and settings, USB Wi-Fi/password recovery and owner-requested updates. [v0.5.0 preparation](docs/development/v0.5.0-preparation-2026-10-10.md) adds Waveshare Box V2 production firmware and browser installation. That candidate has not been published; its physical production installation and update qualification remain pending. Newer Atom ST7735 display revisions remain unqualified.
+> **Project status:** [v0.5.0](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.5.0) is available for AtomS3R C126 + Voice Pyramid A167 and Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2. Both support standalone scheduled Athan, a display, phone-friendly setup and settings, USB Wi-Fi/password recovery and owner-requested signed updates. See the [release notes](docs/releases/v0.5.0.md) and [qualification results](docs/development/release-validation-2026-10-10.md). Waveshare V1 is not supported; newer Atom ST7735 display revisions remain unqualified.
 
 Use the [public setup guide](https://openathan.com/docs/getting-started/) for a
 new speaker and the [firmware update guide](docs/development/firmware-upgrades.md)
@@ -20,14 +20,14 @@ builds exact source commits and packages the [approved normal and Fajr recording
 ### Ordinary users
 
 1. Buy the documented reference hardware.
-2. Plug the pre-assembled modules together.
+2. Assemble the Atom + Pyramid modules, or use the pre-assembled Waveshare Box V2.
 3. Connect the device over USB.
 4. Visit [openathan.com/install](https://openathan.com/install).
 5. Install OpenAthan and enter Wi-Fi credentials.
 6. Complete the phone-friendly local setup wizard.
 7. Use the device standalone.
 
-Precompiled reference releases are available through [openathan.com/install](https://openathan.com/install). This path requires neither YAML nor ESPHome knowledge. Use only the Atom USB-C data connection during setup, then disconnect it and use only Pyramid bottom power for normal playback. After a cold boot, the current reference firmware needs internet time synchronization before automatic playback can resume.
+Precompiled releases are available through [openathan.com/install](https://openathan.com/install). This path requires neither YAML nor ESPHome knowledge. For Atom, use only its USB-C data connection during setup, then disconnect it and use only Pyramid bottom power for normal playback. Waveshare Box V2 uses its rear USB-C data port. First setup requires internet time synchronization. Atom also needs internet time after a cold boot; Waveshare can restore initialized RTC time after a powered restart. RTC battery-backed retention while unplugged has not yet been verified.
 
 ### ESPHome users
 
@@ -37,14 +37,16 @@ The reusable package treats hardware as capabilities. An audio playback endpoint
 
 Home Assistant may eventually be supported as an optional integration on either path, but it will not be required for core operation.
 
-## Initial reference hardware
+## Supported reference hardware
 
-The first official precompiled reference build targets:
+The original precompiled reference build uses:
 
 - **M5Stack AtomS3R C126** — ESP32-S3, 8 MB flash, 8 MB PSRAM, and a 0.85-inch display.
 - **M5Stack Voice Pyramid A167** — speaker and audio hardware, microphone, RGB LEDs, capacitive touch controls, and enclosure.
 
 SKU A167 has also been called **Echo Pyramid**; verify the SKU when purchasing. See the [AtomS3R documentation](https://docs.m5stack.com/en/core/AtomS3R), [Voice Pyramid documentation](https://docs.m5stack.com/en/atom/Voice_Pyramid), and [reference bill of materials](hardware/reference-builds/voice-pyramid/bom.md).
+
+The second supported build is **Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2**: a pre-assembled ESP32-S3 speaker with a round display, 16 MiB flash, 8 MiB PSRAM and onboard RTC. See the [Waveshare profile and hardware mappings](docs/development/waveshare-box-v2.md). V1 has different audio hardware and is not supported. Touch input, microphones and SD storage are not yet supported by OpenAthan.
 
 This C126 + A167 combination is the designated reference target, not a requirement of the reusable OpenAthan package. RTC, removable storage, larger external speakers, and other modules are optional capabilities rather than core requirements.
 
@@ -62,10 +64,12 @@ OpenAthan
 │   └── required and optional capability interfaces
 ├── hardware integrations
 │   ├── Voice Pyramid A167 adapter
+│   ├── Waveshare Box V2 audio, display and RTC adapters
 │   └── user-supplied ESPHome components
 ├── official reference firmware
 │   ├── validated AtomS3R C126 board configuration
 │   ├── C126 + A167 capability mapping
+│   ├── Waveshare Box V2 production configuration
 │   └── provisioning, networking, OTA, and release configuration
 └── local OpenAthan device UI
 ```
@@ -99,15 +103,15 @@ Settings can be changed through the authenticated local interface.
 The reference build includes phone-friendly setup, local configuration,
 USB Wi-Fi/password recovery, explicit first-run activation, prayer-status LEDs
 and signed application updates. The [roadmap](docs/development/roadmap.md)
-separates shipped features from remaining work and validation limits. Touch
-and display controls remain future optional adapters; neither is required by
-the reusable scheduler.
+separates shipped features from remaining work and validation limits. Displays
+and their saved brightness/time-format controls are optional capabilities;
+touch controls remain future work. None is required by the reusable scheduler.
 
-Quran streaming, reciter and passage selection, resume position, adhkar, offline Quran storage, RTC expansion, and optional Home Assistant integration are later work. Streaming audio should use PSRAM for buffering; Quran audio is not expected to fit in the AtomS3R's flash.
+Quran streaming, reciter and passage selection, resume position, adhkar, offline Quran storage, RTC expansion for other hardware, and optional Home Assistant integration are later work. Streaming audio should use PSRAM for buffering; Quran audio is not expected to fit in the AtomS3R's flash.
 
 ## Development safety
 
-- Do not add hardware pin mappings until they have been verified against official M5Stack documentation or source and physical hardware.
+- Do not add hardware pin mappings until they have been verified against the manufacturer's documentation or source and physical hardware.
 - Do not present scaffold files as installable firmware.
 - Do not commit Wi-Fi credentials or signing secrets.
 - Do not bundle third-party Athan or Quran recordings without explicit, compatible redistribution rights.
