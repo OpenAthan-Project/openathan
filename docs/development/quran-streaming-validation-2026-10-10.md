@@ -5,7 +5,85 @@ cover metadata resolution, cancellation, Athan priority and local controls.
 Physical streaming, audible output and concurrent runtime memory remain
 unqualified. This report does not establish release readiness.
 
-## Source and validation scope
+## Verification of review fixes — 2026-10-11
+
+The baseline for these fixes is PR #43 at
+`36fd0a5db639a4ee10ddb3be7e415ae609c6dab5`. Final firmware, UI and regression
+sources are `2eaa4436df07a96bc2589dfc0b014b9c4baa9248`, rebased onto unchanged
+main `e4304465de98c925c34820b945b2549854a4bd63`. This report update changes
+documentation only. All 409 tracked files in each exported source snapshot were
+verified against their respective Git revision before compilation.
+
+| Check | Result |
+| --- | --- |
+| CMake/CTest host suite under UBSan | 18/18 passed. |
+| Complete pinned Python suite | 113/113 passed without skips; final audio adapter regressions also passed the seven audio-image tests after adding stored-start cancellation cases. |
+| Complete browser suites | Chromium 255/255 and WebKit 255/255 passed with Node 24.19.0, Playwright 1.62.1 and the production Digest bridge. |
+| Final Quran browser cases | 22/22 passed across both browsers after bounding test response waits; application/UI sources were unchanged from the complete run. |
+| Production Quran worker and HTTPS helper under UBSan | Passed, including rejection during pending and active Athan ownership. |
+| ESPHome configuration checks | All 13 CI configurations passed. |
+| Pinned installer contract | Both hardware profiles passed the real producer/consumer checks without device access. |
+| Pinned ESPHome mirror verification | All 20 upstream manifest hashes match ESPHome 2026.9.0; only the two documented patched files differ locally. Both copied license files are unchanged. |
+
+Audio adapter regressions cover outgoing playback, draining one command at a time,
+independently delayed pipeline stops, new playback and natural completion. They
+also cover direct stored starts, rapid replacements, invalid-request preservation,
+pending stored/stream cancellation, speaker failure and recovery, reader/decoder
+errors before and after submission, and the startup deadline including Stop wait.
+The production worker rejects Quran Play while Athan owns a pending start even
+when the speaker reports idle, and continues rejecting it during active playback.
+
+Browser regressions cover editable search during delayed or failed edition
+loading, multiple edits while busy, stale responses after returning to the same
+query, pending/uncertain Play, fresh status and Athan gating, changed-query
+pagination, explicit failure recovery and appending only to an accepted query.
+The permanent pagination regression fails on the preserved baseline in both
+browsers: it requests offset 20 for the new query instead of zero. It passes on
+the candidate. These checks use simulated pipelines and HTTP responses, not
+physical decoding, TLS or listening.
+
+### OTA comparison for review fixes
+
+All ten baseline and candidate variants were compiled with identical Python
+3.13.5, ESPHome 2026.9.0, tzdata 2026.4, ESP-IDF 5.5.5, source/build paths,
+configurations, substitutions and compile-only settings. Capacity checks passed
+for every actual `firmware.ota.bin`; resolved dependency pins, both 2 MiB slots
+and the separate 3.5 MiB shared-audio partition remain unchanged. Fixtures are
+synthetic and must not be installed or played.
+
+| Variant | PR baseline OTA bytes | Fixed OTA bytes | Fix delta | Budget remaining | Slot free | Static RAM bytes (fix delta) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Atom reference | 1,298,640 | 1,299,248 | +608 | 273,616 | 797,904 | 115,651 (+32) |
+| Waveshare production | 1,306,640 | 1,307,232 | +592 | 265,632 | 789,920 | 116,147 (+32) |
+| Scheduler device | 1,121,520 | 1,121,520 | 0 | 451,344 | 975,632 | 113,231 (0) |
+| Scheduler validation | 1,139,056 | 1,139,056 | 0 | 433,808 | 958,096 | 113,943 (0) |
+| Provisioning validation | 1,300,096 | 1,300,688 | +592 | 272,176 | 796,464 | 115,651 (+32) |
+| Upgrade qualification | 1,304,912 | 1,305,536 | +624 | 267,328 | 791,616 | 115,723 (+24) |
+| Upgrade startup failure | 1,304,912 | 1,305,536 | +624 | 267,328 | 791,616 | 115,723 (+24) |
+| Waveshare audio | 1,235,296 | 1,235,904 | +608 | 336,960 | 861,248 | 113,723 (+24) |
+| Waveshare display | 1,285,024 | 1,285,632 | +608 | 287,232 | 811,520 | 116,147 (+32) |
+| Waveshare diagnostics | 1,371,888 | 1,372,464 | +576 | 200,400 | 724,688 | 116,807 (+24) |
+
+The smallest remaining budget against the 1,572,864-byte limit is 200,400 bytes.
+Embedded gzip assets total 25,494 bytes versus 25,104 on the PR baseline, +390
+bytes. There are no new dependencies or bundled recordings. A relocated cached
+bootloader CMake project initially prevented the baseline startup-failure build;
+regenerating that disposable cache resolved it, and the table uses the successful
+run. The generic firmware images have no byte growth.
+
+Static RAM increases of 24 or 32 bytes do not establish runtime heap,
+fragmentation, PSRAM or stack headroom. The owned pending URL is bounded, but its
+runtime allocation and concurrent streaming still need physical qualification.
+No firmware was installed, no hardware was accessed, and no merge or release was
+performed for these fixes. HTTP APIs, durable settings, prayer history and
+shared-audio storage are unchanged. The sole added interface is the guarded
+internal speaker observation helper. The streaming contract now correctly
+attributes ESPHome's C++ runtime to GPLv3 and Python/other material to MIT.
+
+## Original implementation scope — 2026-10-10
+
+The following measurements retain the original implementation evidence. The
+verification section above gives the final automated results and firmware sizes.
 
 The comparison baseline is main `e4304465de98c925c34820b945b2549854a4bd63`.
 Candidate firmware and embedded UI match `16d7da50436dc294d8d23dc975edc6f9a875460d`.
@@ -45,7 +123,7 @@ or foreign destinations before connecting and verify detached callback lifetime.
 The audio adapter checks decoder failure, request timeout and epoch revocation.
 These tests use deterministic adapters, without real TLS or a physical decoder.
 
-## OTA capacity
+## Original OTA capacity
 
 All ten variants are compared using actual `firmware.ota.bin` payloads and the
 capacity checker. The 1,572,864-byte application budget, dual 2,097,152-byte slots
