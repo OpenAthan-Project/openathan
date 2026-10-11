@@ -90,6 +90,9 @@ interval:
             self.assertIn("pyramid_speaker->set_audio_dac(pyramid_dac)", source)
             self.assertIn("athan_test_scheduler->set_playback(athan_test_audio)", source)
             self.assertNotIn("voice_pyramid_audio::Audio", source)
+            self.assertIn("pyramid_amplifier->set_enable_on_startup(true)", source)
+            self.assertNotIn("set_volume_fence", source)
+            self.assertNotIn("pyramid_speaker_enable", source)
 
     def test_explicit_timezone_required(self):
         self.validate(self.config(timezone=""), False, "explicit timezone")

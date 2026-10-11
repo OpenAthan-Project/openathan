@@ -1,0 +1,2 @@
+#pragma once
+#define DMA_DESCRIPTOR_BUFFER_MAX_SIZE_4B_ALIGNED 4092

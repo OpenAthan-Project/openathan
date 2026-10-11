@@ -111,9 +111,13 @@ add_test(NAME waveshare_power_and_backlight COMMAND waveshare_adapter_tests)
 foreach(mode IN ITEMS production isolated)
   add_executable(pyramid_volume_${mode}_tests tests/pyramid_volume_tests.cpp
     firmware/esphome/components/voice_pyramid/voice_pyramid.cpp
+    third_party/esphome-i2s-audio/components/i2s_audio/speaker/i2s_audio_speaker.cpp
+    third_party/esphome-i2s-audio/components/i2s_audio/speaker/i2s_audio_speaker_standard.cpp
     firmware/esphome/components/openathan/nvs_settings_store.cpp)
-  target_include_directories(pyramid_volume_${mode}_tests PRIVATE tests/pyramid_stubs tests/waveshare_stubs tests/stubs
+  target_include_directories(pyramid_volume_${mode}_tests PRIVATE tests/i2s_stubs tests/pyramid_stubs tests/waveshare_stubs tests/stubs
+    third_party/esphome-i2s-audio/components/i2s_audio/speaker
     firmware lib/openathan-core/include)
+  target_compile_definitions(pyramid_volume_${mode}_tests PRIVATE USE_ESP32 USE_OPENATHAN_VOLUME_FENCE)
   target_link_libraries(pyramid_volume_${mode}_tests PRIVATE openathan_core)
   if(mode STREQUAL "isolated")
     target_compile_definitions(pyramid_volume_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)

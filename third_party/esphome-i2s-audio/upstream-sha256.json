@@ -1,0 +1,17 @@
+{
+  "i2s_audio/__init__.py": "e19cf4bc24bae17e10d931628906c78b63c039dd72f72c9828bfc963c2bb9974",
+  "i2s_audio/i2s_audio.h": "dc886cdf77c5a63189ad7c1b3f339e6321f6cc298dd74ef5ea1a76f09125c363",
+  "i2s_audio/media_player/__init__.py": "2b1a69814e18e7398ca955d5131eb6e2ae4a98c5e0ebfc586f363116b4fdae7c",
+  "i2s_audio/microphone/__init__.py": "6311e4b88b76c3d1bdb6ac7ac852d4113f90ad0b46d9e94499a0edb8ad4d0b20",
+  "i2s_audio/microphone/i2s_audio_microphone.cpp": "305e3619c6411d75080c2807270bf3a31832d0ed44196516ebe1d190dca94e5e",
+  "i2s_audio/microphone/i2s_audio_microphone.h": "f7922dd0f566590e70f9ff42321bbdf68c17deefd5af29d457bfa5aed526208d",
+  "i2s_audio/speaker/__init__.py": "f05467ee1d560dc33a77d12398b77d330c0a1f57b9d7814ea04b2330c0d58dd6",
+  "i2s_audio/speaker/i2s_audio_spdif.cpp": "a65a0f7a35a49ad91aee841ccf975209e932180b23206873ff8cdd557a14b249",
+  "i2s_audio/speaker/i2s_audio_spdif.h": "570682fbab326666c4b18be86979c357a36a40c7aa9b8e1f7d72b5e27e463e49",
+  "i2s_audio/speaker/i2s_audio_speaker.cpp": "bed97784e51d5454679786a35aa76416d045d05c52d4b61fcd6ef6f7d6648919",
+  "i2s_audio/speaker/i2s_audio_speaker.h": "1bcdba7e8cc07747887e67a34200cc31997f8e115ec9be9042d2b4ffa63acbd5",
+  "i2s_audio/speaker/i2s_audio_speaker_standard.cpp": "bcaa3b2f7b9436a88ea4fb1ec73778c6683ecb531e63dd5ae52b39939027515e",
+  "i2s_audio/speaker/i2s_audio_speaker_standard.h": "83646c7ce1acf26e79499c95d7ae467443434b0e9bdc1436c5fd4a9a35e30f12",
+  "i2s_audio/speaker/spdif_encoder.cpp": "7a2eface6bb48701b203340fc14377db1eb818445ed00123d316782c9854a847",
+  "i2s_audio/speaker/spdif_encoder.h": "509ffb6613239f4eabd087ca46897842dbdad60c298dadd974f962d6d1924a2f"
+}

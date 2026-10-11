@@ -8,14 +8,19 @@ external_components:
       type: local
       path: ../../components
     components: [voice_pyramid_audio]
+  - source:
+      type: local
+      path: ../../../../third_party/esphome-i2s-audio/components
+    components: [i2s_audio]
 
-switch:
-  - id: !extend pyramid_speaker_enable
-    restore_mode: ALWAYS_OFF
+voice_pyramid:
+  amplifier:
+    enable_on_startup: false
 
 speaker:
   - id: !extend pyramid_speaker
     audio_dac: !remove
+    volume_fence: true
 
 media_player:
   - id: !extend athan_player
@@ -26,7 +31,7 @@ voice_pyramid_audio:
   id: pyramid_audio
   playback_id: athan_audio
   dac_id: pyramid_dac
-  enable_id: pyramid_speaker_enable
+  speaker_id: pyramid_speaker
   clock_id: pyramid_clock
   amplifier_id: pyramid_amplifier
   scheduler_id: athan_scheduler

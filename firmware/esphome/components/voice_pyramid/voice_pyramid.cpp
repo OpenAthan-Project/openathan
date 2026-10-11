@@ -31,12 +31,23 @@ void Clock::setup() {
 void Amplifier::setup() {
   // Same reset and SYSCTRL values as the successful private audio diagnostic.
   set_timeout(1000, [this]() {
-    if (!write_byte(0x00, 0xFF) || !write_byte(0x01, 0x78)) {
+    uint8_t id{}, control{};
+    const uint8_t startup = enable_on_startup_ ? 0x78 : 0x70;
+    if (!read_byte(0x00, &id) || id != 0x5A || !write_byte(0x00, 0xFF) ||
+        !write_byte(0x01, startup) || !read_byte(0x01, &control) || control != startup) {
       ESP_LOGE("voice_pyramid", "AW87559 setup failed");
       mark_failed();
       return;
     }
     ready_ = true;
   });
+}
+bool Amplifier::set_pa_enabled(bool enabled) {
+  // M5Stack AW87559: SYSCTRL EN_PA is bit 3. Preserve boost, software
+  // enable and every unrelated bit, then verify the entire resulting register.
+  uint8_t before{}, after{};
+  if (!read_byte(0x01, &before)) return false;
+  const uint8_t requested = enabled ? before | 0x08 : before & ~0x08;
+  return write_byte(0x01, requested) && read_byte(0x01, &after) && after == requested;
 }
 }  // namespace esphome::voice_pyramid

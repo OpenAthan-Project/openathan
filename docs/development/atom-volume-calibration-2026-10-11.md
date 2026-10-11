@@ -15,15 +15,42 @@ both software mute and the codec mute. From 50% upwards the codec stays at
 settings beyond ESPHome's -49 dB software range. Neither stage amplifies samples
 or sets positive codec gain. DAC dynamic-range compression is explicitly disabled.
 
-The media player starts muted and the GPIO expander's amplifier enable starts
-off. The adapter waits for the audio partition, clock and amplifier initialization.
-For every volume change it disables the amplifier, requests software mute and
-waits for readback. Only then does it apply codec mute, DRC and gain settings,
-verify the gain/DRC registers, and request the final software level. Amplifier
-enable and new playback remain gated until that level reads back. Codec write or
-readback failure leaves the adapter failed with the amplifier disabled; dropped
-media-player commands are retried while gated. A live adjustment briefly mutes
-the output without stopping or replaying the recording.
+The calibrated amplifier selects `enable_on_startup: false`; its existing
+one-second initialization delay and SYSCTRL settings remain, with PA disabled.
+Generic configurations default to enabled startup. The previous expander GPIO
+binding was removed: checked PA control reads AW87559 SYSCTRL `0x01`, changes
+only EN_PA bit `0x08`, writes it and verifies the complete resulting register.
+This follows [M5Stack's AW87559 control](https://github.com/m5stack/M5Echo-Pyramid/blob/main/src/AW87559.cpp).
+
+Each transition verifies PA disabled, verifies codec mute (`0x31`, bits `0x60`),
+applies and reads back codec gain and DRC, requests fenced software gain, then
+waits for the current token. Only after completion does it verify codec unmute,
+verify PA enabled and publish the applied volume. Zero stays codec-muted and
+PA-disabled while remaining ready and applied. Duplicate pending requests retain
+the transition; a different request immediately closes the gates and supersedes
+the old generation. Stop and speaker sessions invalidate obsolete tokens without
+starting or replaying a recording.
+
+The calibrated adapter owns software gain. Restored or queued media-player
+volume/mute commands cannot override it. The repository-local, pinned
+[ESPHome I2S component](../../third_party/esphome-i2s-audio/UPSTREAM.md) stages raw
+PCM and captures one synchronized gain/generation pair for each DMA descriptor.
+It scales only consumed samples, before bit-depth conversion, and tags the
+existing FIFO completion record, including silence. A complete matching buffer
+proves older FIFO buffers drained. Logical volume readback and wall-clock delay
+cannot provide that proof; a fully stopped and cleaned-up speaker may complete
+immediately.
+
+Each distinct requested value gets a two-second fault deadline once hardware is
+ready. Duplicate requests and Stop/restart retries retain that deadline. It
+triggers failure, never permission to unmute. Allocation, partial writes, completion overflow,
+queue desynchronization, unverified DMA layout, counter exhaustion, failed
+hardware writes/readbacks or missing completion block playback. Failure requests
+software zero, stops the speaker and player, attempts both hardware mutes and
+latches the adapter failed until restart. I2C failure can prevent a physical gate
+from responding; these are checked controls and best-effort fault mutes, not
+proof of physical silence or a replacement for attended acceptance. Normal live
+adjustments briefly mute without stopping or replaying the recording.
 
 The mappings are checked against the [ES8311 register guide](https://files.waveshare.com/wiki/common/ES8311.user.Guide.pdf)
 and pinned ESPHome 2026.9.0 sources for the
@@ -72,7 +99,13 @@ package retains its ordinary ESPHome DAC binding; calibration is selected by the
 separate product package. Core prayer logic and the public website do not acquire
 a hardware dependency.
 
-## Automated validation
+## Initial calibration evidence before the fence correction
+
+The following measurements describe the initial calibrated revision `f1bbe0b`.
+The [output-fence validation report](atom-volume-fence-2026-10-11.md) records the
+correction, current transport regressions and matched before/after builds.
+
+### Automated validation
 
 All 20 CTests passed with UndefinedBehaviorSanitizer, including production and
 isolated calibration fixtures. They cover every legacy percentage, effective
@@ -111,7 +144,9 @@ audio/default-volume bridge changes.
 
 The 1.5 MiB application limit, both 2 MiB OTA slots and the separate 3.5 MiB
 shared audio partition are retained. Compile-only fixtures must never be
-installed or played. The adapter adds no audio task, sample buffer or dependency.
+installed or played. The initial adapter adds no audio task or sample buffer.
+The fence correction vendors the same pinned I2S component and enlarges its existing record queue;
+see the linked report for its separate costs.
 Reference static RAM increases by 152 bytes; runtime heap, fragmentation and
 PSRAM during networking and playback remain unmeasured.
 
@@ -125,7 +160,11 @@ Use the [scheduler runbook](../../firmware/esphome/scheduler/VALIDATION.md) or
 [provisioning runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
 for an attended application-only update with approved real recordings. First
 recheck the live identity, settings, history, audio digest and compatible recovery.
-Verify the migrated level before playback. Start at that level, increase in
+Verify the migrated level and both hardware gates before playback. Confirm PA
+bit `0x08` and codec mute bits `0x60` correspond to observed output gating.
+Check rapid, duplicate and paused live adjustments, Stop during a pending fence
+and fault handling with approved recordings. Register readback alone does not
+prove physical mute or amplifier behavior. Start at that level, increase in
 bounded steps, and stop if the listener reports distortion or uncomfortable
 output. Check zero mute, live adjustment, Stop, both recordings and a cold restart
 with unchanged settings/history/audio. Record register/output observations and
