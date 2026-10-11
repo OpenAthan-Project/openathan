@@ -137,6 +137,98 @@ async function loseSkipResponseAndRestoreContact(f,page){
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: Quran catalog, editions, surah selection and transient playback`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle',reciter:0,edition:0,surah:0};
+  const o=await open(f,browserName),{page}=o;let catalog,requestId=0,plays=0;
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    if(route.request().method()==='POST'){
+     const p=route.request().postDataJSON();requestId++;
+     catalog=p.kind==='reciters'?{reciters:[{id:1,name:'Example reciter'}],surahs:[{id:1,name:'Al-Fatihah'},{id:18,name:'Al-Kahf'}],total:1,next_offset:null}
+       :{editions:[{id:9,name:'Example edition',surahs:[18]}]};
+     await route.fulfill({json:{state:'loading',request:requestId}});
+    }else await route.fulfill({json:{state:'ready',request:requestId,data:catalog}});
+   });
+   await page.route('**/api/quran/play',async route=>{
+    plays++;assert.deepEqual(route.request().postDataJSON(),{reciter:1,edition:9,surah:18});
+    f.state.device.quran={supported:true,state:'loading',reciter:1,edition:9,surah:18};
+    await route.fulfill({json:structuredClone(f.state.device)});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   await page.locator('#quran-reciter').selectOption('1');
+   await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);
+   assert.equal(await page.locator('#quran-surah option[value="1"]').count(),0);
+   await page.locator('#quran-surah').selectOption('18');await page.locator('#quran-play').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   assert.equal(plays,1);assert.ok(await page.locator('#quran-stop').isVisible());
+   f.state.device.quran.state='playing';f.state.device.playing=true;f.state.device.playback_source='quran';
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Playing Al-Kahf'));
+   if(process.env.OPENATHAN_QURAN_CAPTURE_DIR&&browserName==='chromium'){
+    const {mkdir}=require('node:fs/promises');await mkdir(process.env.OPENATHAN_QURAN_CAPTURE_DIR,{recursive:true});
+    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'mobile.png'),fullPage:true});
+   }
+   f.state.device.playing=false;f.state.device.playback_source='none';f.state.device.quran.state='idle';
+   await page.locator('#quran-stop').click();await page.locator('#quran-stop').waitFor({state:'hidden'});
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playback stopped/);
+   assert.doesNotMatch(await page.locator('#quran-feedback').textContent(),/requested|Checking/);
+   assert.equal(f.state.mutations,0);assert.equal(plays,1);
+  }finally{await o.close();await f.close();}
+ });
+ test(`${browserName}: failed Quran catalog leaves retry available`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName),{page}=o;
+  try{
+   await page.route('**/api/quran/catalog',route=>route.fulfill({status:503,json:{error:'MP3Quran unavailable'}}));
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('MP3Quran unavailable'));
+   assert.ok(await page.locator('#quran-load').isEnabled());assert.ok(await page.locator('#quran-play').isDisabled());
+  }finally{await o.close();await f.close();}
+ });
+ test(`${browserName}: Quran catalog failure stays visible during playback and completion clears request feedback`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'playing',surah:18};f.state.device.playing=true;f.state.device.playback_source='quran';
+  const o=await open(f,browserName),{page}=o;const gate=deferred();
+  try{
+   await page.route('**/api/quran/catalog',async route=>{await gate.promise;await route.fulfill({status:503,json:{error:'MP3Quran unavailable'}});});
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   assert.match(await page.locator('#quran-catalog-feedback').textContent(),/Loading reciters/);
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playing surah 18/);
+   gate.resolve();await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('MP3Quran unavailable'));
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playing surah 18/);
+   f.state.device.quran.state='idle';f.state.device.playing=false;f.state.device.playback_source='none';
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Playback finished or stopped'));
+   assert.ok(await page.locator('#quran-stop').isHidden());
+  }finally{gate.resolve();await o.close();await f.close();}
+ });
+ test(`${browserName}: uncertain Quran Play is read back without repeating and Stop cancels loading`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName),{page}=o;let plays=0;
+  try{
+   await page.route('**/api/quran/catalog',route=>route.fulfill({json:{state:'ready',request:1,data:route.request().postDataJSON().kind==='reciters'
+    ?{reciters:[{id:1,name:'Example'}],surahs:[{id:18,name:'Al-Kahf'}],total:1,next_offset:null}
+    :{editions:[{id:9,name:'Edition',surahs:[18]}]}}}));
+   await page.route('**/api/quran/play',async route=>{
+    plays++;f.state.device.quran={supported:true,state:'loading',reciter:1,edition:9,surah:18};
+    await route.fulfill({status:200,contentType:'application/json',body:'{'});
+   });
+   await page.route('**/api/stop',async route=>{f.state.device.quran.state='idle';await route.fulfill({json:structuredClone(f.state.device)});});
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);await page.locator('#quran-reciter').selectOption('1');
+   await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);await page.locator('#quran-surah').selectOption('18');
+   await page.locator('#quran-play').click();await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   assert.equal(plays,1);assert.ok(await page.locator('#quran-play').isDisabled());
+   await settings(page);assert.ok(await page.locator('#settings-stop').isVisible());
+   assert.match(await page.locator('#settings-playing').textContent(),/Starting Quran/);
+   if(process.env.OPENATHAN_QURAN_CAPTURE_DIR&&browserName==='chromium'){
+    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'settings-loading-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'settings-loading-mobile.png'),fullPage:true});
+   }
+   await page.locator('#settings-stop').click();await page.locator('#settings-playing').waitFor({state:'hidden'});
+   await page.locator('[data-view=quran]').click();
+   await page.locator('#quran-stop').waitFor({state:'hidden'});
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playback stopped/);assert.equal(plays,1);assert.equal(f.state.mutations,0);
+  }finally{await o.close();await f.close();}
+ });
  for(const stopFirst of [false,true])for(const readback of [false,true])test(`${browserName}: revision-aligned timetable survives ${readback?'Stop readback':'Stop reply'} ${stopFirst?'before':'after'} prayer-save confirmation`,async()=>{
   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName,{},true),{page}=o;
   const saveGate=deferred(),saveStarted=deferred(),stopGate=deferred(),stopStarted=deferred(),verificationGate=deferred(),verificationStarted=deferred();let saves=0,stops=0,reads=0;

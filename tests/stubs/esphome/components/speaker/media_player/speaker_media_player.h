@@ -14,7 +14,10 @@ enum class AudioFileType { MP3 };
 struct AudioFile { const uint8_t *data; size_t length; AudioFileType file_type; };
 }
 namespace speaker {
+enum class AudioPipelineState { STOPPED, PLAYING, ERROR_READING, ERROR_DECODING };
 struct SpeakerMediaPlayer {
+  AudioPipelineState pipeline_state{AudioPipelineState::STOPPED};
+  AudioPipelineState announcement_state() const { return pipeline_state; }
   bool initialized{true};
   float volume{0.7f};
   bool muted{}, drop_volume{};
@@ -26,11 +29,14 @@ struct SpeakerMediaPlayer {
     SpeakerMediaPlayer *player;
     bool announcement{};
     std::optional<float> volume;
+    std::string url;
     void set_volume(float value) { volume = value; }
     void set_command(media_player::MediaPlayerCommand) {}
     void set_announcement(bool value) { announcement = value; }
+    void set_media_url(const std::string &value) { url = value; }
     void perform() {
-      if (volume) {
+      if (!url.empty()) player->commands.push_back(url);
+      else if (volume) {
         if (!player->drop_volume) { player->volume = *volume; player->muted = *volume == 0; }
       } else player->commands.push_back(announcement ? "stop announcement" : "stop media");
     }

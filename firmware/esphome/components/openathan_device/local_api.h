@@ -1,6 +1,7 @@
 #pragma once
 #include "../openathan/openathan.h"
 #include "upgrade_api.h"
+#include "quran_api.h"
 
 namespace esphome::openathan_device {
 struct ZoneEntry {
@@ -24,6 +25,7 @@ class LocalApi {
   }
   void handle(ApiExchange& request);
   void set_upgrade(UpgradeApi *upgrade) { upgrade_ = upgrade; }
+  void set_quran(QuranApi *quran) { quran_ = quran; }
 
  private:
   void time_format_(JsonObject root);
@@ -38,5 +40,6 @@ class LocalApi {
   std::string hostname_;
   bool wifi_connected_{};
   UpgradeApi *upgrade_{};
+  QuranApi *quran_{};
 };
 }  // namespace esphome::openathan_device

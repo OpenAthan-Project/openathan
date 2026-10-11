@@ -32,6 +32,7 @@ add_executable(audio_validator tests/audio_validator.cpp)
 target_include_directories(audio_validator PRIVATE lib/openathan-core/include)
 add_executable(audio_adapter_tests tests/audio_adapter_tests.cpp
   firmware/esphome/components/openathan_audio/partition_audio.cpp)
+target_compile_definitions(audio_adapter_tests PRIVATE OPENATHAN_QURAN)
 target_include_directories(audio_adapter_tests PRIVATE tests/stubs lib/openathan-core/include
   firmware/esphome/components/openathan_audio)
 if(NOT APPLE)
