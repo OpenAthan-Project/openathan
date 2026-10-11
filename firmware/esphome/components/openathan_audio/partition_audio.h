@@ -42,6 +42,11 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   ::openathan::StreamState stream_state_{::openathan::StreamState::IDLE};
   bool observed_playing_{};
 #ifdef OPENATHAN_QURAN
+  // Reserve ownership while the outgoing commands and pipelines drain. Only
+  // one replacement survives; Stop clears its recording and owned URL.
+  bool awaiting_stop_{};
+  audio::AudioFile *pending_file_{};
+  std::string pending_url_;
   uint32_t stream_started_{};
 #endif
 };

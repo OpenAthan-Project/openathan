@@ -49,6 +49,23 @@ call finishes before accepting another metadata request. Metadata browsing leave
 current audio running. Streaming requires completed setup, healthy settings,
 Wi-Fi and a valid clock for TLS. Updates, USB maintenance and shutdown cancel it.
 
+Accepted starts reserve their source immediately. The audio adapter retains one
+replacement and submits it only after the speaker command queue is empty and
+both pipelines report stopped. It ignores outgoing playback and errors during
+that wait; only the submitted session can complete the new reservation. Later
+starts replace the pending recording, and Stop or speaker failure cancels it.
+Quran's 30-second startup deadline includes the wait for Stop. Athan ownership
+blocks Quran Play throughout the handoff and playback; canceled Quran never
+automatically resumes.
+
+Catalog search stays editable with a 400 ms debounce. Edits during catalog,
+edition or Play requests coalesce into the latest search, starting from offset
+zero after the current operation finishes. Following Play, a fresh playback
+observation must no longer report Quran loading or Athan ownership. Obsolete
+catalog/edition results are ignored, and pagination appends only to results for
+the accepted query. Failed API requests require an explicit retry; Play is never
+automatically repeated.
+
 Bounds are 1 MiB per metadata response, 16 KiB per object, 1,024 reciters,
 20 reciters per returned page, 32 editions per reciter, 114 distinct surahs,
 256 bytes per name, 128 bytes per search and 32 KiB per normalized response.
@@ -74,7 +91,9 @@ provider restriction, and the player lacked a public pipeline-state observation.
 Only `audio/audio_reader.cpp` and `speaker/media_player/speaker_media_player.h`
 change upstream behavior, under `OPENATHAN_QURAN`. Stored-file playback retains
 the upstream path. The generic scheduler profiles retain upstream components and
-do not enable this feature. Each mirror includes its MIT license; the
+do not enable this feature. The guarded speaker observation also checks queue
+drain and both stopped pipeline states. Each mirror includes ESPHome's upstream
+license: its C++ runtime is GPLv3, while Python and other material use MIT. The
 [upstream manifest](../../firmware/esphome/components/audio/upstream.json) and
 vendoring regression pin the unmodified files. An ESPHome upgrade must refresh
 both mirrors, reconsider these two patches and rerun adapter and firmware checks.
@@ -112,8 +131,10 @@ The local page attributes MP3Quran. Its published
 [developer-use policy](https://www.mp3quran.net/eng/privacy) permits application
 use of its materials and links; recordings retain their own terms. This change
 bundles no Quran recording, rehosts no provider media and establishes no right to
-redistribute a future offline library. Software/documentation licensing remains
-unchanged; copied ESPHome sources retain MIT attribution.
+redistribute a future offline library. Project-owned software/documentation
+licensing remains unchanged; copied ESPHome C++ runtime sources retain GPLv3
+attribution and Python/other material retains MIT attribution. Both copied
+license files remain intact.
 
 ## Hardware qualification before release
 

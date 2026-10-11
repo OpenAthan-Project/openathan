@@ -61,6 +61,11 @@ int main() {
   service.loop(true, true); execute(service); assert(audio.url.empty()); // Maintenance beats late results.
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);
   audio.start(openathan::Track::NORMAL); execute(service); assert(audio.url.empty()); // Athan beats late result.
+  audio.active = false; // Athan has reserved ownership while its Stop is still draining.
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  service.loop(true, false);
+  assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
+  audio.active = true; // The reservation must remain protected after playback starts.
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
   audio.stop();
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 200);

@@ -136,7 +136,138 @@ async function loseSkipResponseAndRestoreContact(f,page){
  await page.locator('#connection-banner').waitFor({state:'hidden'});
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
+function quranReciters(id=1,name='Alpha',next=null,total=1){
+ return {reciters:[{id,name}],surahs:[{id:18,name:'Al-Kahf'}],next_offset:next,total};
+}
+async function quranRequestStarted(signal){
+ let timer;
+ try{await Promise.race([signal.promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Quran request did not start')),10000);})]);}
+ finally{clearTimeout(timer);}
+}
+async function quranControls(page){
+ await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+ await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+ await page.locator('#quran-reciter').selectOption('1');
+ await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);
+ await page.locator('#quran-surah').selectOption('18');
+}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const failEdition of [false,true])test(`${browserName}: Quran search coalesces edits during ${failEdition?'failed':'delayed'} editions and ignores obsolete results`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(p.kind==='editions'){
+     started.resolve();await gate.promise;
+     await route.fulfill(failEdition?{status:503,json:{error:'Obsolete edition failure'}}
+      :{json:{state:'ready',request:2,data:{editions:[{id:9,name:'Obsolete edition',surahs:[18]}]}}});
+    }else await route.fulfill({json:{state:'ready',request:posts.length,data:quranReciters(p.query?2:1,p.query||'Alpha')}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   await page.locator('#quran-reciter').selectOption('1');await quranRequestStarted(started);
+   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
+   assert.ok(await page.locator('#quran-search').isEnabled());
+   await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(failEdition?500:399);
+   assert.equal(posts.length,2);gate.resolve();await requestsFinished(page);
+   if(!failEdition){assert.equal(posts.length,2);await page.clock.runFor(1);}
+   await page.clock.resume();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled&&document.querySelector('#quran-reciter option[value="2"]'));
+   assert.deepEqual(posts.filter(p=>p.kind==='reciters').map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   assert.equal(await page.locator('#quran-edition option[value="9"]').count(),0);
+   assert.doesNotMatch(await page.locator('#quran-catalog-feedback').textContent(),/Obsolete/);
+   assert.equal(posts.filter(p=>p.kind==='editions').length,1);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran catalog intent rejects stale responses even after returning to the same query`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const oldGate=deferred(),oldStarted=deferred(),latestGate=deferred(),latestStarted=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);const n=posts.length;
+    if(n===2){oldStarted.resolve();await oldGate.promise;}
+    if(n===3){latestStarted.resolve();await latestGate.promise;}
+    await route.fulfill({json:{state:'ready',request:n,data:quranReciters(n===1?1:n===2?9:2,n===2?'Obsolete result':n===3?'Latest Beta':'Alpha')}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);await quranRequestStarted(oldStarted);
+   await page.locator('#quran-search').fill('Gamma');await page.clock.runFor(400);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);
+   oldGate.resolve();await quranRequestStarted(latestStarted);
+   assert.equal(await page.locator('#quran-reciter option[value="9"]').count(),0);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),1);
+   latestGate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0],['Beta',0]]);
+   assert.equal(await page.locator('#quran-reciter option[value="2"]').textContent(),'Latest Beta');
+  }finally{oldGate.resolve();latestGate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran Load more before debounce resets a changed query and replaces the list`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const gate=deferred(),started=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(p.query){started.resolve();await gate.promise;}
+    await route.fulfill({json:{state:'ready',request:posts.length,data:p.query?quranReciters(21,'Beta'):quranReciters(1,'Alpha',20,25)}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.locator('#quran-more').click();await quranRequestStarted(started);
+   await page.clock.runFor(500);assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   gate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),0);
+   assert.equal(await page.locator('#quran-reciter option[value="21"]').count(),1);
+   assert.ok(await page.locator('#quran-more').isHidden());
+   await page.clock.runFor(1000);await requestsFinished(page);assert.equal(posts.length,2);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran failed search retries explicitly from zero and only accepted-query pagination appends`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName,{},true),{page}=o;const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(posts.length===2){await route.fulfill({status:503,json:{error:'Search unavailable'}});return;}
+    await route.fulfill({json:{state:'ready',request:posts.length,data:p.query?quranReciters(p.offset?3:2,p.offset?'Beta next':'Beta',p.offset?null:20,25):quranReciters(1,'Alpha',20,25)}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);
+   await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('Search unavailable'));
+   await page.clock.runFor(2000);await requestsFinished(page);assert.equal(posts.length,2);
+   await page.locator('#quran-more').click();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),0);
+   await page.locator('#quran-more').click();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0],['Beta',0],['Beta',20]]);
+   assert.equal(await page.locator('#quran-reciter option[value="2"]').count(),1);
+   assert.equal(await page.locator('#quran-reciter option[value="3"]').count(),1);
+  }finally{await o.close();}
+ });
+ for(const uncertain of [false,true])test(`${browserName}: Quran search during ${uncertain?'uncertain':'pending'} Play waits for fresh status and Athan without repeating Play`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const gate=deferred(),started=deferred();const posts=[];let plays=0;
+  try{
+   await page.route('**/api/quran/catalog',route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    return route.fulfill({json:{state:'ready',request:posts.length,data:p.kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters(p.query?2:1,p.query||'Alpha')}});
+   });
+   await page.route('**/api/quran/play',async route=>{
+    plays++;f.state.device.quran={supported:true,state:'loading',reciter:1,edition:9,surah:18};started.resolve();await gate.promise;
+    await route.fulfill(uncertain?{status:200,contentType:'application/json',body:'{'}:{json:structuredClone(f.state.device)});
+   });
+   await quranControls(page);await page.locator('#quran-play').click();await quranRequestStarted(started);
+   await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(500);assert.equal(posts.length,2);
+   gate.resolve();await requestsFinished(page);await page.clock.runFor(2000);await requestsFinished(page);
+   assert.equal(posts.length,2);assert.ok(await page.locator('#quran-search').isEnabled());
+   f.state.device.quran.state='idle';f.state.device.playback_source='athan';
+   await page.clock.runFor(2000);await requestsFinished(page);assert.equal(posts.length,2);
+   f.state.device.quran.state='playing';f.state.device.playback_source='quran';f.state.device.playing=true;
+   await page.clock.runFor(2000);await requestsFinished(page);
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.filter(p=>p.kind==='reciters').map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   assert.equal(plays,1);assert.equal(f.state.mutations,0);
+  }finally{gate.resolve();await o.close();}
+ });
  test(`${browserName}: Quran catalog, editions, surah selection and transient playback`,async()=>{
   const f=await fixture();f.state.device.quran={supported:true,state:'idle',reciter:0,edition:0,surah:0};
   const o=await open(f,browserName),{page}=o;let catalog,requestId=0,plays=0;
