@@ -1,0 +1,11 @@
+# Maintainer-only controlled HTTPS fixtures; never install CI placeholder images.
+packages:
+  diagnostic: !include diagnostics.yaml
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_quran_qualification]
+openathan_quran_qualification:
+  origin: !secret quran_qualification_origin
+  ca_file: !secret quran_qualification_ca_file

@@ -5,6 +5,8 @@ The local Quran page loads the live reciter catalog, searches across it, pages
 through matching reciters, and offers each selected recording edition's available
 surahs. This feature requires separate physical qualification before release;
 see the [implementation validation](quran-streaming-validation-2026-10-10.md).
+The [controlled failure runbook](quran-failure-qualification.md) provides private
+HTTPS fixtures and an isolated maintainer profile for subsequent hardware tests.
 
 ## Playback contract
 

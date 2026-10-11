@@ -3,6 +3,9 @@
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 #include <cstring>
+#ifdef OPENATHAN_QURAN_QUALIFICATION
+#include "esphome/components/openathan_quran_qualification/qualification.h"
+#endif
 
 namespace esphome::openathan_device {
 // Shared by metadata and the pinned audio reader. Redirect validation happens
@@ -21,6 +24,11 @@ class QuranHttp {
       if (audio ? !quran_audio_url(url) : !metadata) return false;
       esp_http_client_config_t config{};
       config.url = url.c_str(); config.crt_bundle_attach = esp_crt_bundle_attach;
+#ifdef OPENATHAN_QURAN_QUALIFICATION
+      const auto transport_url = openathan_quran_qualification::route(url);
+      config.url = transport_url.c_str();
+      openathan_quran_qualification::configure_tls(config);
+#endif
       config.disable_auto_redirect = true; config.timeout_ms = timeout_ms;
       config.buffer_size = buffer_size; config.buffer_size_tx = 1024;
       config.event_handler = event_; config.user_data = this;

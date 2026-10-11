@@ -53,6 +53,20 @@ def check(arduinojson):
             str(worker), str(worker_controls), "-o", str(integration)], check=True)
         subprocess.run([str(integration)], check=True)
         print("Atom volume/Quran continuity, pending admission, zero, rapid changes, Stop and faults passed")
+        qualified = Path(directory) / "quran-qualification-tests"
+        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined",
+            "-fno-sanitize-recover=all", "-DOPENATHAN_QURAN", "-DOPENATHAN_QURAN_QUALIFICATION",
+            "-DOPENATHAN_PROVISIONING_TEST_STORAGE", "-DOPENATHAN_UPDATES_ENABLED=0",
+            '-DOPENATHAN_QURAN_QUALIFICATION_ORIGIN="https://192.168.1.2:8443"',
+            '-DOPENATHAN_QURAN_QUALIFICATION_CA="host test CA"',
+            "-I" + str(ROOT / "tests/upgrade_stubs"), "-I" + str(ROOT / "tests/stubs"),
+            "-I" + arduinojson, "-I" + str(ROOT / "firmware"),
+            "-I" + str(ROOT / "firmware/esphome/components/openathan_device"),
+            "-I" + str(ROOT / "lib/openathan-core/include"),
+            str(ROOT / "tests/quran_qualification_tests.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan_quran_qualification/qualification.cpp"),
+            "-o", str(qualified)], check=True)
+        subprocess.run([str(qualified)], check=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
