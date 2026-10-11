@@ -8,12 +8,23 @@ unqualified. This report does not establish release readiness.
 ## Verification of playback request race fixes — 2026-10-11
 
 These fixes compare PR #43 at `aebc1d094ddf6dfb2287c790a5062a4c03c508dc`
-with final firmware, UI and regression source
+with measured firmware, UI and regression source
 `7e1d505c5d9b9151875a6f85085ab8dbdad9774a`, rebased onto unchanged main
 `e4304465de98c925c34820b945b2549854a4bd63`. All 409 tracked measured source
-files were verified against that final revision. This report update changes
+files were verified against that measured revision. This report update changes
 documentation only; the earlier review and original implementation results below
 remain historical comparisons.
+
+Production firmware and UI code are unchanged after the measured revision. The
+final browser fixture source is
+`36478f31fb735863387a0aaeb0474ef8f549131c`: its prayer-occurrence cases explicitly
+gate Stop readback and await confirmed Stop before releasing an older Skip/Restore
+reply. The initial CI run passed 531/532 cases and exposed the fixture's earlier
+assumption that an updated prayer name already implied completed Stop. All state
+and feedback assertions are retained. The complete local browser results below
+were recorded on the measured source; 28/28 affected cases passed with the final
+fixture. Current-head complete suites are enforced by
+[PR #43's checks](https://github.com/OpenAthan-Project/openathan/pull/43/checks).
 
 Play now requires the transient `quran.playback_token` observed from the device.
 The per-boot identifier and playback counter reject delayed requests invalidated
@@ -36,7 +47,7 @@ it. Browser storage remembers selection IDs only.
 | CMake/CTest host suite under UBSan | 18/18 passed. |
 | Complete pinned Python suite | 113/113 passed without skips. |
 | Complete browser suites | Chromium 266/266 and WebKit 266/266 passed with Node 24.19.0, Playwright 1.62.1 and the production Digest bridge. |
-| Final focused browser regressions | 82/82 passed across Chromium and WebKit. |
+| Focused browser regressions | 82/82 passed on measured source; 28/28 final fixture and playback-ordering cases passed across Chromium and WebKit. |
 | Production Quran worker and HTTPS helper under UBSan | Passed token validation, simulated physical/other-client Stop, reboot invalidation, counter wrap, pending/active Athan priority and existing worker cancellation checks. |
 | Production and isolated local API tests | Passed token forwarding/status exposure, HTTP 409 propagation and durable-record preservation. |
 | ESPHome configuration checks | All 13 CI configurations passed. |
