@@ -37,6 +37,8 @@ let actionBusy = false,
   actionOrder = 0;
 let stopBusy = false,
   stopAwaiting = false;
+let playbackIntent = null,
+  playbackReadFloor = 0;
 let timezonesReady = false,
   timezonesLoading = false,
   proposedLocation;
@@ -362,8 +364,9 @@ function projectSnapshot() {
   for (const key of ["display", "lights", "time_format"]) snapshot[key] = domainData(key);
   snapshot.firmware = firmware.data;
 }
-function acceptResponse({ data, order }, resource = "status") {
+function acceptResponse({ data, order }, resource = "status", allowPlayback = true) {
   const accepted = {};
+  let playbackAccepted = false;
   const initial = !snapshot,
     wasFault = settingsFault();
   if (resource === "status") {
@@ -390,18 +393,23 @@ function acceptResponse({ data, order }, resource = "status") {
         time_format,
         firmware: update,
         playing,
+        quran,
+        playback_source,
         ...operational
       } = data;
-      observedStatus.data = { ...operational, playing: observedStatus.data?.playing };
+      observedStatus.data = { ...operational, playing: observedStatus.data?.playing,
+        quran: observedStatus.data?.quran, playback_source: observedStatus.data?.playback_source };
       observedStatus.order = order;
       if (actionUncertain && order >= actionOrder) {
         actionUncertain = false;
         status("action", "Skip state checked · review the current prayer");
       }
     }
-    if (order >= observedStatus.playbackOrder) {
-      observedStatus.data = { ...observedStatus.data, playing: data.playing };
+    if (allowPlayback && order >= Math.max(observedStatus.playbackOrder, playbackReadFloor)) {
+      observedStatus.data = { ...observedStatus.data, playing: data.playing,
+        quran: data.quran, playback_source: data.playback_source };
       observedStatus.playbackOrder = order;
+      playbackAccepted = true;
     }
   } else if (resource !== "firmware") accepted[resource] = acceptDomain(resource, data, order);
   const update = resource === "firmware" ? data : resource === "status" ? data.firmware : null;
@@ -416,7 +424,7 @@ function acceptResponse({ data, order }, resource = "status") {
   connected = true;
   projectSnapshot();
   if (snapshot) {
-    if (stopAwaiting && snapshot.playing === false) stoppedFeedback();
+    if (playbackAccepted) settlePlaybackIntent();
     if (firstRun && snapshot.setup === "active" && !draftDirty && snapshot.settings) {
       fillDraft(snapshot.settings);
       status("prayer", "Saved prayer settings", "success");
@@ -454,6 +462,7 @@ function acceptResponse({ data, order }, resource = "status") {
   render();
   applyPendingLocation();
   queueMicrotask(pump);
+  queueMicrotask(drainQuranSearch);
   return accepted;
 }
 function acceptSavedResponse(key, response) {
@@ -640,6 +649,7 @@ function renderTimes(id, schedule, settings, isPreview = false) {
   }
 }
 function render() {
+  renderQuran();
   const state = snapshot,
     next = state?.clock_ready && state?.setup === "active" ? state.next : null,
     skipped = isSkipped(next, state?.skip);
@@ -680,7 +690,7 @@ function render() {
     : !connected
       ? "Connection lost · stale"
       : state.playing
-        ? "Playing"
+        ? state.playback_source === "quran" ? "Quran playing" : "Playing"
         : settingsFault()
           ? "Saved storage unavailable"
           : actionUncertain
@@ -724,13 +734,16 @@ function render() {
   text("state-detail", detail);
   $("state-detail").hidden = !detail;
   for (const id of ["stop", "settings-stop"]) {
-    $(id).hidden = !state?.playing;
+    $(id).hidden = !playbackControlsNeeded();
     $(id).disabled = !connected || stopBusy;
   }
-  $("settings-playing").hidden = !state?.playing;
+  $("settings-playing").hidden = !playbackControlsNeeded();
+  $("settings-playing").querySelector("strong").textContent = playbackIntent ? "Checking playback"
+    : state?.quran?.state === "loading" ? "Starting Quran" : "Playing";
   $("settings-playing").querySelector(".hint").textContent = connected
-    ? "Playback is active on the speaker."
-    : "Last observed playing · connection lost.";
+    ? playbackIntent ? quran.playMessage : state?.quran?.state === "loading" ? "Quran is starting on the speaker."
+      : state?.playback_source === "quran" ? "Quran is playing on the speaker." : "Playback is active on the speaker."
+    : "Connection lost · playback may still be active.";
   const skipKey = state?.skip,
     skipName = skipKey ? title(prayers[skipKey.prayer]) : next?.name;
   const actionDate =
@@ -767,6 +780,7 @@ function showView(view, focus = true) {
   if (firstRun) view = "settings";
   $("today-view").hidden = view !== "today";
   $("settings-view").hidden = view !== "settings";
+  $("quran-view").hidden = view !== "quran";
   document.querySelectorAll("[data-view]").forEach((b) => {
     if (b.dataset.view === view) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
@@ -776,6 +790,260 @@ function showView(view, focus = true) {
     scrollTo(0, 0);
   }
 }
+
+// Quran sessions are transient; saved prayer settings never acquire media URLs.
+const quran = { reciters: [], surahs: [], editions: [], next: null, total: 0,
+  busy: false, loaded: false, requestedQuery: "", acceptedQuery: "", intent: 0,
+  pendingSearch: false, searchReady: false, searchTimer: null,
+  message: "Load the catalog to choose a recording.", tone: "", selection: {},
+  playMessage: "", playTone: "", observedState: "idle" };
+try {
+  const saved = JSON.parse(localStorage.getItem("openathan-quran") || "{}");
+  if (saved && typeof saved === "object" && !Array.isArray(saved))
+    for (const key of ["reciter", "edition", "surah"])
+      if (/^[1-9][0-9]*$/.test(String(saved[key]))) quran.selection[key] = String(saved[key]);
+} catch {}
+function quranPlaybackFeedback(message, tone = "") {
+  quran.playMessage = message; quran.playTone = tone;
+}
+function playbackActive() { return !!snapshot?.playing || snapshot?.quran?.state === "loading"; }
+function playbackControlsNeeded() { return playbackActive() || !!playbackIntent || stopBusy || stopAwaiting; }
+function playbackToken() {
+  const token = snapshot?.quran?.playback_token;
+  return typeof token === "string" && token.length > 0 && token.length <= 59 ? token : null;
+}
+function beginPlaybackIntent(kind) {
+  const intent = { kind, token: playbackToken(), settled: false, uncertain: true,
+    cancelToken: playbackIntent?.kind === "play" ? playbackIntent.token : playbackIntent?.cancelToken };
+  playbackIntent = intent;
+  // Reads already in flight cannot settle a command that has not replied yet.
+  playbackReadFloor = Infinity;
+  return intent;
+}
+function stopFeedback(message, tone = "warning") {
+  status("action", message + (actionUncertain ? " · Skip state unconfirmed; refresh to check." : ""), tone);
+  text("settings-playback-feedback", message);
+  quranPlaybackFeedback(message, tone);
+}
+function settlePlaybackIntent() {
+  const intent = playbackIntent;
+  if (!intent?.settled || intent.readbackPending) return;
+  const token = playbackToken();
+  if (intent.kind === "play") {
+    if (!token || typeof snapshot.playing !== "boolean" ||
+        !["idle", "loading", "playing", "error"].includes(snapshot.quran?.state) ||
+        intent.uncertain && token === intent.token) {
+      quranPlaybackFeedback("Play unconfirmed · use Stop before trying again.", "warning");
+      return;
+    }
+    playbackIntent = null;
+    quranPlaybackFeedback(intent.error ? intent.error + ". Check playback before trying again."
+      : snapshot.quran?.state === "idle" ? "Playback finished or stopped."
+        : "Quran requested. Checking speaker playback…", intent.error ? "error" : "");
+  } else if (snapshot.playing === false && !["loading", "playing"].includes(snapshot.quran?.state) &&
+      (!intent.cancelToken || token && token !== intent.cancelToken)) {
+    playbackIntent = null;
+    stoppedFeedback(intent.uncertain);
+  } else stopFeedback(playbackActive()
+    ? intent.uncertain ? "Playback is still active. Try Stop again." : "Stop requested · waiting for playback to stop"
+    : "Stop unconfirmed · try Stop again before Play.");
+}
+async function readPlaybackIntent(intent) {
+  if (playbackIntent !== intent) return;
+  intent.settled = true;
+  intent.readbackPending = true;
+  // Fence every read issued before the command settled, including a later
+  // numbered poll that the device answered before admitting Play or Stop.
+  playbackReadFloor = requestOrder + 1;
+  try {
+    const response = await request("/api/status");
+    acceptResponse(response, "status", playbackIntent === intent);
+  } catch (error) {
+    if (playbackIntent !== intent) return;
+    connectionFailure(error);
+    if (intent.kind === "stop") stopFeedback("Stop unconfirmed · reconnect to check. Playback may still be active.");
+    else quranPlaybackFeedback("Play unconfirmed · reconnect and use Stop before trying again.", "warning");
+  } finally {
+    intent.readbackPending = false;
+    // A concurrent settings or Skip reply may carry a newer observation. Finish
+    // this readback with that state, retaining both its data and Stop feedback.
+    if (playbackIntent === intent && observedStatus.playbackOrder >= playbackReadFloor)
+      settlePlaybackIntent();
+  }
+}
+function rememberQuran() {
+  quran.selection = { reciter: $("quran-reciter").value, edition: $("quran-edition").value,
+    surah: $("quran-surah").value };
+  try { localStorage.setItem("openathan-quran", JSON.stringify(quran.selection)); } catch {}
+}
+function quranOptions(id, entries, placeholder, selected) {
+  const input = $(id);
+  input.replaceChildren();
+  if (placeholder) input.add(new Option(placeholder, ""));
+  for (const entry of entries) input.add(new Option(entry.name, String(entry.id)));
+  if (entries.some((entry) => String(entry.id) === String(selected))) input.value = String(selected);
+}
+function filterQuranReciters() {
+  const value = $("quran-reciter").value || quran.selection.reciter;
+  quranOptions("quran-reciter", quran.reciters, "Choose a reciter", value);
+  renderQuran();
+}
+function quranSurahs() {
+  const edition = quran.editions.find((entry) => String(entry.id) === $("quran-edition").value);
+  const available = new Set(edition?.surahs || []);
+  quranOptions("quran-surah", quran.surahs.filter((entry) => available.has(entry.id)),
+    "Choose a surah", quran.selection.surah);
+  renderQuran();
+}
+function renderQuran() {
+  const state = snapshot?.quran;
+  if (connected && state) {
+    if (state.state === "idle" && ["playing", "loading"].includes(quran.observedState) && !playbackIntent && !stopBusy && !stopAwaiting)
+      quranPlaybackFeedback("Playback finished or stopped.");
+    quran.observedState = state.state;
+  }
+  const surahName = quran.surahs.find((entry) => entry.id === state?.surah)?.name;
+  $("quran-nav").hidden = !state?.supported || firstRun;
+  const disabled = !connected || firstRun || !state?.supported;
+  const catalogBusy = quran.busy || quran.pendingSearch || !!playbackIntent;
+  $("quran-load").disabled = disabled || quran.busy || !!playbackIntent;
+  $("quran-load").textContent = quran.reciters.length ? "Refresh catalog" : "Load reciters";
+  $("quran-search").disabled = disabled || !quran.loaded;
+  $("quran-reciter").disabled = disabled || catalogBusy || !quran.reciters.length;
+  $("quran-more").hidden = quran.next === null;
+  $("quran-more").disabled = disabled || quran.busy || !!playbackIntent;
+  $("quran-edition").disabled = disabled || catalogBusy || !quran.editions.length;
+  $("quran-surah").disabled = disabled || catalogBusy || !$("quran-edition").value;
+  $("quran-play").disabled = disabled || catalogBusy || stopBusy || stopAwaiting || !playbackToken() || !$("quran-surah").value ||
+    snapshot?.playback_source === "athan" || state?.state === "loading";
+  $("quran-stop").hidden = !playbackControlsNeeded();
+  $("quran-stop").disabled = !connected || stopBusy;
+  text("quran-count", quran.reciters.length ? `${quran.reciters.length} of ${quran.total} reciters loaded` : "");
+  text("quran-catalog-feedback", quran.message);
+  $("quran-catalog-feedback").className = "feedback " + quran.tone;
+  const message = !connected ? (playbackIntent || stopAwaiting) && quran.playMessage || "Connection lost · playback may still be active."
+    : playbackIntent || stopBusy || stopAwaiting ? quran.playMessage : state?.state === "loading"
+    ? "Starting Quran on the speaker…" : state?.state === "playing" ? `Playing ${surahName || "surah " + state.surah} on the speaker`
+      : snapshot?.playback_source === "athan" ? "Athan is playing on the speaker."
+        : state?.state === "error" ? state.error : state?.supported && !playbackToken()
+          ? "Reload the page and check device firmware before pressing Play." : quran.playMessage;
+  text("quran-feedback", message);
+  $("quran-feedback").hidden = !message;
+  $("quran-feedback").className = "feedback " + (state?.state === "error" ? "error" :
+    ["playing", "loading"].includes(state?.state) && !stopAwaiting ? "" : quran.playTone);
+}
+async function quranCatalog(payload) {
+  const initial = (await request("/api/quran/catalog", payload)).data;
+  const id = initial.request;
+  const deadline = Date.now() + 75000;
+  let result = initial;
+  while (result.state === "loading" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    result = (await request("/api/quran/catalog")).data;
+    if (result.request !== id) throw new Error("Another page requested a catalog. Try again.");
+  }
+  if (result.state !== "ready" || !result.data) throw new Error(result.error || "Catalog loading timed out. Try again.");
+  return result.data;
+}
+function quranCatalogAvailable() {
+  return !quran.busy && !playbackIntent && !stopBusy && !stopAwaiting && connected && !firstRun && snapshot?.quran?.supported &&
+    snapshot.quran.state !== "loading" && snapshot.playback_source !== "athan";
+}
+function drainQuranSearch() {
+  if (quran.pendingSearch && quran.searchReady && quranCatalogAvailable())
+    void requestQuranReciters(false);
+}
+function loadQuran(more = false) {
+  clearTimeout(quran.searchTimer); quran.searchTimer = null;
+  const query = $("quran-search").value.trim();
+  if (query !== quran.requestedQuery) ++quran.intent;
+  quran.requestedQuery = query;
+  quran.pendingSearch = true; quran.searchReady = true;
+  if (!quranCatalogAvailable()) { renderQuran(); return; }
+  // An offset belongs to the last accepted query, never to the editable input.
+  return requestQuranReciters(more && quran.loaded && query === quran.acceptedQuery);
+}
+async function requestQuranReciters(more) {
+  const query = quran.requestedQuery, intent = quran.intent;
+  quran.pendingSearch = false; quran.searchReady = false;
+  quran.busy = true; quran.message = "Loading reciters from MP3Quran…"; quran.tone = "";
+  let accepted = false;
+  renderQuran();
+  try {
+    const data = await quranCatalog({ kind: "reciters", offset: more ? quran.next : 0, query });
+    if (intent !== quran.intent) return;
+    if (!Array.isArray(data.reciters) || !Array.isArray(data.surahs)) throw new Error("Catalog response is incomplete");
+    quran.reciters = more ? [...new Map([...quran.reciters, ...data.reciters].map((entry) => [entry.id, entry])).values()] : data.reciters;
+    quran.surahs = data.surahs; quran.next = data.next_offset; quran.total = data.total;
+    quran.loaded = true; quran.acceptedQuery = query; accepted = true;
+    if (!more) { quran.editions = []; quranOptions("quran-edition", [], "", ""); quranSurahs(); }
+    filterQuranReciters();
+    quran.message = data.total ? "Choose a reciter. Load more to browse all results." : "No reciters match this search.";
+  } catch (error) {
+    if (intent === quran.intent) { quran.message = error.message; quran.tone = "error"; }
+  } finally {
+    quran.busy = false; renderQuran();
+    if (quran.pendingSearch) drainQuranSearch();
+    else if (accepted && intent === quran.intent && $("quran-reciter").value && !quran.editions.length)
+      void loadQuranEditions();
+  }
+}
+async function loadQuranEditions() {
+  if (quran.busy || quran.pendingSearch) return;
+  quran.editions = []; quranOptions("quran-edition", [], "", ""); quranSurahs();
+  const reciter = Number($("quran-reciter").value);
+  if (!reciter) return;
+  const intent = quran.intent;
+  quran.busy = true; quran.message = "Loading this reciter’s recordings…"; quran.tone = "";
+  renderQuran();
+  try {
+    const data = await quranCatalog({ kind: "editions", reciter });
+    if (intent !== quran.intent || reciter !== Number($("quran-reciter").value)) return;
+    if (!Array.isArray(data.editions)) throw new Error("Recording response is incomplete");
+    quran.editions = data.editions;
+    quranOptions("quran-edition", data.editions, data.editions.length > 1 ? "Choose an edition" : "",
+      quran.selection.reciter === String(reciter) ? quran.selection.edition : "");
+    $("quran-edition-label").hidden = data.editions.length <= 1;
+    quranSurahs();
+    quran.message = data.editions.length ? "Choose a surah, then press Play." : "This reciter has no available recordings.";
+  } catch (error) {
+    if (intent === quran.intent) { quran.message = error.message; quran.tone = "error"; }
+  } finally { quran.busy = false; renderQuran(); drainQuranSearch(); }
+}
+$("quran-load").addEventListener("click", () => loadQuran());
+$("quran-more").addEventListener("click", () => loadQuran(true));
+$("quran-search").addEventListener("input", () => {
+  clearTimeout(quran.searchTimer);
+  ++quran.intent; quran.requestedQuery = $("quran-search").value.trim();
+  quran.pendingSearch = true; quran.searchReady = false;
+  quran.searchTimer = setTimeout(() => {
+    quran.searchTimer = null; quran.searchReady = true; drainQuranSearch();
+  }, 400);
+  renderQuran();
+});
+$("quran-reciter").addEventListener("change", loadQuranEditions);
+$("quran-edition").addEventListener("change", () => { quranSurahs(); rememberQuran(); });
+$("quran-surah").addEventListener("change", () => { rememberQuran(); renderQuran(); });
+$("quran-stop").addEventListener("click", stopPlayback);
+$("quran-play").addEventListener("click", async () => {
+  if (quran.busy || $("quran-play").disabled) return;
+  const intent = beginPlaybackIntent("play");
+  quranPlaybackFeedback("Requesting Quran playback…");
+  rememberQuran(); render();
+  try {
+    const response = await request("/api/quran/play", { reciter: Number(quran.selection.reciter),
+      edition: Number(quran.selection.edition), surah: Number(quran.selection.surah), expected_playback_token: intent.token });
+    acceptResponse(response, "status", false);
+    intent.uncertain = false;
+  } catch (error) {
+    intent.error = error.message;
+    intent.uncertain = !error.status;
+  }
+  if (playbackIntent !== intent) return;
+  quranPlaybackFeedback("Checking speaker playback…");
+  await readPlaybackIntent(intent);
+  if (playbackIntent === intent || !playbackIntent) { render(); drainQuranSearch(); }
+});
 function focusStep() {
   const id =
     setupStep === 0
@@ -1273,45 +1541,34 @@ async function runAction(action) {
     render();
   }
 }
-function stoppedFeedback() {
+function stoppedFeedback(readback = false) {
   stopAwaiting = false;
+  const message = "Playback stopped" + (readback ? " · confirmed after readback" : "");
   status(
     "action",
-    "Playback stopped" + (actionUncertain ? " · Skip state unconfirmed; refresh to check." : ""),
+    message + (actionUncertain ? " · Skip state unconfirmed; refresh to check." : ""),
     actionUncertain ? "warning" : "success"
   );
-  text("settings-playback-feedback", "Playback stopped");
+  text("settings-playback-feedback", message);
+  quranPlaybackFeedback(message, "success");
 }
 async function stopPlayback() {
   if (stopBusy || !connected) return;
+  const intent = beginPlaybackIntent("stop");
   stopBusy = true;
   stopAwaiting = true;
   status("action", "Requesting Stop…");
   text("settings-playback-feedback", "Requesting Stop…");
+  quranPlaybackFeedback("Requesting Stop…");
   $("action-feedback").hidden = false;
   $("settings-playback-feedback").hidden = false;
   render();
   try {
-    acceptResponse(await request("/api/stop", {}));
-    if (snapshot.playing) {
-      stopAwaiting = true;
-      status("action", "Stop requested · waiting for playback to stop", "warning");
-      text("settings-playback-feedback", "Stop requested · waiting for playback to stop");
-    } else stoppedFeedback();
-  } catch {
-    try {
-      acceptResponse(await request("/api/status"));
-      const message = snapshot.playing
-        ? "Playback is still active. Try Stop again."
-        : "Playback stopped · confirmed after readback";
-      status("action", message, snapshot.playing ? "warning" : "success");
-      text("settings-playback-feedback", message);
-    } catch (error) {
-      connectionFailure(error);
-      const message = "Stop unconfirmed · reconnect to check. Playback may still be active.";
-      status("action", message, "warning");
-      text("settings-playback-feedback", message);
-    }
+    acceptResponse(await request("/api/stop", {}), "status", false);
+    intent.uncertain = false;
+  } catch { /* Never infer that an uncertain Stop took effect. */ }
+  try {
+    await readPlaybackIntent(intent);
   } finally {
     stopBusy = false;
     $("action-feedback").hidden = false;

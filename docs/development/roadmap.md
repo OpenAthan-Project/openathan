@@ -86,10 +86,12 @@ discovery is separate from public OTA application-transfer acceptance.
 
 ## Phase 3 — Quran and adhkar
 
-- [ ] Quran streaming with selectable reciter/source.
-- [ ] Surah/ayah playback controls.
+- [x] Development implementation: MP3Quran streaming with reciter, edition and
+  available-surah selection; see the [contract](quran-streaming.md).
+- [ ] Physical playback and runtime memory qualification before release.
+- [ ] Additional streaming providers and ayah playback controls.
 - [ ] Resume/bookmark behavior.
-- [ ] Athan interruption/resume policy.
+- [x] Athan interrupts Quran; this version requires an explicit Play to restart it.
 - [ ] Morning/evening adhkar support.
 
 ## Phase 4 — Offline resilience and expansion

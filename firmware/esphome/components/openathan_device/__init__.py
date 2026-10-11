@@ -61,6 +61,7 @@ def timezone_entries():
 
 
 async def to_code(config):
+    cg.add_define("OPENATHAN_QURAN")
     root = Path(__file__).resolve().parents[4]
     release = json.loads((root / "release/firmware.json").read_text())
     version = release["version"]

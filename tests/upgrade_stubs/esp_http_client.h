@@ -59,6 +59,7 @@ inline int esp_http_client_fetch_headers(Http *h){
   return h->data.size();
 }
 inline int esp_http_client_get_status_code(Http *h){return h->reply.status;}
+inline int esp_http_client_set_user_data(Http *h,void *value){h->config.user_data=value;return 0;}
 inline int esp_http_client_get_content_length(Http *h){return h->data.size();}
 inline int esp_http_client_read(Http *h,char *out,int size){if(on_read){auto callback=on_read;on_read=nullptr;callback();}if(transfer_fail)return -1;size=std::min<size_t>(size,h->data.size()-h->offset);memcpy(out,h->data.data()+h->offset,size);h->offset+=size;return size;}
 inline bool esp_http_client_is_complete_data_received(Http *h){return h->offset==h->data.size();}

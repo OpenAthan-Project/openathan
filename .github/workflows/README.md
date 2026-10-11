@@ -120,3 +120,9 @@ recordings, private trust setup, source-bound artifacts and attended hardware wo
 
 CI establishes source/build behavior, not audible playback or hardware recovery.
 See the [dated device results](../../docs/development/feasibility-report.md).
+
+The device job also runs `tools/check_quran.py --arduinojson` against its
+resolved ArduinoJson headers. This compiles the production metadata worker and
+shared redirect policy under UBSan with deterministic HTTP/task adapters. It
+checks cancellation, Athan priority, URL restrictions, paging/search, malformed
+responses and unavailable recordings; it does not establish physical streaming.

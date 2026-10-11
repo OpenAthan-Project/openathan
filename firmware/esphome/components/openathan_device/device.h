@@ -16,6 +16,7 @@
 #include "protocol.h"
 #include "wifi_attempt.h"
 #include "upgrade.h"
+#include "quran.h"
 
 namespace esphome::openathan_device {
 struct Asset {
@@ -87,6 +88,7 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   Asset assets_[3];
   std::unique_ptr<LocalApi> api_;
   Upgrade upgrade_;
+  Quran quran_;
   httpd_handle_t server_{};
   std::mutex queue_mutex_;
   std::deque<std::shared_ptr<HttpExchange>> requests_;

@@ -31,6 +31,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   const char *light_application_status() const;
   ::openathan::LightMode current_light_mode() const { return light_mode_; }
   void set_playback(::openathan::Playback *playback) { playback_ = playback; }
+  ::openathan::Playback *playback() const { return playback_; }
   // Internal injection points, wired before setup by the developer test harness.
   void set_calculator(::openathan::DayCalculator *calculator) { calculator_source_ = calculator; }
   void set_state_store(::openathan::StateStore *store) { state_store_ = store; }

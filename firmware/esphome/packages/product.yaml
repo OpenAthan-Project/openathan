@@ -10,7 +10,7 @@ external_components:
   - source:
       type: local
       path: ../components
-    components: [openathan_audio, openathan_device, improv_serial]
+    components: [audio, speaker, openathan_audio, openathan_device, improv_serial]
 
 logger:
   hardware_uart: USB_SERIAL_JTAG

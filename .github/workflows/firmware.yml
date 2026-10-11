@@ -128,6 +128,7 @@ jobs:
           cmake --build build --target openathan_core --parallel 2
           python -m unittest discover -s tests -p test_settings_adapter.py -v
           python tools/check_upgrade_runtime.py --arduinojson "$OPENATHAN_ARDUINOJSON_INCLUDE"
+          python tools/check_quran.py --arduinojson "$OPENATHAN_ARDUINOJSON_INCLUDE"
       - name: Test update request formatting with the resolved SDK
         if: matrix.configuration == 'reference' && (steps.build_policy.outcome != 'success' || steps.build_policy.outputs.build_required != 'false')
         env:

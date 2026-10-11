@@ -41,7 +41,8 @@ void StatusDisplay::update() {
       std::strcmp(athan_->setup_state(), "storage_fault") == 0 || (service && !service->healthy()),
       clock.valid, wifi::global_wifi_component && wifi::global_wifi_component->is_connected(),
       enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), stop_button_,
-      round_, next_event, clock.utc};
+      round_, next_event, clock.utc,
+      athan_->playback() && athan_->playback()->source() == ::openathan::PlaybackSource::QURAN};
   if (cache_.accept(::openathan::screen::present(input))) display_->update();
 }
 }

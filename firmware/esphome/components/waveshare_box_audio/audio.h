@@ -29,6 +29,11 @@ class Audio : public Component, public ::openathan::Playback {
   bool playing() const override { return playback_ && playback_->playing(); }
   bool start(::openathan::Track track) override { return ready() && playback_->start(track); }
   void stop() override { if (playback_) playback_->stop(); }
+  bool stream_supported() const override { return playback_ && playback_->stream_supported(); }
+  uint32_t playback_epoch() const override { return playback_ ? playback_->playback_epoch() : 0; }
+  ::openathan::PlaybackSource source() const override { return playback_ ? playback_->source() : ::openathan::PlaybackSource::NONE; }
+  ::openathan::StreamState stream_state() const override { return playback_ ? playback_->stream_state() : ::openathan::StreamState::IDLE; }
+  bool start_stream(const std::string &url) override { return ready() && playback_->start_stream(url); }
   std::optional<unsigned> volume_percent() const override {
     return healthy_() ? playback_->volume_percent() : std::nullopt;
   }

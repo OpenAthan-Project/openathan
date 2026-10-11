@@ -99,6 +99,10 @@ void LocalApi::snapshot_(JsonObject root) {
   root["hostname"] = hostname_;
   const auto status = athan_->status();
   root["playing"] = status.playing;
+  const auto source = athan_->playback() ? athan_->playback()->source() : ::openathan::PlaybackSource::NONE;
+  root["playback_source"] = source == ::openathan::PlaybackSource::QURAN ? "quran" :
+      source == ::openathan::PlaybackSource::ATHAN ? "athan" : "none";
+  if (quran_) quran_->snapshot(root["quran"].to<JsonObject>());
   if (status.next) {
     auto next = root["next"].to<JsonObject>();
     event_json(next, *status.next);
@@ -131,6 +135,8 @@ void LocalApi::handle(ApiExchange& request) {
     snapshot_(root);
   else if (request.method == "GET" && request.uri == "/api/firmware" && upgrade_)
     upgrade_->snapshot(root);
+  else if (request.method == "GET" && request.uri == "/api/quran/catalog" && quran_)
+    quran_->catalog_snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/time-format")
     time_format_(root);
   else if (request.method == "GET" && request.uri == "/api/display")
@@ -150,7 +156,13 @@ void LocalApi::handle(ApiExchange& request) {
     auto payload = input.as<JsonObject>();
     const bool settings_action =
         request.uri == "/api/settings" || request.uri == "/api/preview" || request.uri == "/api/activate";
-    if (request.uri.rfind("/api/firmware/", 0) == 0 && upgrade_) {
+    if ((request.uri == "/api/quran/catalog" || request.uri == "/api/quran/play") && quran_) {
+      std::string message;
+      const int code = quran_->action(request.uri == "/api/quran/play" ? "play" : "catalog", payload, message);
+      if (code != 200) { error(request, code, message.c_str()); return; }
+      if (request.uri == "/api/quran/catalog") quran_->catalog_snapshot(root);
+      else snapshot_(root);
+    } else if (request.uri.rfind("/api/firmware/", 0) == 0 && upgrade_) {
       std::string message;
       const int code = upgrade_->action(request.uri.substr(14), payload, message);
       if (code != 200) { error(request, code, message.c_str()); return; }

@@ -12,6 +12,10 @@ function initial(){
  const times=['05:30','06:45','12:30','15:45','18:20','19:40'].map((time,i)=>({name:['Fajr','Sunrise','Dhuhr','Asr','Maghrib','Isha'][i],local:'2026-09-25 '+time,utc:Date.parse('2026-09-25T'+time+':00Z')/1000}));
  return {time_format:{schema:1,revision:1,hours:24,application:'applied'},schema:1,revision:1,setup:'active',application:'applied',automatic_ready:true,clock_ready:true,local_date:'2026-09-25',scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times,conflicts:[]},next:{day:20721,prayer:2,name:'Asr',local:times[3].local,utc:times[3].utc}};
 }
+function stopQuran(device){
+ device.playing=false;if(device.quran||'playback_source' in device)device.playback_source='none';
+ if(device.quran){device.quran.state='idle';if(device.quran.playback_token){const [boot,epoch]=device.quran.playback_token.split(':');device.quran.playback_token=boot+':'+(Number(epoch)+1);}}
+}
 async function fixture(){
   const state={device:initial(),lightMutations:0,lightDrop:false,lightFailRead:false,mutations:0,drop:false,failRead:false,posts:[],authenticated:0,
     now:100, challenges:[],cnonces:new Set()};
@@ -91,7 +95,7 @@ async function fixture(){
     if(req.url==='/api/skip'){
       if(payload.expected_revision!==state.device.revision||payload.occurrence.utc!==state.device.next.utc){send(409,{error:'Occurrence changed; reload status'});return;}
       state.device.skip={day:payload.occurrence.day,prayer:payload.occurrence.prayer};
-    }else if(req.url==='/api/cancel-skip'){delete state.device.skip;}else if(req.url==='/api/stop'&&!state.stopStillPlaying){state.device.playing=false;}
+    }else if(req.url==='/api/cancel-skip'){delete state.device.skip;}else if(req.url==='/api/stop'&&!state.stopStillPlaying){stopQuran(state.device);}
     if(state.actionDrop&&['/api/skip','/api/cancel-skip','/api/stop'].includes(req.url)){state.actionDrop=false;res.writeHead(200);res.end('{');return;}
     send(200,state.device);
   });
@@ -136,7 +140,349 @@ async function loseSkipResponseAndRestoreContact(f,page){
  await page.locator('#connection-banner').waitFor({state:'hidden'});
  assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#skip').isDisabled());
 }
+function quranReciters(id=1,name='Alpha',next=null,total=1){
+ return {reciters:[{id,name}],surahs:[{id:18,name:'Al-Kahf'}],next_offset:next,total};
+}
+async function requestStarted(signal){
+ let timer;
+ try{await Promise.race([signal.promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Device request did not start')),10000);})]);}
+ finally{clearTimeout(timer);}
+}
+async function quranControls(page){
+ await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+ await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+ await page.locator('#quran-reciter').selectOption('1');
+ await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);
+ await page.locator('#quran-surah').selectOption('18');
+}
+function admitQuran(device,payload){
+ if(payload.expected_playback_token!==device.quran.playback_token)return false;
+ stopQuran(device);Object.assign(device.quran,{state:'loading',reciter:payload.reciter,edition:payload.edition,surah:payload.surah});return true;
+}
+async function mockQuranCatalog(page){
+ await page.route('**/api/quran/catalog',route=>route.fulfill({json:{state:'ready',request:1,
+  data:route.request().postDataJSON().kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters()}}));
+}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ for(const stopView of ['quran','settings','today'])test(`${browserName}: ${stopView} Stop invalidates a Quran Play not yet delivered`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:stopView==='quran'?'playing':'idle'};
+  f.state.device.playing=stopView==='quran';f.state.device.playback_source=f.state.device.playing?'quran':'none';
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred();let attempts=0,admitted=0,stops=0;
+  try{
+   await mockQuranCatalog(page);
+   await page.route('**/api/quran/play',async route=>{attempts++;started.resolve();await gate.promise;
+    if(admitQuran(f.state.device,route.request().postDataJSON())){admitted++;await route.fulfill({json:structuredClone(f.state.device)});}
+    else await route.fulfill({status:409,json:{error:'Playback changed; check status'}});
+   });
+   await page.route('**/api/stop',route=>{stops++;stopQuran(f.state.device);return route.fulfill({json:structuredClone(f.state.device)});});
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
+   if(stopView!=='quran')await page.locator(`[data-view=${stopView}]`).click();
+   const id=stopView==='quran'?'quran-stop':stopView==='settings'?'settings-stop':'stop';
+   assert.ok(await page.locator('#'+id).isVisible());await page.locator('#'+id).click();
+   const feedback=stopView==='quran'?'quran-feedback':stopView==='settings'?'settings-playback-feedback':'action-feedback';
+   await page.waitForFunction(id=>document.getElementById(id).textContent==='Playback stopped',feedback);
+   gate.resolve();await requestsFinished(page);
+   await page.locator('[data-view=quran]').click();
+   assert.equal(attempts,1);assert.equal(admitted,0);assert.equal(stops,1);assert.equal(f.state.device.quran.state,'idle');
+   assert.equal(await page.locator('#quran-feedback').textContent(),'Playback stopped');assert.ok(await page.locator('#quran-play').isEnabled());
+   assert.deepEqual(JSON.parse(await page.evaluate(()=>localStorage.getItem('openathan-quran'))),{reciter:'1',edition:'9',surah:'18'});
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran Play survives an idle five-second poll and a late pre-acknowledgement read`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred(),oldRead=deferred(),oldStarted=deferred();let idlePolls=0,delayRead=false;
+  try{
+   await mockQuranCatalog(page);
+   await page.route('**/api/quran/play',async route=>{started.resolve();await gate.promise;assert.ok(admitQuran(f.state.device,route.request().postDataJSON()));await route.fulfill({json:structuredClone(f.state.device)});});
+   await page.route('**/api/status',async route=>{const raw=structuredClone(f.state.device);if(raw.quran.state==='idle')idlePolls++;
+    if(delayRead){delayRead=false;oldStarted.resolve();await oldRead.promise;}await route.fulfill({json:raw});
+   });
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
+   const poll=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/status');await page.clock.runFor(5000);await (await poll).finished();
+   assert.equal(idlePolls,1);assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
+   delayRead=true;await page.clock.runFor(5000);await requestStarted(oldStarted);
+   gate.resolve();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   oldRead.resolve();await requestsFinished(page);
+   assert.equal(f.state.device.quran.state,'loading');assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
+   assert.match(await page.locator('#quran-feedback').textContent(),/Starting Quran/);
+  }finally{gate.resolve();oldRead.resolve();await o.close();}
+ });
+ for(const readFails of [false,true])test(`${browserName}: uncertain Quran Play ${readFails?'reconnects':'reads idle'} without allowing another Play`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o;let plays=0;let original;
+  try{
+   await mockQuranCatalog(page);
+   await page.route('**/api/quran/play',route=>{plays++;original=route.request().postDataJSON();f.state.failRead=readFails;
+    return readFails?route.abort('timedout'):route.fulfill({status:200,contentType:'application/json',body:'{'});
+   });
+   await quranControls(page);await page.locator('#quran-play').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Play unconfirmed'));
+   assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
+   if(readFails){f.state.failRead=false;await refresh(page);await page.locator('[data-view=quran]').click();await page.locator('#quran-stop').waitFor({state:'visible'});}
+   assert.ok(await page.locator('#quran-play').isDisabled());
+   f.state.actionDrop=true;await page.locator('#quran-stop').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent==='Playback stopped · confirmed after readback');
+   assert.equal(plays,1);assert.equal(admitQuran(f.state.device,original),false);assert.ok(await page.locator('#quran-play').isEnabled());
+  }finally{await o.close();}
+ });
+ for(const omitted of ['playing','quran'])test(`${browserName}: acknowledged Quran Play keeps controls pending after readback omits ${omitted}`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o;let plays=0;
+  try{
+   await mockQuranCatalog(page);await quranControls(page);
+   await page.route('**/api/quran/play',route=>{plays++;assert.ok(admitQuran(f.state.device,route.request().postDataJSON()));return route.fulfill({json:structuredClone(f.state.device)});});
+   await page.route('**/api/status',route=>{const raw=structuredClone(f.state.device);delete raw[omitted];return route.fulfill({json:raw});},{times:1});
+   await page.locator('#quran-play').click();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Play unconfirmed'));
+   assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());assert.equal(plays,1);
+   await refresh(page);await page.locator('[data-view=quran]').click();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   assert.equal(plays,1);assert.equal(f.state.device.quran.state,'loading');await page.locator('#quran-stop').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent==='Playback stopped');assert.equal(f.state.device.quran.state,'idle');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Quran Stop cannot confirm idle while the pending Play token remains valid`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o;let stops=0;
+  try{
+   await mockQuranCatalog(page);
+   await page.route('**/api/quran/play',route=>route.fulfill({status:200,contentType:'application/json',body:'{'}));
+   await page.route('**/api/stop',route=>{stops++;return route.fulfill({status:200,contentType:'application/json',body:'{'});});
+   await quranControls(page);await page.locator('#quran-play').click();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Play unconfirmed'));
+   await page.locator('#quran-stop').click();await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Stop unconfirmed'));
+   assert.ok(await page.locator('#quran-stop').isVisible());assert.ok(await page.locator('#quran-play').isDisabled());
+   await page.clock.runFor(5000);await requestsFinished(page);assert.doesNotMatch(await page.locator('#quran-feedback').textContent(),/Playback stopped/);
+   stopQuran(f.state.device);await page.clock.runFor(5000);await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Playback stopped'));assert.equal(stops,1);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: obsolete Quran Play acknowledgement does not stop a newly due Athan`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred();let stops=0;
+  try{
+   await mockQuranCatalog(page);
+   await page.route('**/api/quran/play',async route=>{assert.ok(admitQuran(f.state.device,route.request().postDataJSON()));const raw=structuredClone(f.state.device);started.resolve();await gate.promise;await route.fulfill({json:raw});});
+   await page.route('**/api/stop',route=>{stops++;stopQuran(f.state.device);return route.fulfill({json:structuredClone(f.state.device)});});
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);await page.locator('#quran-stop').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent==='Playback stopped');
+   stopQuran(f.state.device);f.state.device.playing=true;f.state.device.playback_source='athan';
+   gate.resolve();await requestsFinished(page);await page.clock.runFor(5000);await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Athan is playing'));
+   assert.equal(stops,1);assert.equal(f.state.device.playback_source,'athan');assert.equal(f.state.device.playing,true);assert.ok(await page.locator('#quran-play').isDisabled());
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran clients without a playback token must reload before Play`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,state:'idle'};const o=await open(f,browserName),{page}=o;
+  try{await mockQuranCatalog(page);await quranControls(page);assert.ok(await page.locator('#quran-play').isDisabled());assert.match(await page.locator('#quran-feedback').textContent(),/Reload the page/);assert.equal(f.state.posts.filter(p=>p.url==='/api/quran/play').length,0);}
+  finally{await o.close();}
+ });
+
+ for(const failEdition of [false,true])test(`${browserName}: Quran search coalesces edits during ${failEdition?'failed':'delayed'} editions and ignores obsolete results`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};
+  const o=await open(f,browserName,{},true),{page}=o,gate=deferred(),started=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(p.kind==='editions'){
+     started.resolve();await gate.promise;
+     await route.fulfill(failEdition?{status:503,json:{error:'Obsolete edition failure'}}
+      :{json:{state:'ready',request:2,data:{editions:[{id:9,name:'Obsolete edition',surahs:[18]}]}}});
+    }else await route.fulfill({json:{state:'ready',request:posts.length,data:quranReciters(p.query?2:1,p.query||'Alpha')}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   await page.locator('#quran-reciter').selectOption('1');await requestStarted(started);
+   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
+   assert.ok(await page.locator('#quran-search').isEnabled());
+   await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(failEdition?500:399);
+   assert.equal(posts.length,2);gate.resolve();await requestsFinished(page);
+   if(!failEdition){assert.equal(posts.length,2);await page.clock.runFor(1);}
+   await page.clock.resume();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled&&document.querySelector('#quran-reciter option[value="2"]'));
+   assert.deepEqual(posts.filter(p=>p.kind==='reciters').map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   assert.equal(await page.locator('#quran-edition option[value="9"]').count(),0);
+   assert.doesNotMatch(await page.locator('#quran-catalog-feedback').textContent(),/Obsolete/);
+   assert.equal(posts.filter(p=>p.kind==='editions').length,1);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran catalog intent rejects stale responses even after returning to the same query`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const oldGate=deferred(),oldStarted=deferred(),latestGate=deferred(),latestStarted=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);const n=posts.length;
+    if(n===2){oldStarted.resolve();await oldGate.promise;}
+    if(n===3){latestStarted.resolve();await latestGate.promise;}
+    await route.fulfill({json:{state:'ready',request:n,data:quranReciters(n===1?1:n===2?9:2,n===2?'Obsolete result':n===3?'Latest Beta':'Alpha')}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);await requestStarted(oldStarted);
+   await page.locator('#quran-search').fill('Gamma');await page.clock.runFor(400);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);
+   oldGate.resolve();await requestStarted(latestStarted);
+   assert.equal(await page.locator('#quran-reciter option[value="9"]').count(),0);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),1);
+   latestGate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0],['Beta',0]]);
+   assert.equal(await page.locator('#quran-reciter option[value="2"]').textContent(),'Latest Beta');
+  }finally{oldGate.resolve();latestGate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran Load more before debounce resets a changed query and replaces the list`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const gate=deferred(),started=deferred();const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(p.query){started.resolve();await gate.promise;}
+    await route.fulfill({json:{state:'ready',request:posts.length,data:p.query?quranReciters(21,'Beta'):quranReciters(1,'Alpha',20,25)}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.locator('#quran-more').click();await requestStarted(started);
+   await page.clock.runFor(500);assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   gate.resolve();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),0);
+   assert.equal(await page.locator('#quran-reciter option[value="21"]').count(),1);
+   assert.ok(await page.locator('#quran-more').isHidden());
+   await page.clock.runFor(1000);await requestsFinished(page);assert.equal(posts.length,2);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran failed search retries explicitly from zero and only accepted-query pagination appends`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName,{},true),{page}=o;const posts=[];
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    if(posts.length===2){await route.fulfill({status:503,json:{error:'Search unavailable'}});return;}
+    await route.fulfill({json:{state:'ready',request:posts.length,data:p.query?quranReciters(p.offset?3:2,p.offset?'Beta next':'Beta',p.offset?null:20,25):quranReciters(1,'Alpha',20,25)}});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();await requestsFinished(page);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(400);
+   await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('Search unavailable'));
+   await page.clock.runFor(2000);await requestsFinished(page);assert.equal(posts.length,2);
+   await page.locator('#quran-more').click();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.equal(await page.locator('#quran-reciter option[value="1"]').count(),0);
+   await page.locator('#quran-more').click();await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.map(p=>[p.query,p.offset]),[['',0],['Beta',0],['Beta',0],['Beta',20]]);
+   assert.equal(await page.locator('#quran-reciter option[value="2"]').count(),1);
+   assert.equal(await page.locator('#quran-reciter option[value="3"]').count(),1);
+  }finally{await o.close();}
+ });
+ for(const uncertain of [false,true])test(`${browserName}: Quran search during ${uncertain?'uncertain':'pending'} Play waits for fresh status and Athan without repeating Play`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName,{},true),{page}=o;
+  const gate=deferred(),started=deferred();const posts=[];let plays=0;
+  try{
+   await page.route('**/api/quran/catalog',route=>{
+    const p=route.request().postDataJSON();posts.push(p);
+    return route.fulfill({json:{state:'ready',request:posts.length,data:p.kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters(p.query?2:1,p.query||'Alpha')}});
+   });
+   await page.route('**/api/quran/play',async route=>{
+    plays++;f.state.device.quran={supported:true,playback_token:'boot:1',state:'loading',reciter:1,edition:9,surah:18};started.resolve();await gate.promise;
+    await route.fulfill(uncertain?{status:200,contentType:'application/json',body:'{'}:{json:structuredClone(f.state.device)});
+   });
+   await quranControls(page);await page.locator('#quran-play').click();await requestStarted(started);
+   await page.locator('#quran-search').fill('B');await page.clock.runFor(200);
+   await page.locator('#quran-search').fill('Beta');await page.clock.runFor(500);assert.equal(posts.length,2);
+   gate.resolve();await requestsFinished(page);await page.clock.runFor(2000);await requestsFinished(page);
+   assert.equal(posts.length,2);assert.ok(await page.locator('#quran-search').isEnabled());
+   f.state.device.quran.state='idle';f.state.device.playback_source='athan';
+   await page.clock.runFor(2000);await requestsFinished(page);assert.equal(posts.length,2);
+   f.state.device.quran.state='playing';f.state.device.playback_source='quran';f.state.device.playing=true;
+   await page.clock.runFor(2000);await requestsFinished(page);
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   assert.deepEqual(posts.filter(p=>p.kind==='reciters').map(p=>[p.query,p.offset]),[['',0],['Beta',0]]);
+   assert.equal(plays,1);assert.equal(f.state.mutations,0);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Quran catalog, editions, surah selection and transient playback`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle',reciter:0,edition:0,surah:0};
+  const o=await open(f,browserName),{page}=o;let catalog,requestId=0,plays=0;
+  try{
+   await page.route('**/api/quran/catalog',async route=>{
+    if(route.request().method()==='POST'){
+     const p=route.request().postDataJSON();requestId++;
+     catalog=p.kind==='reciters'?{reciters:[{id:1,name:'Example reciter'}],surahs:[{id:1,name:'Al-Fatihah'},{id:18,name:'Al-Kahf'}],total:1,next_offset:null}
+       :{editions:[{id:9,name:'Example edition',surahs:[18]}]};
+     await route.fulfill({json:{state:'loading',request:requestId}});
+    }else await route.fulfill({json:{state:'ready',request:requestId,data:catalog}});
+   });
+   await page.route('**/api/quran/play',async route=>{
+    plays++;assert.deepEqual(route.request().postDataJSON(),{reciter:1,edition:9,surah:18,expected_playback_token:'boot:0'});
+    f.state.device.quran={supported:true,playback_token:'boot:1',state:'loading',reciter:1,edition:9,surah:18};
+    await route.fulfill({json:structuredClone(f.state.device)});
+   });
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);
+   await page.locator('#quran-reciter').selectOption('1');
+   await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);
+   assert.equal(await page.locator('#quran-surah option[value="1"]').count(),0);
+   await page.locator('#quran-surah').selectOption('18');await page.locator('#quran-play').click();
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   assert.equal(plays,1);assert.ok(await page.locator('#quran-stop').isVisible());
+   f.state.device.quran.state='playing';f.state.device.playing=true;f.state.device.playback_source='quran';
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Playing Al-Kahf'));
+   if(process.env.OPENATHAN_QURAN_CAPTURE_DIR&&browserName==='chromium'){
+    const {mkdir}=require('node:fs/promises');await mkdir(process.env.OPENATHAN_QURAN_CAPTURE_DIR,{recursive:true});
+    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'mobile.png'),fullPage:true});
+   }
+   f.state.device.playing=false;f.state.device.playback_source='none';f.state.device.quran.state='idle';
+   await page.locator('#quran-stop').click();await page.locator('#quran-stop').waitFor({state:'hidden'});
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playback stopped/);
+   assert.doesNotMatch(await page.locator('#quran-feedback').textContent(),/requested|Checking/);
+   assert.equal(f.state.mutations,0);assert.equal(plays,1);
+  }finally{await o.close();await f.close();}
+ });
+ test(`${browserName}: failed Quran catalog leaves retry available`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName),{page}=o;
+  try{
+   await page.route('**/api/quran/catalog',route=>route.fulfill({status:503,json:{error:'MP3Quran unavailable'}}));
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('MP3Quran unavailable'));
+   assert.ok(await page.locator('#quran-load').isEnabled());assert.ok(await page.locator('#quran-play').isDisabled());
+  }finally{await o.close();await f.close();}
+ });
+ test(`${browserName}: Quran catalog failure stays visible during playback and completion clears request feedback`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'playing',surah:18};f.state.device.playing=true;f.state.device.playback_source='quran';
+  const o=await open(f,browserName),{page}=o;const gate=deferred();
+  try{
+   await page.route('**/api/quran/catalog',async route=>{await gate.promise;await route.fulfill({status:503,json:{error:'MP3Quran unavailable'}});});
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   assert.match(await page.locator('#quran-catalog-feedback').textContent(),/Loading reciters/);
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playing surah 18/);
+   gate.resolve();await page.waitForFunction(()=>document.getElementById('quran-catalog-feedback').textContent.includes('MP3Quran unavailable'));
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playing surah 18/);
+   f.state.device.quran.state='idle';f.state.device.playing=false;f.state.device.playback_source='none';
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Playback finished or stopped'));
+   assert.ok(await page.locator('#quran-stop').isHidden());
+  }finally{gate.resolve();await o.close();await f.close();}
+ });
+ test(`${browserName}: uncertain Quran Play is read back without repeating and Stop cancels loading`,async()=>{
+  const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:'idle'};const o=await open(f,browserName),{page}=o;let plays=0;
+  try{
+   await page.route('**/api/quran/catalog',route=>route.fulfill({json:{state:'ready',request:1,data:route.request().postDataJSON().kind==='reciters'
+    ?{reciters:[{id:1,name:'Example'}],surahs:[{id:18,name:'Al-Kahf'}],total:1,next_offset:null}
+    :{editions:[{id:9,name:'Edition',surahs:[18]}]}}}));
+   await page.route('**/api/quran/play',async route=>{
+    plays++;f.state.device.quran={supported:true,playback_token:'boot:1',state:'loading',reciter:1,edition:9,surah:18};
+    await route.fulfill({status:200,contentType:'application/json',body:'{'});
+   });
+   await page.route('**/api/stop',async route=>{stopQuran(f.state.device);await route.fulfill({json:structuredClone(f.state.device)});});
+   await page.locator('[data-view=quran]').click();await page.locator('#quran-load').click();
+   await page.waitForFunction(()=>!document.getElementById('quran-reciter').disabled);await page.locator('#quran-reciter').selectOption('1');
+   await page.waitForFunction(()=>!document.getElementById('quran-surah').disabled);await page.locator('#quran-surah').selectOption('18');
+   await page.locator('#quran-play').click();await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('quran-feedback').textContent.includes('Starting Quran'));
+   assert.equal(plays,1);assert.ok(await page.locator('#quran-play').isDisabled());
+   await settings(page);assert.ok(await page.locator('#settings-stop').isVisible());
+   assert.match(await page.locator('#settings-playing').textContent(),/Starting Quran/);
+   if(process.env.OPENATHAN_QURAN_CAPTURE_DIR&&browserName==='chromium'){
+    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'settings-loading-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(process.env.OPENATHAN_QURAN_CAPTURE_DIR,'settings-loading-mobile.png'),fullPage:true});
+   }
+   await page.locator('#settings-stop').click();await page.locator('#settings-playing').waitFor({state:'hidden'});
+   await page.locator('[data-view=quran]').click();
+   await page.locator('#quran-stop').waitFor({state:'hidden'});
+   assert.match(await page.locator('#quran-feedback').textContent(),/Playback stopped/);assert.equal(plays,1);assert.equal(f.state.mutations,0);
+  }finally{await o.close();await f.close();}
+ });
  for(const stopFirst of [false,true])for(const readback of [false,true])test(`${browserName}: revision-aligned timetable survives ${readback?'Stop readback':'Stop reply'} ${stopFirst?'before':'after'} prayer-save confirmation`,async()=>{
   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName,{},true),{page}=o;
   const saveGate=deferred(),saveStarted=deferred(),stopGate=deferred(),stopStarted=deferred(),verificationGate=deferred(),verificationStarted=deferred();let saves=0,stops=0,reads=0;
@@ -149,7 +495,11 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    });
    await page.route('**/api/status',async route=>{
     reads++;
-    if(readback&&reads===1){const old=structuredClone(f.state.device);stopStarted.resolve();await stopGate.promise;await route.fulfill({status:200,json:old});return;}
+    if(reads===1){
+     if(readback){const old=structuredClone(f.state.device);stopStarted.resolve();await stopGate.promise;await route.fulfill({status:200,json:old});}
+     else await route.continue();
+     return;
+    }
     verificationStarted.resolve();await verificationGate.promise;await route.continue();
    });
    await page.route('**/api/stop',async route=>{
@@ -169,7 +519,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    if(!stopFirst){stopGate.resolve();await page.locator('#settings-stop').waitFor({state:'hidden'});}
    await requestsFinished(page);await page.waitForFunction(()=>document.getElementById('settings-playback-feedback').textContent.includes('Playback stopped'));assert.equal(await page.locator('#offset-asr').inputValue(),'60');assert.ok(await page.locator('#settings-stop').isHidden());assert.match(await page.locator('#settings-playback-feedback').textContent(),/Playback stopped/);
    await page.locator('[data-view="today"]').click();assert.equal(await page.locator('#next-name').textContent(),'Asr');assert.equal(await page.locator('#next-time').textContent(),'16:45');assert.equal(await page.locator('[data-prayer="asr"] dd').first().textContent(),'16:45');assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'asr');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());assert.equal(await page.locator('#skip').textContent(),'Skip Asr today');
-   assert.equal(f.state.device.revision,2);assert.equal(saves,1);assert.equal(stops,1);assert.equal(reads,Number(readback)+Number(stopFirst));assert.equal(f.state.posts.length,1); // Only the preview uses the simulated server; routed mutations are counted above.
+   assert.equal(f.state.device.revision,2);assert.equal(saves,1);assert.equal(stops,1);assert.equal(reads,1+Number(stopFirst));assert.equal(f.state.posts.length,1); // Only the preview uses the simulated server; routed mutations are counted above.
    await page.locator('#skip').click();await page.waitForFunction(()=>document.getElementById('skip').textContent==='Restore Asr today'&&!document.getElementById('skip').disabled);
    const skipped=f.state.posts.find(p=>p.url==='/api/skip').payload;assert.equal(skipped.expected_revision,2);assert.equal(skipped.occurrence.utc,f.state.device.schedule.times[3].utc);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'asr');assert.match(await page.locator('#times [data-prayer="asr"] dt').textContent(),/Skipped/);
   }finally{saveGate.resolve();stopGate.resolve();verificationGate.resolve();await o.close();}
@@ -404,7 +754,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   const f=await fixture();f.state.device.playing=true;f.state.stopStillPlaying=true;
   const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
   try{
-   await page.clock.install();await page.route('**/api/status',async route=>{started.resolve();await gate.promise;if(failure==='network')await route.abort();else await route.fulfill({status:503,json:{error:'Old status unavailable'}});});
+   await page.clock.install();await page.route('**/api/status',async route=>{started.resolve();await gate.promise;if(failure==='network')await route.abort();else await route.fulfill({status:503,json:{error:'Old status unavailable'}});},{times:1});
    await page.clock.runFor(5000);await started.promise;await page.locator('#stop').click();await page.waitForFunction(()=>document.getElementById('action-feedback').textContent.includes('waiting for playback'));
    gate.resolve();await requestsFinished(page);await page.waitForFunction(()=>document.getElementById('readiness-text').textContent==='Playing'&&!document.getElementById('stop').disabled);assert.ok(await page.locator('#connection-banner').isHidden());assert.ok(await page.locator('#stop').isEnabled());assert.equal(await page.locator('#readiness-text').textContent(),'Playing');
   }finally{gate.resolve();await o.close();}
@@ -1017,7 +1367,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};
    const o=await open(f,browserName),{page}=o;let release,requested,oldState,actionStarted=false;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
    try{
-    if(readback)await page.route('**/api/status',async route=>{if(!actionStarted){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
+    if(readback)await page.route('**/api/status',async route=>{if(!actionStarted){await route.continue();return;}actionStarted=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
     await page.route(restore?'**/api/cancel-skip':'**/api/skip',async route=>{
      if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};oldState=structuredClone(f.state.device);actionStarted=true;
      if(readback){await route.fulfill({status:200,body:'{'});return;}requested();await gate;await route.fulfill({status:200,json:oldState});
@@ -1136,7 +1486,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    try{
     if(readback)await page.route('**/api/status',async route=>{if(!stopStarted){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});
     await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);stopStarted=true;if(readback){await route.fulfill({status:200,body:'{'});return;}requested();await gate;await route.fulfill({status:200,json:raw});});
-    await page.locator('#stop').click();await started;await page.locator('#skip').click();await page.waitForFunction(restore=>document.querySelector('#skip').textContent===(restore?'Skip Asr today':'Restore Asr today')&&!document.querySelector('#skip').disabled,restore);release();
+     await page.locator('#stop').click();await started;await page.locator('#skip').click();await page.waitForFunction(restore=>document.querySelector('#skip').textContent===(restore?'Skip Asr today':'Restore Asr today')&&!document.querySelector('#skip').disabled,restore);if(readback)assert.ok(await page.locator('#stop').isVisible());release();
     await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.startsWith('Playback stopped'));assert.equal(await page.locator('#skip').textContent(),restore?'Skip Asr today':'Restore Asr today');assert.equal(await page.locator('#readiness-text').textContent(),restore?'Ready to play':'Athan skipped today');assert.equal(await page.locator('.time-row[aria-current]').count(),1);assert.equal(await page.locator('.time-row[aria-current] small').textContent(),restore?'Athan on':'Skipped');assert.ok(await page.locator('#stop').isHidden());
    }finally{release();await o.close();}
   });
@@ -1188,8 +1538,8 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
  test(`${browserName}: an older Stop reply cannot confirm a newer lost Skip outcome`,async()=>{
   const f=await fixture();f.state.device.playing=true;const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r);
   try{
-   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#stop').click();await started;f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.includes('unconfirmed'));release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent==='Playback stopped');
-   assert.ok(await page.locator('#skip').isDisabled());assert.equal(await page.locator('#readiness-text').textContent(),'Skip state unconfirmed');assert.match(await page.locator('#action-feedback').textContent(),/Skip state unconfirmed/);assert.deepEqual(f.state.device.skip,{day:f.state.device.next.day,prayer:f.state.device.next.prayer});
+   await page.route('**/api/stop',async route=>{f.state.device.playing=false;const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#stop').click();await started;f.state.actionDrop=true;f.state.failRead=true;await page.locator('#skip').click();await page.waitForFunction(()=>document.querySelector('#action-feedback').textContent.includes('unconfirmed'));release();await page.waitForFunction(()=>document.querySelector('#settings-playback-feedback').textContent.includes('Stop unconfirmed'));
+   assert.ok(await page.locator('#skip').isDisabled());assert.ok(await page.locator('#connection-banner').isVisible());assert.match(await page.locator('#action-feedback').textContent(),/Skip state unconfirmed/);assert.deepEqual(f.state.device.skip,{day:f.state.device.next.day,prayer:f.state.device.next.prayer});
    f.state.failRead=false;await refresh(page);await page.waitForFunction(()=>document.querySelector('#skip').textContent==='Restore Asr today'&&!document.querySelector('#skip').disabled);assert.equal(await page.locator('#readiness-text').textContent(),'Athan skipped today');assert.equal(f.state.posts.filter(p=>p.url==='/api/skip').length,1);
   }finally{release();await o.close();}
  });
@@ -1287,11 +1637,14 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
  });
  for(const restore of [false,true])for(const readback of [false,true]){
   test(`${browserName}: an older ${restore?'Restore':'Skip'} ${readback?'readback':'reply'} keeps the newer prayer occurrence`,async()=>{
-   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r),path=restore?'cancel-skip':'skip';let reads=0;
+   const f=await fixture();f.state.device.playing=true;if(restore)f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};const o=await open(f,browserName),{page}=o;let release,requested;const gate=new Promise(r=>release=r),started=new Promise(r=>requested=r),path=restore?'cancel-skip':'skip';let reads=0,stopping=false;const stopRead=deferred(),stopReadStarted=deferred();
    try{
-    await page.route('**/api/'+path,async route=>{if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};if(readback){await route.fulfill({status:200,contentType:'application/json',body:'{'});return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});if(readback)await page.route('**/api/status',async route=>{if(++reads!==1){await route.continue();return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.locator('#skip').click();await started;
-    const next=f.state.device.schedule.times[4];f.state.device.next={day:20721,prayer:3,name:'Maghrib',local:next.local,utc:next.utc};delete f.state.device.skip;await page.locator('#stop').click();await page.waitForFunction(()=>document.getElementById('next-name').textContent==='Maghrib');release();await page.waitForFunction(()=>!actionBusy,{},{timeout:3000});assert.equal(await page.locator('#next-name').textContent(),'Maghrib');assert.equal(await page.locator('#next-time').textContent(),'18:20');assert.equal(await page.locator('#skip').textContent(),'Skip Maghrib today');assert.match(await page.locator('#action-feedback').textContent(),/current prayer/);assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'maghrib');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());
-   }finally{release();await o.close();}
+    await page.route('**/api/'+path,async route=>{if(restore)delete f.state.device.skip;else f.state.device.skip={day:f.state.device.next.day,prayer:f.state.device.next.prayer};if(readback){await route.fulfill({status:200,contentType:'application/json',body:'{'});return;}const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});});await page.route('**/api/status',async route=>{
+     if(readback&&++reads===1){const raw=structuredClone(f.state.device);requested();await gate;await route.fulfill({status:200,json:raw});return;}
+     if(stopping){stopReadStarted.resolve();await stopRead.promise;}await route.continue();
+    });await page.locator('#skip').click();await started;
+    const next=f.state.device.schedule.times[4];f.state.device.next={day:20721,prayer:3,name:'Maghrib',local:next.local,utc:next.utc};delete f.state.device.skip;stopping=true;await page.locator('#stop').click();await requestStarted(stopReadStarted);await page.waitForFunction(()=>document.getElementById('next-name').textContent==='Maghrib');assert.ok(await page.locator('#stop').isVisible());stopRead.resolve();await page.waitForFunction(()=>document.getElementById('stop').hidden);release();await page.waitForFunction(()=>!actionBusy,{},{timeout:3000});assert.equal(await page.locator('#next-name').textContent(),'Maghrib');assert.equal(await page.locator('#next-time').textContent(),'18:20');assert.equal(await page.locator('#skip').textContent(),'Skip Maghrib today');assert.match(await page.locator('#action-feedback').textContent(),/current prayer/);assert.equal(await page.locator('[aria-current="time"]').count(),1);assert.equal(await page.locator('[aria-current="time"]').getAttribute('data-prayer'),'maghrib');assert.equal(await page.locator('#readiness-text').textContent(),'Ready to play');assert.ok(await page.locator('#stop').isHidden());
+   }finally{release();stopRead.resolve();await o.close();}
   });
  }
  for(const waiting of [false,true]){

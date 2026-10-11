@@ -107,7 +107,12 @@ separates shipped features from remaining work and validation limits. Displays
 and their saved brightness/time-format controls are optional capabilities;
 touch controls remain future work. None is required by the reusable scheduler.
 
-Quran streaming, reciter and passage selection, resume position, adhkar, offline Quran storage, RTC expansion for other hardware, and optional Home Assistant integration are later work. Streaming audio should use PSRAM for buffering; Quran audio is not expected to fit in the AtomS3R's flash.
+Development firmware adds [MP3Quran streaming](docs/development/quran-streaming.md)
+with reciter, recording edition and surah selection in the local UI. One surah
+plays directly on the device; Athan interrupts it without automatic resume.
+Physical playback and runtime memory qualification remain release gates.
+Resume positions, ayah selection, adhkar, offline Quran storage, RTC expansion
+for other hardware and optional Home Assistant integration remain later work.
 
 ## Development safety
 
