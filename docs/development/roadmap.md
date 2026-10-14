@@ -1,49 +1,26 @@
 # Roadmap
 
-Status as of **2026-10-10 Toronto**, following the v0.5.0 release and verified
-website adoption. Checked items describe implemented or published capabilities,
-not blanket physical qualification. See the
-[current release evidence and limits](release-validation-2026-10-10.md), [earlier device results](feasibility-report.md)
-and [upgrade qualification](upgrade-qualification-2026-10-01.md).
-Quran development hardware results are updated through
-[2026-10-14](quran-hardware-validation-2026-10-14.md).
+This roadmap tracks implemented capabilities and future product work. Checked
+items may be available in development firmware before a public release. Release
+availability is documented separately.
 
 ## Current milestone
 
-The standalone Athan experience is available on AtomS3R C126 + Voice Pyramid A167
-and Waveshare Box V2: precompiled USB installation, local setup/settings,
-scheduled stored normal/Fajr audio, durable skip/replay protection, optional
-Atom prayer lights, hardware-specific clock/prayer/playback displays, USB credential
-recovery and owner-requested signed application updates. The website verifies
-and adopts approved stable releases; it never compiles firmware or updates a
-speaker on its owner's behalf.
+Standalone Athan is available on AtomS3R C126 + Voice Pyramid A167 and Waveshare
+Box V2, with local setup, prayer scheduling, stored normal/Fajr audio, device
+controls and signed firmware updates. MP3Quran streaming is implemented in
+development firmware.
 
-Atom firmware needs internet time synchronization after a cold boot. Waveshare
-production firmware includes RTC restoration after a powered reset, following
-initial internet time synchronization. [Attended powered RESET validation](waveshare-rtc-validation-2026-10-10.md#attended-powered-reset-validation)
-passed; unplugged retention and RTC-only scheduled listening remain unqualified.
-Once the clock is valid, calculations and stored-recording playback operate
-without the public website or Home Assistant. Compatible firmware updates
-preserve installed audio; replacing recordings is separate from application OTA.
+Atom needs internet time synchronization after a cold boot; Waveshare supports
+onboard RTC restoration after a powered reset. Once the clock is valid, prayer
+calculation and stored-recording playback work independently of the public
+website and Home Assistant.
 
-## Phase 0 — Hardware and release validation
+## Phase 0 — Product foundations
 
-- [x] Verify AtomS3R C126 + Voice Pyramid A167 initialization.
-- [x] Verify complete normal/Fajr Athan playback and practical volume on the reference unit.
-- [x] Verify both LED groups and integrated prayer/status output in bounded tests.
-- [x] Verify audio playback with Wi-Fi active and offline after time synchronization.
-- [x] Measure application capacity and source-bound runtime heap/PSRAM/stack behavior.
-- [x] Approve release recordings and document redistribution rights and attribution.
-- [ ] Resolve lower-right touch nonresponse and implement optional touch controls.
-- [ ] Qualify broader hardware/browser/network coverage and longer runtime operation.
-
-Measurements and physical results remain tied to their tested images. The
-[earlier v0.3.0 evidence](release-validation-2026-10-04.md) does not include a new
-physical fresh-install test or a
-public OTA application-transfer/slot-switch test. Its focused instrumented
-display/audio memory run contains a 13m50s observation gap and does not establish
-maximum-load production headroom or overnight stability. Earlier accepted
-evidence is retained within its source limits.
+- [x] Reusable product core with hardware-specific adapters.
+- [x] Shared recording storage and dual-slot firmware recovery.
+- [x] Licensed release recordings with redistribution rights and attribution.
 
 ## Phase 1 — Standalone Athan MVP
 
@@ -51,61 +28,44 @@ evidence is retained within its source limits.
 - [x] NTP, IANA timezone and recurring DST handling.
 - [x] Local prayer calculation, calculation/Asr methods and high-latitude rules.
 - [x] Per-prayer offsets and enabled-prayer settings.
-- [x] Stored normal and Fajr Athan playback and saved volume with readback/retry.
+- [x] Stored normal and Fajr Athan playback and saved volume.
 - [x] Stop, skip/cancel and durable replay protection across saves and restarts.
 - [x] First-run confirmation before automatic playback.
 - [x] Optional encrypted developer settings/diagnostic console.
 - [x] Optional LED countdown/status adapter with independent on/off and brightness.
 - [ ] Optional touch playback/volume/dismiss adapter.
-- [x] Optional GC9107 AtomS3R display-status adapter (published in v0.3.0;
-      [production orientation and bounded memory results](release-validation-2026-10-04.md)).
-- [x] Waveshare Box V2 production audio, round display and BOOT controls (published in v0.5.0).
+- [x] Optional GC9107 AtomS3R display-status adapter.
+- [x] Waveshare Box V2 audio, round display and BOOT controls.
 
 Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 
 ## Phase 2 — Installation, local UI and updates
 
 - [x] Browser installer at `openathan.com/install` consuming approved release artifacts.
-- [x] Device-local setup/settings/control interface at a unique `openathan-<suffix>.local` address, with an IP fallback.
+- [x] Device-local setup, settings and playback controls.
 - [x] USB device-password setup and settings/history-preserving credential recovery.
 - [x] Optional HTTPS location suggestions, reviewed and saved on the device.
 - [x] Signed application-only update discovery, owner queue/cancel controls and safe-window installation.
-- [x] Startup health confirmation, compatible bootloader checks and automatic rollback.
-- [x] Document preserving USB transitions for older firmware/bootloaders.
-- [x] Automatic website adoption of published stable latest releases after validation.
-- [ ] Qualify and enable browser USB firmware updates that preserve saved data.
-
-The fresh installer erases settings, credentials and prayer history. Existing
-speakers use compatible device-page updates or a reviewed maintainer USB
-transition; preserving browser USB update writes remain disabled. Older partition
-layouts need a deliberate migration; ordinary application OTA cannot change them.
-Historical NVS restores old consumption history and is not routine recovery.
-
-The signed updater's interruption, handoff and rollback tests use a separate
-maintainer qualification build. Production excludes its private feed, isolated
-records, instrumentation and fault injection. Successful real public descriptor
-discovery is separate from public OTA application-transfer acceptance.
+- [x] Startup health confirmation and automatic rollback.
+- [x] Documented USB migration paths for older firmware and bootloaders.
+- [x] Automatic website adoption of approved stable releases.
+- [ ] Browser USB firmware updates that preserve saved data.
 
 ## Phase 3 — Quran and adhkar
 
-- [x] Development implementation: MP3Quran streaming with reciter, edition and
-  available-surah selection; see the [contract](quran-streaming.md).
-- [x] Bounded Waveshare provider playback, interruption/failure recovery and
-  runtime observations; see the [dated results](quran-hardware-validation-2026-10-14.md).
-- [ ] Separate release-candidate acceptance across supported hardware and
-  production profiles, using the dated results and their evidence limits.
-- [ ] Additional streaming providers and ayah playback controls.
+- [x] MP3Quran streaming with reciter, edition and surah selection.
+- [x] Athan priority over Quran playback.
+- [ ] Additional streaming providers.
+- [ ] Ayah playback controls.
 - [ ] Resume/bookmark behavior.
-- [x] Athan interrupts Quran; this version requires an explicit Play to restart it.
 - [ ] Morning/evening adhkar support.
 
 ## Phase 4 — Offline resilience and expansion
 
-- [x] Implement onboard RTC restoration for Waveshare V2 production and development firmware.
-- [x] Qualify Waveshare clock restoration after offline physical RESET with RTC power retained.
-- [ ] Qualify RTC-only scheduled playback, backup-power retention and long-term drift.
-- [ ] Evaluate RTC expansion for other hardware.
-- [ ] Evaluate microSD or USB mass storage.
+- [x] Onboard RTC restoration for Waveshare Box V2.
+- [ ] Backup-power timekeeping and long-term offline resilience.
+- [ ] RTC support for other hardware.
+- [ ] Removable audio storage, such as microSD or USB mass storage.
 - [ ] Optional offline Quran library.
 - [ ] Additional reference hardware if it reduces cost or improves availability.
 
