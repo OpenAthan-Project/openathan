@@ -192,8 +192,9 @@ readability confirmation passed for both the first separate-AM/PM layout and
 the approved inline-suffix refinement; concurrent
 audio/network/display runtime memory remains unmeasured for the clean candidate.
 The [persistent-ring report](waveshare-persistent-ring-validation-2026-10-14.md)
-records the later all-state ring change, with host previews and matched build
-measurements. Physical readability of these additional states has not been tested.
+records the later all-state ring change, host previews, matched build measurements
+and attended Quran/Maghrib visibility and listening results. Physical setup/fault
+readability and exact color boundaries remain untested.
 
 ## Attended validation
 

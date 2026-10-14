@@ -153,4 +153,5 @@ values, not device observations. See the [dated build report](../../../../docs/d
 and [countdown validation](../../../../docs/development/waveshare-countdown-validation-2026-10-09.md),
 and the [hardware runbook](../../provisioning/HARDWARE_TEST.md).
 The [persistent-ring report](../../../../docs/development/waveshare-persistent-ring-validation-2026-10-14.md)
-records the later all-state ring change and matched firmware measurements.
+records the later all-state ring change, matched firmware measurements and
+separately attended Quran/Maghrib playback-screen observations.
