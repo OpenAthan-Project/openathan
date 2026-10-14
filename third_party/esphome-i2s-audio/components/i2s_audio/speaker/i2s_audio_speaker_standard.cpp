@@ -469,6 +469,19 @@ void I2SAudioSpeaker::run_speaker_task() {
     }
   }
 
+#ifdef USE_OPENATHAN_VOLUME_FENCE
+  if (volume_fence_enabled_ && successful_setup) {
+    // The worker no longer services DMA. Stop callbacks before publishing its
+    // exit, rather than overflowing during delayed main-loop task cleanup.
+    // Genuine faults raised before/during disable remain latched.
+    if (i2s_channel_disable(tx_handle_) == ESP_OK) {
+      volume_dma_quiesced_ = true;
+    } else {
+      fail_volume_fence_();
+      ESP_LOGE(TAG, "Failed to quiesce fenced I2S channel");
+    }
+  }
+#endif
   xEventGroupSetBits(this->event_group_, SpeakerEventGroupBits::TASK_STOPPING);
 
   audio_source.reset();

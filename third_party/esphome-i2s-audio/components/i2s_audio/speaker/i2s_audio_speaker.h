@@ -113,6 +113,8 @@ class I2SAudioSpeakerBase : public I2SAudioOut, public speaker::Speaker, public 
   uint32_t volume_completion_capacity_{};
   static bool i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx);
   bool volume_fence_enabled_{};
+  // Published by the worker before TASK_STOPPED; loop() owns channel deletion.
+  bool volume_dma_quiesced_{};
   portMUX_TYPE volume_mutex_ = portMUX_INITIALIZER_UNLOCKED;
   VolumeFenceState volume_fence_;
 #endif

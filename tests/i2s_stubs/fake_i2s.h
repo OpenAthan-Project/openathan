@@ -18,6 +18,7 @@ inline bool defer_isr_bits{};
 inline int64_t now{};
 inline bool allocation_failure{}, partial_write{}, drop_events{}, callback_failure{}, channel_failure{}, invalid_dma_layout{};
 inline bool ring_allocation_failure{}, source_allocation_failure{}, task_creation_failure{}, preload_partial{}, enable_failure{};
+inline bool channel_enabled{}, disable_failure{};
 inline std::function<void()> on_write, on_fill, on_disable;
 inline std::function<void(size_t)> on_receive;
 inline void (*task)(void *); inline void *task_arg{};
@@ -32,6 +33,7 @@ inline bool (*callback)(void *, i2s_event_data_t *, void *); inline void *contex
 inline void reset() {
  now=0; dma_bytes=8; defer_isr_bits=false; allocation_failure=partial_write=drop_events=callback_failure=channel_failure=invalid_dma_layout=false;queues.clear();
  ring_allocation_failure=source_allocation_failure=task_creation_failure=preload_partial=enable_failure=false;
+ channel_enabled=disable_failure=false;
  on_write={}; on_fill={}; on_disable={}; on_receive={}; on_transmit={}; free_descriptors.clear(); next_transmit=current_write=0; current_valid=false; overflow_callback=nullptr; task=nullptr; dma.clear(); transmitted.clear(); written=0; callback=nullptr;
 }
 }

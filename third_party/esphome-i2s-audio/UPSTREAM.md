@@ -39,6 +39,13 @@ ISR queue failures latch under the same ESP-IDF critical-section lock immediatel
 without waiting for deferred event-group updates. Driver teardown rechecks faults
 before clearing events or allowing a stopped speaker to complete a fence.
 
+The opted-in standard speaker disables its I2S channel in the worker before
+publishing `TASK_STOPPING`/`TASK_STOPPED`. DMA must not keep producing completions
+after the worker stops servicing descriptors while main-loop cleanup is delayed.
+The main loop still owns task deletion, channel deletion and bus release, and
+skips a second disable after verified worker quiescence. Existing faults and a
+failed disable remain latched; this does not relax active-stream overflow checks.
+
 No audio task, PCM buffer or queue is added. For an opted-in speaker the existing
 ten-entry record queue grows from 4 to 12 bytes per entry (+80 heap bytes).
 The synchronized state and lock add fixed object storage. DMA descriptors, source
