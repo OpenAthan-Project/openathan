@@ -5,6 +5,8 @@ website adoption. Checked items describe implemented or published capabilities,
 not blanket physical qualification. See the
 [current release evidence and limits](release-validation-2026-10-10.md), [earlier device results](feasibility-report.md)
 and [upgrade qualification](upgrade-qualification-2026-10-01.md).
+Quran development hardware results are updated through
+[2026-10-14](quran-hardware-validation-2026-10-14.md).
 
 ## Current milestone
 
@@ -88,7 +90,10 @@ discovery is separate from public OTA application-transfer acceptance.
 
 - [x] Development implementation: MP3Quran streaming with reciter, edition and
   available-surah selection; see the [contract](quran-streaming.md).
-- [ ] Physical playback and runtime memory qualification before release.
+- [x] Bounded Waveshare provider playback, interruption/failure recovery and
+  runtime observations; see the [dated results](quran-hardware-validation-2026-10-14.md).
+- [ ] Separate release-candidate acceptance across supported hardware and
+  production profiles, using the dated results and their evidence limits.
 - [ ] Additional streaming providers and ayah playback controls.
 - [ ] Resume/bookmark behavior.
 - [x] Athan interrupts Quran; this version requires an explicit Play to restart it.

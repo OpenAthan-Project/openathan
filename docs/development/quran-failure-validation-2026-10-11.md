@@ -2,9 +2,11 @@
 
 The controlled failure harness prepares an isolated Waveshare development profile
 and private HTTPS fixtures. This report covers automated validation and actual
-OTA capacity; the new profile has not been installed or physically qualified.
-Use the [attended failure runbook](quran-failure-qualification.md) for that later
-session. This change does not establish release readiness.
+OTA capacity from the harness implementation session. Subsequent installations,
+fault/recovery observations and the fixed EOF retest are recorded in the
+[dated hardware validation](quran-hardware-validation-2026-10-14.md). The
+[attended failure runbook](quran-failure-qualification.md) describes the procedure.
+Release review is separate from these development results.
 
 ## Automated validation
 
@@ -30,8 +32,8 @@ session. This change does not establish release readiness.
   variants.
 
 The HTTP audio payloads used by host tests are transport fixtures. They are
-neither installed nor played. Decoder failure and audible recovery are pending
-physical results; the fixture server's response is not such a result.
+neither installed nor played. The fixture server's response does not establish
+decoder failure or audible recovery; observed hardware results are linked above.
 
 ## Normal fixture transfer regression
 
@@ -100,5 +102,5 @@ separate from runtime heap, fragmentation, PSRAM and stack headroom. No new
 runtime or recovery claim follows from a successful build.
 
 No device connection, reset, flash write, listening, schedule change or release
-operation occurred in this harness implementation session. Continuous real-provider
-soak and attended device failure/recovery acceptance remain separate work.
+operation occurred in this harness implementation session. Subsequent device
+failure/recovery results retain their own dates and source/profile boundaries.

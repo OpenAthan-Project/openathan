@@ -72,19 +72,19 @@ Both application slots and the separate shared-audio partition are retained.
 Static RAM delta is zero for every pair. The fix adds a per-decoder boolean and
 no buffers, tasks or dynamic allocations. Static measurements do not establish
 runtime heap, fragmentation, PSRAM or stack headroom; those remain separate
-attended measurements.
+from the subsequent hardware observations below.
 
-## Hardware boundary and follow-up
+## Subsequent attended hardware validation
 
-The source fix has not been installed or heard on hardware. The earlier
-controlled failure and successful recoveries describe the unfixed source only.
-Production was restored after that session; no device access occurred during
-this implementation or its build checks.
+Merged source `38943c8` was installed in the private Waveshare qualification
+profile after these implementation/build checks. Invalid MP3 data reported an
+error, released ownership and stayed stopped; explicit full recovery was confirmed
+clear. A later genuine-clock scheduled Athan preempted Quran exactly once, rejected
+Quran Play with HTTP 409 and finished without Quran resumption. Fresh application-only
+restoration and independent readback preserved production records and shared audio.
 
-Use the [failure qualification runbook](quran-failure-qualification.md) for a
-fresh attended invalid-MP3 failure/recovery check on the reviewed source. Require
-an error, released ownership, no automatic resume and clear explicit recovery.
-Scheduled Athan preemption and rejected Quran Play during Athan require a suitable
-real-clock prayer window. Provider soak, attended Wi-Fi interruption and Quran
-cold-power/no-resume checks remain separate. Development evidence does not
-establish public release readiness.
+The [consolidated hardware record](quran-hardware-validation-2026-10-14.md) retains
+the earlier failed observation, corrected retest, scheduled handover, runtime
+samples and source/profile limits. No device access occurred during the original
+source implementation/build comparison or this documentation update. Release
+review is separate from these bounded development results.

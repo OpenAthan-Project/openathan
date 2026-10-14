@@ -1,9 +1,11 @@
 # Quran streaming implementation validation — 2026-10-10
 
-MP3Quran single-surah streaming is a development implementation. Automated checks
-cover metadata resolution, cancellation, Athan priority and local controls.
-Physical streaming, audible output and concurrent runtime memory remain
-unqualified. This report does not establish release readiness.
+This report records the MP3Quran implementation/review sessions' automated and
+build checks for metadata resolution, cancellation, Athan priority and local
+controls. Subsequent playback, interruption, failure/recovery and runtime
+observations are recorded in the [dated hardware validation](quran-hardware-validation-2026-10-14.md).
+Earlier comparisons below retain their source/session boundaries. Release review
+is separate from these development results.
 
 ## Verification of playback request race fixes — 2026-10-11
 
@@ -97,10 +99,9 @@ versus 25,494 bytes on the unfixed baseline, +848 bytes. No dependencies or
 recordings were added. Static RAM grows by 24 bytes on affected variants; this
 does not establish runtime heap, fragmentation, PSRAM or stack headroom.
 
-No firmware was installed and no hardware was accessed. Physical streaming,
-audible output, real device TLS/decoding, long-surah behavior, physical Stop/Athan
-interruption and concurrent runtime-memory measurements remain separate release
-gates. These automated checks do not establish release readiness.
+No firmware was installed and no hardware was accessed in this implementation
+checkpoint. Subsequent physical and runtime observations are linked above;
+these automated checks alone do not establish release readiness.
 
 ## Verification of earlier review fixes — 2026-10-11
 
@@ -170,7 +171,8 @@ run. The generic firmware images have no byte growth.
 
 Static RAM increases of 24 or 32 bytes do not establish runtime heap,
 fragmentation, PSRAM or stack headroom. The owned pending URL is bounded, but its
-runtime allocation and concurrent streaming still need physical qualification.
+runtime allocation and concurrent streaming were not physically measured in
+this review checkpoint; subsequent hardware observations are linked above.
 No firmware was installed, no hardware was accessed, and no merge or release was
 performed for these fixes. HTTP APIs, durable settings, prayer history and
 shared-audio storage are unchanged. The sole added interface is the guarded
@@ -273,7 +275,8 @@ recording and requires HTTP 200. They establish provider reachability, sample
 formats and an observed redirect, without proving the device's TLS, decode,
 mono output, clock handling or long-stream behavior. The pinned decoder supports
 16-bit PCM with one or two channels and supplies decoded stream information to
-the existing I2S speaker; actual output across these formats remains untested.
+the existing I2S speaker. This implementation checkpoint did not test actual
+output; subsequent stereo observations and channel limits are linked above.
 
 ## UI evidence
 
@@ -291,12 +294,11 @@ The loading-state Stop bar is visible in both
 [desktop](quran-streaming/settings-loading-desktop.png) and
 [phone](quran-streaming/settings-loading-mobile.png) captures.
 
-## Remaining qualification
+## Subsequent hardware validation and release review
 
-Before release, follow the [attended hardware qualification list](quran-streaming.md#hardware-qualification-before-release).
-Measure long-surah and repeated-start memory behavior while streaming, parsing
-catalogs, polling the local UI and updating optional displays. Verify audible
-formats, physical Stop, due Athan priority, Wi-Fi stalls/loss, cold restart and
-firmware-maintenance interruption. Confirm preserved prayer settings, consumption
-history, shared recordings and recovery. Existing Athan hardware evidence does
-not qualify this new Quran path.
+The [consolidated hardware record](quran-hardware-validation-2026-10-14.md) covers
+completed provider playback, interruption, controlled failures, runtime samples
+and preservation, with listening and source/profile limits stated separately.
+Use those results with the [hardware qualification guidance](quran-streaming.md#hardware-qualification-before-release)
+when reviewing a release candidate. The earlier automated/build sessions above
+did not themselves exercise hardware.
