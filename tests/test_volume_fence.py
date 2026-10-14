@@ -28,6 +28,16 @@ class ProvenanceTests(unittest.TestCase):
             self.assertEqual(set(paths), set(hashes))
             for name, digest in hashes.items():
                 self.assertEqual(hashlib.sha256(paths[name].read_bytes()).hexdigest(), digest, name)
+            result = subprocess.run(["patch", "--batch", "--forward", "-p1", "-i", str(VENDOR / "volume-fence.patch")],
+                                    cwd=root, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            expected = {str(p.relative_to(VENDOR / "components")): hashlib.sha256(p.read_bytes()).hexdigest()
+                        for p in (VENDOR / "components").rglob("*")
+                        if p.is_file() and p.suffix in (".py", ".h", ".cpp")}
+            rebuilt = {str(p.relative_to(root / "components")): hashlib.sha256(p.read_bytes()).hexdigest()
+                       for p in (root / "components").rglob("*")
+                       if p.is_file() and p.suffix in (".py", ".h", ".cpp")}
+            self.assertEqual(rebuilt, expected)
             metadata = json.loads((VENDOR / "upstream.json").read_text())
             self.assertEqual(metadata["version"], "2026.9.0")
             self.assertEqual(metadata["commit"], "c6e4c87e525dd343e470d8dea368957a002f6505")

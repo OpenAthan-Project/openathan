@@ -406,6 +406,37 @@ static void independent_dma_stalls() {
  try{fake_i2s::task(fake_i2s::task_arg);}catch(const fake_i2s::Exit&){}
  f.speaker.loop();f.audio.loop();assert(f.audio.is_failed());
 }
+static void stopped_task_dma_quiescence() {
+ // Real DMA keeps producing interrupts after the worker stops servicing it.
+ // Delay main-loop teardown for 200 ms, covering immediate and graceful Stop.
+ for(bool graceful:{false,true}) {
+  Fixture f;f.apply(70);unsigned writes=0,disables=0;
+  const int16_t pcm[4]={20000,20000,20000,20000};
+  fake_i2s::on_fill=[&]{f.speaker.loop();if(writes<8)f.speaker.play(reinterpret_cast<const uint8_t*>(pcm),sizeof(pcm));};
+  fake_i2s::on_disable=[&]{++disables;};
+  fake_i2s::on_write=[&]{if(++writes==8){if(graceful)f.speaker.finish();else f.audio.stop();}};
+  f.speaker.start();f.speaker.loop();
+  try{fake_i2s::task(fake_i2s::task_arg);}catch(const fake_i2s::Exit&){}
+  fake_i2s::on_write={};
+  const auto transmitted=fake_i2s::transmitted.size();
+  for(unsigned i=0;i<20;++i)fake_i2s::advance();
+  assert(f.speaker.volume_fence_healthy());
+  assert(!fake_i2s::channel_enabled&&disables==1);
+  assert(fake_i2s::transmitted.size()==transmitted);
+  f.speaker.loop();f.audio.loop();
+  assert(f.audio.ready()&&f.audio.volume_percent()==70&&disables==1);
+  // Another recording must start without reboot or changing the saved gain.
+  assert(f.audio.start(::openathan::Track::NORMAL));
+  writes=0;fake_i2s::on_write=[&]{if(++writes==8)f.audio.stop();};
+  f.run();f.audio.loop();
+  assert(f.audio.ready()&&f.audio.volume_percent()==70&&disables==2);
+ }
+ // A failed disable is a genuine teardown fault, not a successful Stop.
+ Fixture failed;failed.apply(70);unsigned writes=0;fake_i2s::disable_failure=true;
+ fake_i2s::on_write=[&]{if(++writes==8)failed.audio.stop();};
+ failed.run();failed.audio.loop();
+ assert(failed.audio.is_failed()&&!failed.enabled()&&failed.speaker.fenced_volume()==0);
+}
 static void unfenced_transport_control() {
  Fixture f;f.speaker.set_volume_fence(false);unsigned writes=0;
  const int16_t pcm[4]={20000,20000,20000,20000};
@@ -484,4 +515,4 @@ int main() {
  quran_volume_continuity();
 #endif
  curves(); storage(); interrupted_saves(); isolated_storage();amplifier_control();
- adapter_idle_and_faults();streaming_handoff();dma_fence();rapid_pause_stop_restart();superseded_deadline();dma_faults_and_deadline();independent_dma_stalls();unfenced_transport_control(); }
+ adapter_idle_and_faults();streaming_handoff();dma_fence();rapid_pause_stop_restart();superseded_deadline();dma_faults_and_deadline();independent_dma_stalls();stopped_task_dma_quiescence();unfenced_transport_control(); }

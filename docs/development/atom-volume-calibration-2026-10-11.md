@@ -41,6 +41,12 @@ proves older FIFO buffers drained. Logical volume readback and wall-clock delay
 cannot provide that proof; a fully stopped and cleaned-up speaker may complete
 immediately.
 
+On Stop or natural completion, the opted-in speaker worker disables DMA before
+publishing its exit. Main-loop cleanup then deletes the task and channel and
+releases the bus. This prevents unserviced completion interrupts from turning
+an ordinary stop into a latched overflow fault when that cleanup is delayed.
+Active-stream overflow and channel-disable errors still fail closed.
+
 Each distinct requested value gets a two-second fault deadline once hardware is
 ready. Duplicate requests and Stop/restart retries retain that deadline. It
 triggers failure, never permission to unmute. Allocation, partial writes, completion overflow,

@@ -91,14 +91,24 @@
 +    portEXIT_CRITICAL(&volume_mutex_);
 +  }
 +#endif
-@@ -296 +357,5 @@
+@@ -269,0 +331,3 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  volume_dma_quiesced_ = false;
++#endif
+@@ -296 +360,5 @@
 -    this->write_records_queue_ = xQueueCreate(event_queue_size, sizeof(uint32_t));
 +    size_t record_size = sizeof(uint32_t);
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +    if (volume_fence_enabled_) record_size = sizeof(VolumeDmaRecord);
 +#endif
 +    this->write_records_queue_ = xQueueCreate(event_queue_size, record_size);
-@@ -338,0 +404,12 @@
+@@ -314 +382,4 @@
+-    i2s_channel_disable(this->tx_handle_);
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++    if (!volume_fence_enabled_ || !volume_dma_quiesced_)
++#endif
++      i2s_channel_disable(this->tx_handle_);
+@@ -338,0 +410,12 @@
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +  if (this_speaker->volume_fence_enabled_) {
 +    portENTER_CRITICAL_ISR(&this_speaker->volume_mutex_);
@@ -111,7 +121,7 @@
 +    portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
 +  }
 +#endif
-@@ -344,0 +422,9 @@
+@@ -344,0 +428,9 @@
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +    // Event-group updates from ISR are deferred to FreeRTOS's timer task.
 +    // Latch under the same ISR-safe lock before any fence acknowledgement.
@@ -121,7 +131,7 @@
 +      portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
 +    }
 +#endif
-@@ -352 +438,8 @@
+@@ -352 +444,8 @@
 -  xQueueSendToBackFromISR(this_speaker->i2s_event_queue_, &now, &need_yield3);
 +  const BaseType_t sent = xQueueSendToBackFromISR(this_speaker->i2s_event_queue_, &now, &need_yield3);
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
@@ -131,7 +141,7 @@
 +    portEXIT_CRITICAL_ISR(&this_speaker->volume_mutex_);
 +  }
 +#endif
-@@ -356,0 +450,13 @@
+@@ -356,0 +456,13 @@
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +bool IRAM_ATTR I2SAudioSpeakerBase::i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx) {
 +  auto *speaker = static_cast<I2SAudioSpeakerBase *>(user_ctx);
@@ -145,17 +155,17 @@
 +}
 +#endif
 +
-@@ -358 +464,5 @@
+@@ -358 +470,5 @@
 -  if (this->q31_volume_factor_ == INT32_MAX) {
 +  apply_volume_factor_(data, bytes_read, q31_volume_factor_);
 +}
 +
 +void I2SAudioSpeakerBase::apply_volume_factor_(uint8_t *data, size_t bytes_read, int32_t factor) {
 +  if (factor == INT32_MAX) {
-@@ -365 +475 @@
+@@ -365 +481 @@
 -  esp_audio_libs::gain::apply(data, data, this->q31_volume_factor_, len, bytes_per_sample);
 +  esp_audio_libs::gain::apply(data, data, factor, len, bytes_per_sample);
-@@ -382,0 +493,70 @@
+@@ -382,0 +499,70 @@
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +VolumeFenceToken I2SAudioSpeakerBase::request_volume_with_fence(float level) {
 +  if (!volume_fence_enabled_ || !std::isfinite(level) || level < 0 || level > 1) return {};
@@ -243,7 +253,7 @@
 +  float fenced_volume();
 +#endif
 +
-@@ -92,0 +105,14 @@
+@@ -92,0 +105,16 @@
 +#ifdef USE_OPENATHAN_VOLUME_FENCE
 +  VolumeGain volume_gain_snapshot_();
 +  void complete_volume_fence_(VolumeFenceToken token);
@@ -255,10 +265,12 @@
 +  uint32_t volume_completion_capacity_{};
 +  static bool i2s_on_send_q_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx);
 +  bool volume_fence_enabled_{};
++  // Published by the worker before TASK_STOPPED; loop() owns channel deletion.
++  bool volume_dma_quiesced_{};
 +  portMUX_TYPE volume_mutex_ = portMUX_INITIALIZER_UNLOCKED;
 +  VolumeFenceState volume_fence_;
 +#endif
-@@ -134,0 +161 @@
+@@ -134,0 +163 @@
 +  void apply_volume_factor_(uint8_t *data, size_t bytes_read, int32_t factor);
 --- a/components/i2s_audio/speaker/i2s_audio_speaker_standard.cpp
 +++ b/components/i2s_audio/speaker/i2s_audio_speaker_standard.cpp
@@ -438,6 +450,20 @@
 +        else --volume_completed_descriptors_;
 +        portEXIT_CRITICAL(&volume_mutex_);
 +      }
++#endif
+@@ -347,0 +472,13 @@
++#ifdef USE_OPENATHAN_VOLUME_FENCE
++  if (volume_fence_enabled_ && successful_setup) {
++    // The worker no longer services DMA. Stop callbacks before publishing its
++    // exit, rather than overflowing during delayed main-loop task cleanup.
++    // Genuine faults raised before/during disable remain latched.
++    if (i2s_channel_disable(tx_handle_) == ESP_OK) {
++      volume_dma_quiesced_ = true;
++    } else {
++      fail_volume_fence_();
++      ESP_LOGE(TAG, "Failed to quiesce fenced I2S channel");
++    }
++  }
 +#endif
 --- /dev/null
 +++ b/components/i2s_audio/speaker/volume_fence.h

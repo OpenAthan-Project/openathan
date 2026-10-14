@@ -25,6 +25,7 @@ struct i2s_event_callbacks_t {
 namespace fake_i2s {
 // ESP-IDF 5.5.5 circular DMA: callbacks precede queue overflow and auto-clear.
 inline void advance() {
+ if(!channel_enabled){now+=10000;return;}
  assert(dma.size()==5);
  if(on_transmit)on_transmit(next_transmit,dma[next_transmit]);
  transmitted.push_back(dma[next_transmit]);now+=10000;
@@ -39,9 +40,9 @@ inline void advance() {
 }
 inline int i2s_new_channel(const i2s_chan_config_t*,void **out,void*) {*out=fake_i2s::channel_failure?nullptr:reinterpret_cast<void*>(1);return fake_i2s::channel_failure?1:0;}
 inline int i2s_channel_init_std_mode(void*,const i2s_std_config_t*){return 0;}
-inline int i2s_del_channel(void*){fake_i2s::dma.clear();fake_i2s::written=0;fake_i2s::free_descriptors.clear();fake_i2s::next_transmit=0;fake_i2s::current_valid=false;return 0;}
-inline int i2s_channel_disable(void*){if(fake_i2s::on_disable)fake_i2s::on_disable();return 0;}
-inline int i2s_channel_enable(void*){return fake_i2s::enable_failure?1:0;}
+inline int i2s_del_channel(void*){fake_i2s::channel_enabled=false;fake_i2s::dma.clear();fake_i2s::written=0;fake_i2s::free_descriptors.clear();fake_i2s::next_transmit=0;fake_i2s::current_valid=false;return 0;}
+inline int i2s_channel_disable(void*){if(fake_i2s::on_disable)fake_i2s::on_disable();if(fake_i2s::disable_failure)return ESP_ERR_INVALID_STATE;fake_i2s::channel_enabled=false;return 0;}
+inline int i2s_channel_enable(void*){fake_i2s::channel_enabled=!fake_i2s::enable_failure;return fake_i2s::enable_failure?1:0;}
 inline int i2s_channel_get_info(void*,i2s_chan_info_t*out){out->total_dma_buf_size=5*fake_i2s::dma_bytes+(fake_i2s::invalid_dma_layout?1:0);return 0;}
 inline int i2s_channel_preload_data(void*,const void*d,size_t n,size_t*out){auto p=static_cast<const uint8_t*>(d);fake_i2s::dma.emplace_back(p,p+n);*out=fake_i2s::preload_partial?n-1:n;return 0;}
 inline int i2s_channel_register_event_callback(void*,const i2s_event_callbacks_t*c,void*ctx){
