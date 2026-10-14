@@ -137,3 +137,12 @@ and unavailable recordings. A separate UBSan executable checks qualification
 routing and the original logical redirect policy. Python tests exercise real
 local TLS rejection, served faults and profile/release exclusion. These checks
 do not establish physical streaming or device TLS acceptance.
+
+The reference job runs `tools/check_mp3_decoder.py --build-dir` against its
+resolved micro-MP3 0.4.0 dependency. It compiles the production decoder and audio
+transfer buffers with UBSan and deterministic host memory/ring-buffer adapters,
+linking the codec's unmodified native host library. Synthetic single-frame, short and 52-second
+MP3 fixtures verify decoded PCM, chunked input, graceful partial EOF, sink
+backpressure and decoder reuse. Empty, text-only, ID3-only and incomplete first
+frames must fail in Quran-enabled builds; the non-Quran path retains upstream
+EOF behavior. No hardware playback or audible acceptance is established.

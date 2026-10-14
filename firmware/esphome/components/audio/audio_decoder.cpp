@@ -76,6 +76,9 @@ esp_err_t AudioDecoder::start(AudioFileType audio_file_type) {
 
   this->potentially_failed_count_ = 0;
   this->end_of_file_ = false;
+#if defined(OPENATHAN_QURAN) && defined(USE_AUDIO_MP3_SUPPORT)
+  this->mp3_audio_decoded_ = false;
+#endif
 
   switch (this->audio_file_type_) {
 #ifdef USE_AUDIO_FLAC_SUPPORT
@@ -118,6 +121,15 @@ esp_err_t AudioDecoder::start(AudioFileType audio_file_type) {
   return ESP_OK;
 }
 
+AudioDecoderState AudioDecoder::finished_state_() const {
+#if defined(OPENATHAN_QURAN) && defined(USE_AUDIO_MP3_SUPPORT)
+  // Metadata or a parsed frame header without PCM is not a played recording.
+  if (this->audio_file_type_ == AudioFileType::MP3 && !this->mp3_audio_decoded_)
+    return AudioDecoderState::FAILED;
+#endif
+  return AudioDecoderState::FINISHED;
+}
+
 AudioDecoderState AudioDecoder::decode(bool stop_gracefully) {
   if (this->input_buffer_ == nullptr) {
     return AudioDecoderState::FAILED;
@@ -127,12 +139,12 @@ AudioDecoderState AudioDecoder::decode(bool stop_gracefully) {
     if (this->output_transfer_buffer_->available() == 0) {
       if (this->end_of_file_) {
         // The file decoder indicates it reached the end of file
-        return AudioDecoderState::FINISHED;
+        return this->finished_state_();
       }
 
       if (!this->input_buffer_->has_buffered_data()) {
         // If all the internal buffers are empty, the decoding is done
-        return AudioDecoderState::FINISHED;
+        return this->finished_state_();
       }
     }
   }
@@ -140,7 +152,7 @@ AudioDecoderState AudioDecoder::decode(bool stop_gracefully) {
   if (this->potentially_failed_count_ > MAX_POTENTIALLY_FAILED_COUNT) {
     if (stop_gracefully) {
       // No more new data is going to come in, so decoding is done
-      return AudioDecoderState::FINISHED;
+      return this->finished_state_();
     }
     return AudioDecoderState::FAILED;
   }
@@ -312,6 +324,9 @@ FileDecoderState AudioDecoder::decode_mp3_() {
     if (samples_decoded > 0 && this->audio_stream_info_.has_value()) {
       this->output_transfer_buffer_->increase_buffer_length(
           this->audio_stream_info_.value().frames_to_bytes(samples_decoded));
+#ifdef OPENATHAN_QURAN
+      this->mp3_audio_decoded_ = true;
+#endif
     }
   } else if (result == micro_mp3::MP3_STREAM_INFO_READY || result == micro_mp3::MP3_STREAM_INFO_CHANGED) {
     // Header parsed: capture stream info and resize the output buffer to fit one full frame.

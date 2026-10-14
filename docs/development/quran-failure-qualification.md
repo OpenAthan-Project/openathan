@@ -119,7 +119,7 @@ triggered by an explicit catalog refresh. Do not retry an uncertain Play.
 | `metadata-malformed`, `metadata-oversize` | Parsing fails, no recording starts, clients close, catalog or playback reports its own error. |
 | `metadata-truncate` | Premature disconnect fails without accepting incomplete JSON. |
 | `metadata-stall` | Partial body stalls; metadata returns an error within its I/O/deadline bounds. |
-| `audio-content-type`, `audio-decode` | Wrong MIME type or deliberate text without MP3 frames fails; no persistent loading/playing state. |
+| `audio-content-type`, `audio-decode` | Wrong MIME type or deliberate text without MP3 frames reports an error and releases ownership; no persistent loading/playing state. A silent `idle` finish is not a pass. |
 | `audio-truncate` | Reader terminates and clears ownership; record whether the pipeline reports an error or a partial EOF. It cannot prove normal full-recording completion. |
 | `audio-stall` | Partial audio stops or errors within the reader's bounds, without automatic retry or resumption. |
 | `metadata-redirect-http`, `audio-redirect-http` | HTTPS downgrade is rejected before a second connection. |

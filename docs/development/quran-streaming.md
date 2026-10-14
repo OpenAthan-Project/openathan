@@ -97,15 +97,22 @@ HTTP 200 and MP3 content type. No user-entered URL or provider credential is use
 The product package mirrors the pinned ESPHome 2026.9.0 `audio` and `speaker`
 components because the original network reader followed redirects without the
 provider restriction, and the player lacked a public pipeline-state observation.
-Only `audio/audio_reader.cpp` and `speaker/media_player/speaker_media_player.h`
-change upstream behavior, under `OPENATHAN_QURAN`. Stored-file playback retains
-the upstream path. The generic scheduler profiles retain upstream components and
+The patches are limited to `audio/audio_reader.cpp`, `audio/audio_decoder.cpp`,
+`audio/audio_decoder.h` and `speaker/media_player/speaker_media_player.h`, under
+`OPENATHAN_QURAN`. The reader retains its upstream stored-file path. Product MP3
+decoding requires at least one frame of decoded PCM before accepting EOF; text,
+metadata-only or incomplete first-frame input reports a decoding error. A parsed
+header alone does not qualify. Graceful EOF after valid PCM retains its existing
+partial-stream behavior and does not establish full-recording completion.
+The generic scheduler profiles retain upstream components and
 do not enable this feature. The guarded speaker observation also checks queue
 drain and both stopped pipeline states. Each mirror includes ESPHome's upstream
 license: its C++ runtime is GPLv3, while Python and other material use MIT. The
 [upstream manifest](../../firmware/esphome/components/audio/upstream.json) and
 vendoring regression pin the unmodified files. An ESPHome upgrade must refresh
-both mirrors, reconsider these two patches and rerun adapter and firmware checks.
+both mirrors, reconsider these patches and rerun adapter and firmware checks.
+The [MP3 EOF validation report](quran-mp3-eof-validation-2026-10-14.md) records
+the no-frame regression, matched image measurements and pending hardware retest.
 
 ## Local API
 
