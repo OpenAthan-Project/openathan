@@ -121,6 +121,7 @@ class AudioDecoder {
   void set_pause_output_state(bool pause_state) { this->pause_output_ = pause_state; }
 
  protected:
+  AudioDecoderState finished_state_() const;
 #ifdef USE_AUDIO_FLAC_SUPPORT
   FileDecoderState decode_flac_();
   std::unique_ptr<micro_flac::FLACDecoder> flac_decoder_;
@@ -152,6 +153,9 @@ class AudioDecoder {
   uint32_t playback_ms_{0};
 
   bool end_of_file_{false};
+#if defined(OPENATHAN_QURAN) && defined(USE_AUDIO_MP3_SUPPORT)
+  bool mp3_audio_decoded_{false};
+#endif
 
   bool pause_output_{false};
 };
