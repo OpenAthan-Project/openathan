@@ -4,6 +4,8 @@
 Waveshare Box V2. The [release qualification report](release-validation-2026-10-10.md)
 records exact production images, attended Waveshare installation/update results,
 public delivery and remaining limits.
+The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md) records the next
+review candidate and the evidence/checks required before its publication.
 The [v0.4.0 preparation record](v0.4.0-preparation-2026-10-07.md) records its
 automated builds and physical-validation limits. The earlier
 [release evidence](release-validation-2026-10-04.md) records reference-device
