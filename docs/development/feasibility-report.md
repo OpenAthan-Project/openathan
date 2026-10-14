@@ -4,6 +4,8 @@ This report preserves the dated development measurements and device observations
 below. They are not current release sizes or a statement of today's pending work.
 For v0.5.0 production sizes, hardware qualification and public-installer status,
 see the [2026-10-10 release summary](release-validation-2026-10-10.md).
+Subsequent Quran playback, failure/recovery and runtime observations are recorded
+in the [2026-10-14 hardware validation](quran-hardware-validation-2026-10-14.md).
 
 **The compile-time capacity target passed.** ESPHome, released Adhan C++, and
 the shared audio adapter fit comfortably in each 2 MiB OTA slot. Both supplied

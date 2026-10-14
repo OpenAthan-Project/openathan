@@ -3,8 +3,10 @@
 The product development firmware can play one MP3Quran surah on the speaker.
 The local Quran page loads the live reciter catalog, searches across it, pages
 through matching reciters, and offers each selected recording edition's available
-surahs. This feature requires separate physical qualification before release;
-see the [implementation validation](quran-streaming-validation-2026-10-10.md).
+surahs. Automated checks are recorded in the
+[implementation validation](quran-streaming-validation-2026-10-10.md); completed
+Waveshare tests and their source/profile limits are recorded in the
+[hardware validation](quran-hardware-validation-2026-10-14.md) for separate release review.
 The [controlled failure runbook](quran-failure-qualification.md) provides private
 HTTPS fixtures and an isolated maintainer profile for subsequent hardware tests.
 
@@ -112,7 +114,7 @@ license: its C++ runtime is GPLv3, while Python and other material use MIT. The
 vendoring regression pin the unmodified files. An ESPHome upgrade must refresh
 both mirrors, reconsider these patches and rerun adapter and firmware checks.
 The [MP3 EOF validation report](quran-mp3-eof-validation-2026-10-14.md) records
-the no-frame regression, matched image measurements and pending hardware retest.
+the no-frame regression, matched image measurements and completed hardware retest.
 
 ## Local API
 
@@ -162,6 +164,9 @@ attribution and Python/other material retains MIT attribution. Both copied
 license files remain intact.
 
 ## Hardware qualification before release
+
+Use the [dated hardware results](quran-hardware-validation-2026-10-14.md) to retain
+completed passes and identify candidate-specific evidence needs for release review.
 
 Use the applicable [scheduler runbook](../../firmware/esphome/scheduler/VALIDATION.md)
 or [provisioning runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md),
