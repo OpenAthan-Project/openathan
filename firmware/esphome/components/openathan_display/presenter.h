@@ -59,6 +59,11 @@ inline Frame present(const Inputs &in) {
   f.clock = format_clock(in.clock_valid ? in.local_time : std::string_view{}, in.hours);
   if (!f.clock[0]) text(f.clock, "--:--");
   if (!in.wifi_connected) text(f.footer, "Offline");
+  // Prayer timing remains visible around playback and fault messages. Only a
+  // trustworthy future visual event can give the round ring a timing color.
+  if (in.round && in.setup_complete && !in.storage_fault && in.clock_valid &&
+      next && next->utc > in.utc && valid_time(in.next_time))
+    f.proximity = prayer_proximity(next->utc - in.utc);
   if (in.storage_fault || in.status.fault != Fault::NONE) {
     f.error = true;
     text(f.heading, "Error");
@@ -84,7 +89,6 @@ inline Frame present(const Inputs &in) {
     text(f.detail, skipped ? "Will be skipped" : in.round && !next->enabled ? "Muted" : in.status.automatic_ready ? "Next Athan" : "Not ready yet");
     if (in.round) {
       f.countdown = format_countdown(next->utc - in.utc);
-      f.proximity = prayer_proximity(next->utc - in.utc);
     }
   } else {
     text(f.heading, "Athan"); text(f.main, "Waiting"); text(f.detail, "No time set");

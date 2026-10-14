@@ -172,9 +172,12 @@ It follows every calculated prayer, including muted and skipped announcements,
 using the portable LED timetable independently of LED hardware/preferences.
 Green means above 30 minutes, orange above 10 through 30, red 10 or less.
 Countdown duration uses UTC; displayed times use the saved local timezone.
-Setup, clock-waiting, playback and faults keep their existing centered 2× layout
-at offset (52,52), without a countdown or proximity ring. The panel remains
-rotated 180° for viewing opposite the rear USB cable.
+The ring remains visible during Quran/Athan playback and other application
+states. Setup, clock-waiting, playback and faults keep their existing centered
+2× layout at offset (52,52), without a countdown. When setup, clock, settings
+storage or future prayer timing is unavailable, the ring is neutral gray
+`#606060`; otherwise it continues to indicate the next calculated prayer.
+The panel remains rotated 180° for viewing opposite the rear USB cable.
 Host tests check every rendered pixel against circular
 bounds. Playback guidance says “Button to stop” through the explicit
 `stop_button` capability. Saved timezone, time format and
@@ -188,6 +191,9 @@ capacity measurements and the attended application installations. Owner
 readability confirmation passed for both the first separate-AM/PM layout and
 the approved inline-suffix refinement; concurrent
 audio/network/display runtime memory remains unmeasured for the clean candidate.
+The [persistent-ring report](waveshare-persistent-ring-validation-2026-10-14.md)
+records the later all-state ring change, with host previews and matched build
+measurements. Physical readability of these additional states has not been tested.
 
 ## Attended validation
 
