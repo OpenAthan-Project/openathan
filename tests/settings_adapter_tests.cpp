@@ -16,10 +16,11 @@ int64_t esp_timer_get_time() { return mono*1000; }
 static int64_t epoch(CivilDate d, unsigned hour = 0) { return int64_t(day_number(d))*86400+hour*3600; }
 struct Audio : Playback {
   unsigned volume{70}, requested{70}, requests{}, starts{}, stops{};
-  bool active{}, drop{}, available{true};
+  bool active{}, drop{}, available{true}, quran{};
   bool ready() const override { return available; }
   bool playing() const override { return active; }
-  bool start(Track) override { ++starts; active = true; return true; }
+  PlaybackSource source() const override { return active ? quran ? PlaybackSource::QURAN : PlaybackSource::ATHAN : PlaybackSource::NONE; }
+  bool start(Track) override { ++starts; active = true; quran = false; return true; }
   void stop() override { ++stops; active = false; }
   std::optional<unsigned> volume_percent() const override { return volume; }
   bool request_volume_percent(unsigned value) override { ++requests; requested = value; if (!drop) volume = value; return true; }
@@ -402,7 +403,7 @@ static void round_display_adapter() {
   // Moving the clock back rebuilds the visual window, without replaying history.
   f.device.utc=epoch({2026,9,25},4); f.device.step(0); screen.update();
   lcd.text("Fajr",140,4,0xFFFFFF); lcd.countdown("In 50min",0x00FF00);
-  f.device.failed_clock_read=true; screen.update(); CHECK(lcd.pixels[8*360+179]==0);
+  f.device.failed_clock_read=true; screen.update(); CHECK(lcd.pixels[8*360+179]==0x606060);
   f.device.failed_clock_read=false;
   f.calculator.shift_seconds=0; settings.prayer.offsets[0]=0;
   settings.prayer.enabled.fill(true); CHECK(f.save(settings)==SettingsResult::SAVED);
@@ -445,6 +446,42 @@ static void round_display_adapter() {
   esphome::wifi::global_wifi_component=nullptr;
 }
 
+static void round_playback_ring_adapter() {
+  struct LCD : esphome::display::Display {
+    uint32_t ring{};
+    int get_width() override { return 360; }
+    int get_height() override { return 360; }
+    void fill(esphome::Color) override { ring=0; }
+    void draw_pixel_at(int x,int y,esphome::Color color) override {
+      if (x==179 && y==8) ring=(uint32_t(color.red)<<16)|(uint32_t(color.green)<<8)|color.blue;
+    }
+  } lcd;
+  Fixture f; f.begin(); f.audio.active=f.audio.quran=true;
+  esphome::openathan_display::StatusDisplay screen;
+  screen.set_round(true); screen.set_display(&lcd); screen.set_openathan(&f.device);
+  lcd.set_writer([&](esphome::display::Display &canvas) { screen.draw(canvas); });
+  screen.setup(); CHECK(lcd.ring==0x00FF00 && f.device.status().playing);
+  const auto settings=*f.device.settings_service()->saved();
+  const auto writes=nvs_test::writes;
+  auto updates=lcd.updates;
+  screen.update(); CHECK(lcd.updates==updates);
+  f.device.utc=epoch({2026,9,25},4)+29*60+59; f.device.step(0); screen.update();
+  CHECK(lcd.ring==0x00FF00 && f.audio.source()==PlaybackSource::QURAN);
+  f.device.step(1); screen.update(); CHECK(lcd.ring==0xFF6000);
+  f.device.step(20*60); screen.update(); CHECK(lcd.ring==0xFF0000);
+  updates=lcd.updates; screen.update(); CHECK(lcd.updates==updates);
+  CHECK(nvs_test::writes==writes && *f.device.settings_service()->saved()==settings);
+  f.device.failed_clock_read=true; screen.update(); CHECK(lcd.ring==0x606060);
+  f.device.failed_clock_read=false; screen.update(); CHECK(lcd.ring==0xFF0000);
+  // The normal scheduled handoff consumes Fajr and selects Dhuhr for the ring.
+  f.device.utc=epoch({2026,9,25},5)-1; f.device.step(0); screen.update(); CHECK(lcd.ring==0xFF0000);
+  f.device.step(1); screen.update();
+  CHECK(f.audio.starts==1 && f.audio.source()==PlaybackSource::ATHAN && lcd.ring==0x00FF00);
+  CHECK(f.device.next_visual_prayer(f.device.read())->key.prayer==Prayer::DHUHR);
+  CHECK(*f.device.settings_service()->saved()==settings);
+  f.device.stop(); screen.update(); CHECK(lcd.ring==0x00FF00 && !f.audio.active);
+}
+
 static void display_button_guidance() {
   struct LCD : esphome::display::Display {
     explicit LCD(int size) : size(size), pixels(size * size) {}
@@ -476,7 +513,12 @@ static void display_button_guidance() {
       };
       openathan::screen::draw_text(pixel, button ? "Button to stop" : "Use phone", 96, 1, 0xD0D8D8);
       const int first = round ? 244 : 96, end = round ? 260 : 104;
-      for (int i = first*lcd.size; i < end*lcd.size; ++i) CHECK(lcd.pixels[i] == expected[i]);
+      for (int y = first; y < end; ++y) for (int x = 0; x < lcd.size; ++x) {
+        const int dx=2*x+1-360, dy=2*y+1-360, distance=dx*dx+dy*dy;
+        if (round && distance>=328*328 && distance<=344*344)
+          CHECK(lcd.pixels[y*lcd.size+x]==0x00FF00);
+        else CHECK(lcd.pixels[y*lcd.size+x] == expected[y*lcd.size+x]);
+      }
       const auto updates = lcd.updates;
       screen.update(); CHECK(lcd.updates == updates);
     }
@@ -919,6 +961,7 @@ int main() {
   upgrade_boot_scheduler_health();
   display_adapter();
   round_display_adapter();
+  round_playback_ring_adapter();
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST

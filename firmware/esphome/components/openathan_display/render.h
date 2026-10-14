@@ -38,17 +38,17 @@ template<typename Pixel> void render(const Frame &frame, Pixel pixel) {
   }
   draw_text(pixel, frame.footer.data(), 116, 1, 0xD0D8D8);
 }
-// Upcoming round frames add a native-resolution ring/countdown. Other states
-// retain the 128-pixel layout centered in a 256-pixel square on the round panel.
+// Every round frame has a native-resolution ring; unavailable timing is gray.
+// Upcoming frames add a countdown. Other states retain the centered 2x layout.
 template<typename Pixel> void render_round(const Frame &frame, Pixel pixel) {
+  const uint32_t color = frame.proximity == LightMode::GREEN ? 0x00FF00 :
+      frame.proximity == LightMode::ORANGE ? 0xFF6000 : frame.proximity == LightMode::RED ? 0xFF0000 : 0x606060;
+  for (int y = 8; y < 352; ++y) for (int x = 8; x < 352; ++x) {
+    const int dx = 2*x + 1 - 360, dy = 2*y + 1 - 360;
+    const int distance = dx*dx + dy*dy;
+    if (distance <= 344*344 && distance >= 328*328) pixel(x, y, color);
+  }
   if (frame.upcoming && frame.countdown[0]) {
-    const uint32_t color = frame.proximity == LightMode::GREEN ? 0x00FF00 :
-        frame.proximity == LightMode::ORANGE ? 0xFF6000 : frame.proximity == LightMode::RED ? 0xFF0000 : 0;
-    if (color) for (int y = 8; y < 352; ++y) for (int x = 8; x < 352; ++x) {
-      const int dx = 2*x + 1 - 360, dy = 2*y + 1 - 360;
-      const int distance = dx*dx + dy*dy;
-      if (distance <= 344*344 && distance >= 328*328) pixel(x, y, color);
-    }
     draw_text(pixel, frame.clock.data(), 64, 2, 0xD0D8D8, 360);
     draw_text(pixel, frame.detail.data(), 112, 2, 0xD0D8D8, 360);
     draw_text(pixel, frame.heading.data(), 140, 4, 0xFFFFFF, 360);

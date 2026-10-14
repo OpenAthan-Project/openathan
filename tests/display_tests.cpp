@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -13,6 +14,31 @@
 using namespace openathan;
 using namespace openathan::screen;
 bool equal(const auto &value, const char *expected) { return std::string_view(value.data()) == expected; }
+
+static void round_state_capture(const char *name, const Frame &frame, uint32_t ring, const char *directory) {
+  CHECK(!frame.upcoming && equal(frame.countdown, ""));
+  std::array<uint32_t, 360 * 360> pixels{};
+  render_round(frame, [&](int x, int y, uint32_t rgb) {
+    CHECK(x >= 0 && x < 360 && y >= 0 && y < 360);
+    const int dx = 2*x+1-360, dy = 2*y+1-360, distance = dx*dx+dy*dy;
+    if (rgb == ring) CHECK(distance >= 328*328 && distance <= 344*344);
+    else CHECK(distance < 328*328); // Status text stays entirely inside the ring.
+    pixels[y*360+x] = rgb;
+  });
+  for (int y = 0; y < 360; ++y) for (int x = 0; x < 360; ++x) {
+    const int dx = 2*x+1-360, dy = 2*y+1-360, distance = dx*dx+dy*dy;
+    if (distance >= 328*328 && distance <= 344*344) CHECK(pixels[y*360+x] == ring);
+    else if (distance >= 328*328) CHECK(pixels[y*360+x] == 0);
+  }
+  if (!directory) return;
+  std::ofstream file(std::filesystem::path(directory)/(std::string(name)+".ppm"),std::ios::binary);
+  file << "P6\n360 360\n255\n";
+  for (auto rgb : pixels) {
+    const char bytes[]{static_cast<char>(rgb>>16),static_cast<char>(rgb>>8),static_cast<char>(rgb)};
+    file.write(bytes,3);
+  }
+  CHECK(file.good());
+}
 
 static void round_capture(const char *name, const Frame &frame, const char *directory) {
   std::array<uint32_t, 360 * 360> pixels{};
@@ -126,9 +152,81 @@ static void round_countdown(const char *directory) {
     if (state==4) blocked.visual_next.reset();
     if (state==5) blocked.visual_next->utc=blocked.utc;
     const auto frame=present(blocked);
-    CHECK(!frame.upcoming && equal(frame.countdown,"") && frame.proximity==LightMode::OFF);
+    CHECK(!frame.upcoming && equal(frame.countdown,""));
+    CHECK(frame.proximity == (state==2 || state==3 ? prayer_proximity(in.visual_next->utc-in.utc) : LightMode::OFF));
   }
   in.round=false; CHECK(equal(present(in).heading,"Isha") && equal(present(in).countdown,""));
+}
+
+static void persistent_round_ring(const char *directory) {
+  if (directory) std::filesystem::create_directories(directory);
+  Inputs in;
+  in.round = in.setup_complete = in.clock_valid = in.wifi_connected = in.prayers_enabled = true;
+  in.utc=10000; in.local_time="18:00"; in.next_time="18:45";
+  in.visual_next=Event{{20735,Prayer::MAGHRIB},in.utc+2700,true,{}};
+  in.status.next=Event{{20735,Prayer::ISHA},in.utc+7200,true,{}};
+  in.status.automatic_ready=true; in.status.playing=true;
+  for (bool quran : {false, true}) {
+    in.quran=quran;
+    auto frame=present(in);
+    CHECK(equal(frame.heading,quran ? "Quran" : "Athan") && equal(frame.main,"Playing"));
+    CHECK(equal(frame.detail,"Button to stop") && frame.proximity==LightMode::GREEN);
+    round_state_capture(quran ? "round-quran-playing" : "round-athan-playing",frame,0x00FF00,directory);
+    FrameCache cache; CHECK(cache.accept(frame)); CHECK(!cache.accept(frame));
+    // Color changes during playback still redraw, without adding a countdown.
+    for (auto [seconds,mode,color] : {std::tuple{1801,LightMode::GREEN,0x00FF00U},
+                                    std::tuple{1800,LightMode::ORANGE,0xFF6000U},
+                                    std::tuple{601,LightMode::ORANGE,0xFF6000U},
+                                    std::tuple{600,LightMode::RED,0xFF0000U}}) {
+      in.visual_next->utc=in.utc+seconds;
+      frame=present(in); CHECK(frame.proximity==mode);
+      CHECK(cache.accept(frame)==(seconds==1800 || seconds==600));
+      CHECK(!cache.accept(frame));
+      round_state_capture(quran ? "round-quran-proximity" : "round-athan-proximity",frame,color,nullptr);
+    }
+    in.visual_next->utc=in.utc+2700;
+  }
+  in.quran=true; in.wifi_connected=false;
+  in.visual_next->enabled=in.prayers_enabled=false; in.status.skip=in.visual_next->key;
+  CHECK(present(in).proximity==LightMode::GREEN && equal(present(in).footer,"Offline"));
+  round_state_capture("round-quran-offline-muted",present(in),0x00FF00,directory);
+  in.wifi_connected=true; in.visual_next->enabled=in.prayers_enabled=true; in.status.skip.reset();
+  for (auto fault : {Fault::INVALID_SETTINGS,Fault::INVALID_SCHEDULE,Fault::STORAGE,
+                     Fault::AUDIO_UNAVAILABLE,Fault::PLAYBACK_REJECTED}) {
+    in.status.fault=fault;
+    const auto frame=present(in);
+    CHECK(frame.error && equal(frame.heading,"Error") && frame.proximity==LightMode::GREEN);
+    const auto name=std::string("round-error-")+fault_name(fault);
+    round_state_capture(name.c_str(),frame,0x00FF00,directory);
+    Inputs unavailable=in; unavailable.visual_next.reset();
+    CHECK(present(unavailable).error && present(unavailable).proximity==LightMode::OFF);
+    round_state_capture(name.c_str(),present(unavailable),0x606060,nullptr);
+  }
+  in.status.fault=Fault::NONE;
+  for (unsigned state=0; state<7; ++state) {
+    Inputs unavailable=in;
+    if (state==0) unavailable.setup_complete=false;
+    if (state==1) unavailable.clock_valid=false;
+    if (state==2) unavailable.storage_fault=true;
+    if (state==3) unavailable.visual_next.reset();
+    if (state==4) unavailable.visual_next->utc=unavailable.utc;
+    if (state==5) unavailable.visual_next->utc=unavailable.utc-1;
+    if (state==6) unavailable.next_time="25:00";
+    const auto frame=present(unavailable);
+    CHECK(frame.proximity==LightMode::OFF);
+    const auto name=std::string("round-neutral-")+std::to_string(state);
+    round_state_capture(name.c_str(),frame,0x606060,directory);
+    FrameCache cache; CHECK(cache.accept(present(in))); CHECK(cache.accept(frame));
+    CHECK(!cache.accept(frame)); CHECK(cache.accept(present(in)));
+  }
+  in.status.playing=false; in.clock_valid=false;
+  round_state_capture("round-waiting-time",present(in),0x606060,directory);
+  // The old occurrence cannot leave a stale red ring when it expires.
+  in.clock_valid=in.status.playing=true; in.visual_next->utc=in.utc+1;
+  CHECK(present(in).proximity==LightMode::RED);
+  ++in.utc; CHECK(present(in).proximity==LightMode::OFF);
+  in.visual_next=Event{{20735,Prayer::ISHA},in.utc+7200,true,{}}; in.next_time="20:45";
+  CHECK(present(in).proximity==LightMode::GREEN && equal(present(in).heading,"Quran"));
 }
 
 void capture(const char *name, const Frame &frame, const char *directory, bool upcoming = false) {
@@ -171,6 +269,7 @@ void capture(const char *name, const Frame &frame, const char *directory, bool u
 int main(int argc, char **argv) {
   const char *directory = argc == 2 ? argv[1] : nullptr;
   round_countdown(directory);
+  persistent_round_ring(directory);
   Inputs in;
   in.setup_complete = in.clock_valid = in.wifi_connected = in.prayers_enabled = true;
   in.local_time = "12:04"; in.next_time = "12:30";

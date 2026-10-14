@@ -14,6 +14,8 @@ saved-state checks and owner readability confirmation passed for both the first
 separate-AM/PM layout and the approved inline-suffix refinement. Clean runtime
 heap/PSRAM remains unmeasured.
 See the dated report for evidence limits.
+The persistent ring around status screens has host validation only; previous
+owner readability confirmation applies to the earlier upcoming-prayer layouts.
 
 ## Approved composition
 
@@ -50,9 +52,14 @@ below 60 seconds show `In <1min`. Midnight and daylight-saving changes affect
 the local times, while UTC determines elapsed duration. Offline scheduling and
 countdown continue with a valid clock.
 
-Setup, clock-waiting, playback and fault screens retain their existing centered
-2× layout and messages, with no ring or countdown. The Atom square display
-retains its existing layout and audible-next behavior.
+The ring remains visible around every application screen. Setup, clock-waiting,
+Quran/Athan playback and fault screens retain their existing centered 2× layout
+and messages, without a countdown. Playback and fault messages do not override
+the next prayer's timing color. Incomplete setup, unhealthy settings storage,
+an invalid clock or missing/invalid future prayer timing uses neutral gray
+`#606060`, with no stale timing color. At the prayer timestamp, the ring follows
+the next strictly future calculated prayer, including during Athan playback.
+The Atom square display retains its existing layout and audible-next behavior.
 
 ## Implementation contract
 
@@ -73,5 +80,7 @@ The [display component guide](../../firmware/esphome/components/openathan_displa
 owns runtime behavior and fixture rendering. The
 [dated validation report](../../docs/development/waveshare-countdown-validation-2026-10-09.md)
 records automated checks, matched firmware capacity and remaining hardware work.
+The [persistent-ring report](../../docs/development/waveshare-persistent-ring-validation-2026-10-14.md)
+records the later all-state behavior and its separate validation limits.
 No generated mockup is bundled in firmware. Rendered bounds and a successful
 build do not establish physical readability or concurrent runtime headroom.

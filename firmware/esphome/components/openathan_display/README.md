@@ -110,11 +110,17 @@ into hours and minutes: `In 2hr 15min`, `In 1hr`, `In 8min`. Below 60 seconds
 use `In <1min`; omit zero-valued units. Color uses exact seconds rather than
 rounded wording. Wi-Fi loss adds Offline without interrupting the countdown.
 
-The state table's “All prayers off” row applies to the square display. Round
-setup, clock-waiting, playback and faults keep the existing centered 2× square
-layout and messages, without a countdown or proximity ring. At an occurrence's
-timestamp, playback takes priority or the timetable advances to the next future
-calculated prayer. No new preference, HTTP API or framebuffer is introduced.
+The state table's “All prayers off” row applies to the square display. The round
+ring stays visible around every application screen. Setup, clock-waiting,
+playback and faults keep the existing centered 2× square layout and messages,
+without a countdown. Quran and Athan playback do not override the prayer ring's
+color. A valid future visual prayer supplies the timing color even while an
+audio or consumption-history fault is shown. Incomplete setup, unhealthy settings
+storage, an invalid clock or unavailable/invalid future prayer timing uses a
+neutral gray ring (`#606060`), never a stale proximity color.
+At an occurrence's timestamp, the timetable advances to the next future
+calculated prayer, including during Athan playback. No new preference, HTTP API
+or framebuffer is introduced. The ring is independent of physical LED preferences.
 
 ## Font attribution
 
@@ -130,9 +136,11 @@ shared/stale skips, refresh deduplication, PWM limits and each failed I2C write.
 The production and isolated settings-adapter tests exercise the real presenter
 adapter with pinned ESPHome timezone conversion: both DST boundaries, midnight,
 unchanged polls, network loss, and scheduled playback with a failed display.
-Round regressions also cover muted/all-disabled prayers, shared and suppressed
-Isha, schedule/settings invalidation, exact 30/10-minute boundaries, rounded
-hour/minute wording, and countdown changes across both DST transitions.
+Round regressions also cover ring presence in every state, neutral fallback and
+recovery, proximity transitions during Quran/Athan playback, muted/all-disabled
+prayers, shared and suppressed Isha, schedule/settings invalidation, exact
+30/10-minute boundaries, rounded hour/minute wording, and countdown changes
+across both DST transitions.
 
 To inspect all fixture screens using the actual shipping renderer:
 
@@ -144,3 +152,5 @@ The resulting PPM images are 128×128 and, for `round-*`, 360×360. They contain
 values, not device observations. See the [dated build report](../../../../docs/development/display-validation-2026-10-03.md)
 and [countdown validation](../../../../docs/development/waveshare-countdown-validation-2026-10-09.md),
 and the [hardware runbook](../../provisioning/HARDWARE_TEST.md).
+The [persistent-ring report](../../../../docs/development/waveshare-persistent-ring-validation-2026-10-14.md)
+records the later all-state ring change and matched firmware measurements.
