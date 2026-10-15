@@ -14,3 +14,7 @@ firmware/esphome/components/atom_s3r_display/LICENSE.
 The display uses Daniel Hepper's public-domain font8x8 basic Latin bitmap font,
 based on Marcel Sondaar's public-domain IBM VGA font work. Attribution and source
 are retained in firmware/esphome/components/openathan_display/README.md and font.h.
+
+The optional connection display includes Project Nayuki's QR Code generator
+v1.8.0 under the MIT license. Its complete license notices and pinned-source
+provenance are retained in firmware/esphome/components/openathan_display/.

@@ -266,10 +266,117 @@ void capture(const char *name, const Frame &frame, const char *directory, bool u
   }
   CHECK(file.good());
 }
+static void connection_capture(const char *name, const Frame &frame, bool round, const char *directory) {
+  const int size = round ? 360 : 128;
+  std::vector<uint32_t> pixels(size*size);
+  const auto pixel = [&](int x, int y, uint32_t rgb) {
+    CHECK(x >= 0 && x < size && y >= 0 && y < size);
+    if (round) {
+      const int dx = 2*x+1-360, dy = 2*y+1-360;
+      const int distance = dx*dx + dy*dy;
+      if (rgb == 0x00FF00) CHECK(distance >= 328*328 && distance <= 344*344);
+      else CHECK(distance < 328*328);
+    }
+    pixels[y*size+x] = rgb;
+  };
+  if (round) render_round(frame, pixel); else render(frame, pixel);
+  if (round) {
+    for (int y=0; y<size; ++y) for (int x=0; x<size; ++x) {
+      const int dx = 2*x+1-360, dy = 2*y+1-360, distance = dx*dx+dy*dy;
+      if (distance >= 328*328 && distance <= 344*344) CHECK(pixels[y*size+x] == 0x00FF00);
+      else if (distance >= 328*328) CHECK(pixels[y*size+x] == 0);
+    }
+  }
+  if (frame.connection.connected && frame.connection.qr_valid && frame.page == Page::QR) {
+    const int offset=round ? 69 : 8, scale=round ? 6 : 3;
+    // Quiet-zone pixels must be explicitly white, including all corners.
+    for (int y=0; y<37*scale; ++y) for (int x=0; x<37*scale; ++x) {
+      if (x<4*scale || x>=33*scale || y<4*scale || y>=33*scale)
+        CHECK(pixels[(y+offset)*size+x+offset] == 0xFFFFFF);
+      else {
+        const bool dark=qrcodegen_getModule(frame.connection.qr.data(),x/scale-4,y/scale-4);
+        CHECK(pixels[(y+offset)*size+x+offset] == (dark ? 0U : 0xFFFFFFU));
+      }
+    }
+  }
+  if (!directory) return;
+  std::filesystem::create_directories(directory);
+  std::ofstream file(std::filesystem::path(directory)/(std::string(name)+".ppm"), std::ios::binary);
+  file << "P6\n" << size << ' ' << size << "\n255\n";
+  for (auto rgb : pixels) {
+    const char bytes[]{static_cast<char>(rgb>>16),static_cast<char>(rgb>>8),static_cast<char>(rgb)};
+    file.write(bytes,3);
+  }
+  CHECK(file.good());
+}
+static void connection_pages(const char *directory) {
+  ConnectionInfo info{"openathan-a1b2c3.local", "255.255.255.255", true, false};
+  Inputs in;
+  in.round=in.setup_complete=in.clock_valid=in.wifi_connected=in.prayers_enabled=true;
+  in.utc=10000; in.local_time="12:04"; in.next_time="12:30";
+  in.visual_next=Event{{20729,Prayer::DHUHR},in.utc+2000,true,{}};
+  in.status.next=in.visual_next; in.status.automatic_ready=true;
+  ConnectionCache cache;
+  auto connection=cache.read(info);
+  CHECK(connection.available && connection.connected && connection.qr_valid);
+  CHECK(qrcodegen_getSize(connection.qr.data()) == 29);
+  CHECK(equal(connection.hostname,info.hostname.c_str()) && equal(connection.ipv4,info.ipv4.c_str()));
+  in.connection=&connection; in.page_hint=true;
+  CHECK(equal(present(in).footer,"Press for page"));
+  connection_capture("page-round-hint",present(in),true,directory);
+  in.page_hint=false; CHECK(equal(present(in).footer,""));
+  in.page=Page::QR;
+  for (const auto *hostname : {"openathan-a1b2c3.local", "openathan-test-a1b2c3.local"}) {
+    info.hostname=hostname; connection=cache.read(info);
+    CHECK(connection.qr_valid && qrcodegen_getSize(connection.qr.data())==29);
+    const std::string suffix=info.hostname.starts_with("openathan-test-") ? "test" : "production";
+    connection_capture(("page-atom-qr-"+suffix).c_str(),present(in),false,directory);
+    connection_capture(("page-round-qr-"+suffix).c_str(),present(in),true,directory);
+    in.page=Page::ADDRESS;
+    connection_capture(("page-atom-address-"+suffix).c_str(),present(in),false,directory);
+    in.page=Page::QR;
+  }
+  auto old=connection;
+  info.ipv4="192.168.1.23"; connection=cache.read(info);
+  CHECK(connection != old && connection.qr == old.qr);
+  info.connected=false; connection=cache.read(info);
+  CHECK(connection.available && !connection.connected && !connection.qr_valid && !connection.ipv4[0]);
+  for (const auto byte : connection.qr) CHECK(byte==0);
+  connection_capture("page-atom-offline",present(in),false,directory);
+  connection_capture("page-round-offline",present(in),true,directory);
+  // Maximum ESPHome identity is retained completely even when fixed V3 cannot
+  // encode it. Render every hostname character in bounded address rows.
+  info.connected=true; info.hostname=std::string(63,'a')+".local";
+  connection=cache.read(info);
+  CHECK(connection.available && !connection.qr_valid && equal(connection.hostname,info.hostname.c_str()));
+  connection_capture("page-atom-long-host",present(in),false,directory);
+  connection_capture("page-round-long-host",present(in),true,directory);
+  for (const auto *invalid : {"", "invalid host.local", "wrong/local"}) {
+    info.hostname=invalid; connection=cache.read(info);
+    CHECK(!connection.available && !connection.qr_valid);
+    connection_capture("page-atom-unavailable",present(in),false,nullptr);
+    connection_capture("page-round-unavailable",present(in),true,nullptr);
+  }
+  info.hostname=std::string(70,'a'); connection=cache.read(info);
+  CHECK(!connection.available && !connection.hostname[0]);
+  info.hostname="openathan-a1b2c3.local";
+  for (const auto *invalid_ip : {"", "0.0.0.0", "300.1.2.3", "192.168.1", "1.2.3.4.5", "1..2.3"}) {
+    info.ipv4=invalid_ip; connection=cache.read(info);
+    CHECK(connection.connected && !connection.qr_valid && !connection.ipv4[0]);
+    connection_capture("page-atom-no-ip",present(in),false,directory);
+    connection_capture("page-round-no-ip",present(in),true,directory);
+  }
+  info.ipv4="192.168.1.23"; connection=cache.read(info);
+  auto state=present(in);
+  FrameCache frames; CHECK(frames.accept(state)); CHECK(!frames.accept(state));
+  in.visual_next->utc=in.utc+600;
+  CHECK(present(in).proximity==LightMode::RED && frames.accept(present(in)));
+}
 int main(int argc, char **argv) {
   const char *directory = argc == 2 ? argv[1] : nullptr;
   round_countdown(directory);
   persistent_round_ring(directory);
+  connection_pages(directory);
   Inputs in;
   in.setup_complete = in.clock_valid = in.wifi_connected = in.prayers_enabled = true;
   in.local_time = "12:04"; in.next_time = "12:30";

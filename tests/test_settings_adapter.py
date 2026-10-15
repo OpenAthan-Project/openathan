@@ -59,6 +59,7 @@ inline bool parse_json(const std::string &text, const std::function<bool(JsonObj
                 str(ROOT / "firmware/esphome/components/openathan/nvs_settings_store.cpp"),
                 str(ROOT / "firmware/esphome/components/openathan/setup_store.cpp"),
                 str(ROOT / "firmware/esphome/components/openathan_display/status_display.cpp"),
+                str(ROOT / "firmware/esphome/components/openathan_display/qrcodegen.cpp"),
                 str(package / "components/time/posix_tz.cpp"), str(core), "-o", str(output)], check=True)
             result = subprocess.run([str(output)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

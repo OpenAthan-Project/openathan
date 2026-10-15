@@ -159,6 +159,15 @@ bool OpenAthan::cancel_skip() {
   log_status_();
   return ok;
 }
+void OpenAthan::physical_control(unsigned kind) {
+  if (physical_control_handler_) {
+    physical_control_handler_(kind);
+    return;
+  }
+  if (kind == 0) stop();
+  else if (kind == 1) skip_next();
+  else if (kind == 2) cancel_skip();
+}
 const char *OpenAthan::setup_state() const {
   if (!setup_gate_) return "active";
   if (!setup_gate_->healthy()) return "storage_fault";

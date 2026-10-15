@@ -58,6 +58,10 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   void serial_request(const Frame& request);
   void on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanResult>& results) override;
   void on_wifi_connect_state(StringRef ssid, std::span<const uint8_t, 6> bssid) override;
+  const std::string &hostname() const { return hostname_; }
+  std::string ipv4_address() const;
+  bool connected() const;
+  bool playback_busy() const;
 
  private:
   static esp_err_t http_handler_(httpd_req_t* request);

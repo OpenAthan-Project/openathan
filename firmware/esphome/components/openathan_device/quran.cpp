@@ -222,6 +222,10 @@ void Quran::loop(bool connected, bool blocked) {
   }
 }
 void Quran::shutdown() { if (job_) job_->cancel = true; resolving_ = false; }
+bool Quran::playback_pending() const {
+  const auto *playback = athan_ ? athan_->playback() : nullptr;
+  return resolving_ && job_ && !job_->cancel && playback && job_->epoch == playback->playback_epoch();
+}
 void Quran::snapshot(JsonObject root) {
 #ifdef OPENATHAN_QURAN_QUALIFICATION
   openathan_quran_qualification::snapshot(root);

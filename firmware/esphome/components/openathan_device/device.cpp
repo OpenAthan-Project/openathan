@@ -124,6 +124,23 @@ std::string Device::ip_() const {
   wifi::global_wifi_component->get_ip_addresses()[0].str_to(address);
   return address;
 }
+std::string Device::ipv4_address() const {
+  if (!connected()) return {};
+  const auto ip = wifi::global_wifi_component->get_ip_addresses()[0];
+  if (!ip.is_ip4() || !ip.is_set()) return {};
+  char address[network::IP_ADDRESS_BUFFER_SIZE];
+  ip.str_to(address);
+  return address;
+}
+bool Device::connected() const {
+  return wifi::global_wifi_component && wifi::global_wifi_component->is_connected();
+}
+bool Device::playback_busy() const {
+  const auto *playback = athan_ ? athan_->playback() : nullptr;
+  return quran_.playback_pending() || (playback && (playback->playing() ||
+      playback->source() != ::openathan::PlaybackSource::NONE ||
+      playback->stream_state() == ::openathan::StreamState::LOADING));
+}
 std::vector<std::string> Device::urls_() const {
   if (!wifi::global_wifi_component->is_connected()) return {};
   return {"http://" + hostname_ + "/", "http://" + ip_() + "/"};

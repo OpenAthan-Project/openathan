@@ -2,6 +2,7 @@
 #include "openathan/scheduler.h"
 #include "openathan/lights.h"
 #include "openathan/time_format.h"
+#include "connection.h"
 #include <array>
 #include <cstdio>
 #include <string_view>
@@ -17,6 +18,9 @@ struct Inputs {
   std::optional<Event> visual_next;
   int64_t utc{};
   bool quran{};
+  const ConnectionFrame *connection{};
+  Page page{Page::STATUS};
+  bool page_hint{};
 };
 struct Frame {
   std::array<char, 9> clock{};
@@ -27,6 +31,8 @@ struct Frame {
   LightMode proximity{LightMode::OFF};
   unsigned main_scale{2};
   bool error{}, upcoming{};
+  Page page{Page::STATUS};
+  ConnectionFrame connection;
   bool operator==(const Frame &) const = default;
 };
 template<size_t N> inline void text(std::array<char, N> &out, std::string_view value) {
@@ -92,6 +98,14 @@ inline Frame present(const Inputs &in) {
     }
   } else {
     text(f.heading, "Athan"); text(f.main, "Waiting"); text(f.detail, "No time set");
+  }
+  if (in.connection) {
+    if (in.page != Page::STATUS) {
+      f.page = in.page;
+      f.connection = *in.connection;
+    } else if (in.page_hint && in.connection->available && in.connection->connected && !in.status.playing) {
+      text(f.footer, "Press for page");
+    }
   }
   return f;
 }

@@ -3,6 +3,7 @@
 #include "../firmware/esphome/components/openathan_device/upgrade_policy.h"
 #include "../firmware/esphome/components/openathan_display/status_display.h"
 #include "esphome/components/wifi/wifi_component.h"
+#include "esphome/core/hal.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -335,6 +336,170 @@ static void display_adapter() {
   esphome::openathan_display::StatusDisplay absent;
   absent.setup(); CHECK(absent.is_failed());
   esphome::wifi::global_wifi_component = nullptr;
+}
+
+static void physical_control_fallback() {
+  using esphome::openathan_component::PhysicalControlAction;
+  Fixture f; f.begin();
+  PhysicalControlAction<> stop(&f.device, 0), skip(&f.device, 1), cancel(&f.device, 2);
+  f.audio.active = true;
+  stop.play();
+  CHECK(f.audio.stops == 1 && !f.audio.active);
+  skip.play(); CHECK(f.device.status().skip);
+  cancel.play(); CHECK(!f.device.status().skip);
+}
+
+static void connection_navigation_adapter(bool round) {
+  using esphome::openathan_component::PhysicalControlAction;
+  using openathan::screen::ConnectionInfo;
+  using esphome::openathan_display::StatusDisplay;
+  using openathan::screen::Page;
+  struct LCD : esphome::display::Display {
+    explicit LCD(bool round) : size(round ? 360 : 128), pixels(size * size) {}
+    int size;
+    std::vector<uint32_t> pixels;
+    int get_width() override { return size; }
+    int get_height() override { return size; }
+    void fill(esphome::Color) override { std::fill(pixels.begin(), pixels.end(), 0); }
+    void draw_pixel_at(int x, int y, esphome::Color color) override {
+      CHECK(x >= 0 && x < size && y >= 0 && y < size);
+      pixels[y * size + x] = (uint32_t(color.red) << 16) | (uint32_t(color.green) << 8) | color.blue;
+    }
+  } lcd(round);
+  // Model the distinct pre-audio phases without pretending they are already
+  // playing. The Quran service's own tests cover its real late-worker epochs.
+  struct PendingAudio : Audio {
+    bool unresolved{}, queued{}, loading{};
+    unsigned epoch{};
+    PlaybackSource source() const override {
+      return queued || loading ? PlaybackSource::QURAN : Audio::source();
+    }
+    bool busy() const { return unresolved || source() != PlaybackSource::NONE; }
+    void stop() override {
+      ++epoch; unresolved = queued = loading = false; Audio::stop();
+    }
+  } audio;
+  esphome::wifi::WiFiComponent wifi;
+  esphome::wifi::global_wifi_component = &wifi;
+  Fixture f; f.device.set_playback(&audio); f.begin();
+  ConnectionInfo connection{"openathan-test-aabbcc.local", "192.0.2.10", true, false};
+  const auto read_connection = [&]() {
+    auto result = connection;
+    result.playback_busy = audio.busy();
+    return result;
+  };
+  StatusDisplay screen;
+  screen.set_round(round); screen.set_display(&lcd); screen.set_openathan(&f.device);
+  screen.set_connection_reader(read_connection);
+  lcd.set_writer([&](esphome::display::Display &canvas) { screen.draw(canvas); });
+  esphome::mock_millis = 100;
+  screen.setup(); CHECK(!screen.is_failed() && screen.page() == Page::STATUS);
+  PhysicalControlAction<> press(&f.device, 0), skip(&f.device, 1), cancel(&f.device, 2);
+  const auto records = nvs_test::committed;
+  const auto writes = nvs_test::writes, commits = nvs_test::commits;
+  const auto settings = *f.device.settings_service()->saved();
+
+  press.play(); CHECK(screen.page() == Page::QR);
+  const auto updates = lcd.updates;
+  const auto qr = lcd.pixels;
+  for (unsigned i = 0; i < 20; ++i) screen.update();
+  CHECK(lcd.updates == updates && lcd.pixels == qr);
+  press.play(); CHECK(screen.page() == (round ? Page::STATUS : Page::ADDRESS));
+  if (!round) { press.play(); CHECK(screen.page() == Page::STATUS); }
+
+  // Both paths refresh the IP on the visible address view, without a reboot.
+  press.play();
+  if (!round) press.play();
+  const auto original_address = lcd.pixels;
+  connection.ipv4 = "198.51.100.234"; screen.update();
+  CHECK(lcd.pixels != original_address);
+  const auto online = lcd.pixels;
+  connection.connected = false; connection.ipv4.clear(); wifi.connected = false;
+  screen.update(); CHECK(lcd.pixels != online && f.device.status().automatic_ready);
+  connection.connected = true; connection.ipv4 = "203.0.113.55"; wifi.connected = true;
+  screen.update();
+  CHECK(lcd.pixels != online);
+
+  // Timeout uses the monotonic clock, independently of prayer/timezone time.
+  esphome::mock_millis += 60000; screen.update(); CHECK(screen.page() == Page::STATUS);
+  press.play(); CHECK(screen.page() == Page::QR);
+  esphome::mock_millis += 59999; screen.update(); CHECK(screen.page() == Page::QR);
+  ++esphome::mock_millis; screen.update(); CHECK(screen.page() == Page::STATUS);
+  esphome::mock_millis = 0xFFFFD000;
+  press.play();
+  esphome::mock_millis += 59999; screen.update(); CHECK(screen.page() == Page::QR);
+  ++esphome::mock_millis; screen.update(); CHECK(screen.page() == Page::STATUS);
+  if (!round) {
+    press.play(); esphome::mock_millis += 59000;
+    press.play(); CHECK(screen.page() == Page::ADDRESS);
+    esphome::mock_millis += 59999; screen.update(); CHECK(screen.page() == Page::ADDRESS);
+    ++esphome::mock_millis; screen.update(); CHECK(screen.page() == Page::STATUS);
+  }
+
+  for (unsigned stage = 0; stage < 5; ++stage) {
+    press.play(); CHECK(screen.page() == Page::QR);
+    audio.unresolved = stage == 0;
+    audio.queued = stage == 1;
+    audio.loading = stage == 2;
+    audio.active = stage >= 3;
+    audio.quran = stage == 3;
+    CHECK(audio.busy());
+    if (stage == 0) CHECK(audio.source() == PlaybackSource::NONE && !audio.playing());
+    if (stage == 1 || stage == 2) CHECK(audio.source() == PlaybackSource::QURAN && !audio.playing());
+    const auto epoch_before = audio.epoch, stops_before = audio.stops;
+    // An accepted request dismisses the overlay before samples start playing.
+    screen.update(); CHECK(screen.page() == Page::STATUS && audio.epoch == epoch_before);
+    press.play();
+    CHECK(screen.page() == Page::STATUS && !audio.busy());
+    CHECK(audio.epoch == epoch_before + 1 && audio.stops == stops_before + 1);
+  }
+
+  CHECK(nvs_test::committed == records && nvs_test::writes == writes && nvs_test::commits == commits);
+  CHECK(*f.device.settings_service()->saved() == settings);
+  press.play(); CHECK(screen.page() == Page::QR);
+  // Existing openathan.stop/skip/cancel actions remain direct commands; only
+  // the separately registered physical-button action owns navigation.
+  esphome::openathan_component::ControlAction<> direct_stop(&f.device, 0),
+      direct_skip(&f.device, 1), direct_cancel(&f.device, 2);
+  auto direct_stops = audio.stops;
+  direct_stop.play(); CHECK(audio.stops == direct_stops + 1 && screen.page() == Page::QR);
+  direct_skip.play(); CHECK(f.device.status().skip && screen.page() == Page::QR);
+  direct_cancel.play(); CHECK(!f.device.status().skip && screen.page() == Page::QR);
+  skip.play(); CHECK(screen.page() == Page::STATUS && f.device.status().skip);
+  press.play();
+  cancel.play(); CHECK(screen.page() == Page::STATUS && !f.device.status().skip);
+
+  // Reconstructing the presenter does not restore a transient navigation page.
+  press.play();
+  StatusDisplay restarted;
+  restarted.set_round(round); restarted.set_display(&lcd); restarted.set_openathan(&f.device);
+  restarted.set_connection_reader(read_connection);
+  lcd.set_writer([&](esphome::display::Display &canvas) { restarted.draw(canvas); });
+  restarted.setup(); CHECK(restarted.page() == Page::STATUS);
+  const auto before_failure = audio.stops;
+  lcd.mark_failed();
+  audio.unresolved = true;
+  press.play(); CHECK(audio.stops == before_failure + 1 && !audio.busy());
+  CHECK(restarted.page() == Page::STATUS && f.device.upgrade_health());
+  esphome::wifi::global_wifi_component = nullptr;
+}
+
+static void failed_connection_display_controls() {
+  using esphome::openathan_component::PhysicalControlAction;
+  esphome::display::Display lcd;
+  lcd.mark_failed();
+  Fixture f; f.begin();
+  esphome::openathan_display::StatusDisplay screen;
+  screen.set_display(&lcd); screen.set_openathan(&f.device);
+  screen.set_connection_reader([]() {
+    return openathan::screen::ConnectionInfo{"openathan-aabbcc.local", "192.0.2.1", true, true};
+  });
+  screen.setup(); CHECK(screen.is_failed());
+  PhysicalControlAction<> stop(&f.device, 0), skip(&f.device, 1), cancel(&f.device, 2);
+  f.audio.active = true;
+  stop.play(); CHECK(f.audio.stops == 1 && !f.audio.active);
+  skip.play(); CHECK(f.device.status().skip);
+  cancel.play(); CHECK(!f.device.status().skip);
 }
 
 static void round_display_adapter() {
@@ -959,6 +1124,10 @@ static void json_transport() {
 #endif
 int main() {
   upgrade_boot_scheduler_health();
+  physical_control_fallback();
+  connection_navigation_adapter(false);
+  connection_navigation_adapter(true);
+  failed_connection_display_controls();
   display_adapter();
   round_display_adapter();
   round_playback_ring_adapter();

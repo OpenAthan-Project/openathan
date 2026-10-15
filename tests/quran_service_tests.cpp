@@ -94,6 +94,7 @@ int main() {
   Audio audio;
   esphome::openathan_component::OpenAthan athan; athan.audio = &audio;
   Quran service; service.begin(&athan, "boot-a"); service.loop(true, false);
+  assert(!service.playback_pending());
   const std::string base = "https://www.mp3quran.net/api/v3/";
   const std::string entry = R"({"id":1,"name":"Example","moshaf":[{"id":9,"name":"Edition","server":"https://cdn.mp3quran.net/example/","surah_list":"1,18,114"}]})";
   http_replies[base + "reciters?language=eng&reciter=1"] = {200, "", "{\"reciters\":[" + entry + "]}"};
@@ -134,15 +135,24 @@ int main() {
   assert(service.action("play", play.as<JsonObjectConst>(), error) == 409);
   assert(audio.epoch == 0 && task_attempts == attempts);
   assert(request_play(service, play, error) == 200);
-  athan.stop(); execute(service); assert(audio.url.empty()); // Stop while resolving.
+  assert(service.playback_pending() && !audio.playing() && audio.source() == openathan::PlaybackSource::NONE);
+  athan.stop();
+  assert(!service.playback_pending()); // Epoch revocation is visible before the worker/loop runs.
+  execute(service); assert(audio.url.empty()); // Stop while resolving.
+  assert(!service.playback_pending());
   assert(request_play(service, play, error) == 200);
-  service.loop(false, false); execute(service); assert(audio.url.empty()); // Reconnect cannot revive a canceled job.
+  assert(service.playback_pending());
+  service.loop(false, false); assert(!service.playback_pending());
+  execute(service); assert(audio.url.empty()); // Reconnect cannot revive a canceled job.
   assert(request_play(service, play, error) == 200);
-  service.shutdown(); execute(service); assert(audio.url.empty());
+  service.shutdown(); assert(!service.playback_pending());
+  execute(service); assert(audio.url.empty());
   assert(request_play(service, play, error) == 200);
-  service.loop(true, true); execute(service); assert(audio.url.empty()); // Maintenance beats late results.
+  service.loop(true, true); assert(!service.playback_pending());
+  execute(service); assert(audio.url.empty()); // Maintenance beats late results.
   assert(request_play(service, play, error) == 200);
-  audio.start(openathan::Track::NORMAL); execute(service); assert(audio.url.empty()); // Athan beats late result.
+  audio.start(openathan::Track::NORMAL); assert(!service.playback_pending());
+  execute(service); assert(audio.url.empty()); // Athan beats late result.
   audio.active = false; // Athan has reserved ownership while its Stop is still draining.
   assert(request_play(service, play, error) == 409);
   service.loop(true, false);
@@ -151,7 +161,10 @@ int main() {
   assert(request_play(service, play, error) == 409);
   audio.stop();
   assert(request_play(service, play, error) == 200);
-  execute(service); assert(audio.url == "https://cdn.mp3quran.net/example/018.mp3");
+  assert(service.playback_pending());
+  run_worker(); assert(service.playback_pending()); // Resolving stays pending until its result is committed.
+  service.loop(true, false); assert(!service.playback_pending() && live_http_clients == 0);
+  assert(audio.url == "https://cdn.mp3quran.net/example/018.mp3");
   service.loop(false, false);assert(!audio.active && audio.kind==openathan::PlaybackSource::NONE);
   service.loop(true, false);assert(!audio.active);
   assert(request_play(service, play, error) == 200);execute(service);
@@ -164,7 +177,7 @@ int main() {
   service.loop(false, false); assert(request_play(service, play, error) == 503);
   service.loop(true, false);
   task_available = false;
-  assert(request_play(service, play, error) == 503); task_available = true;
+  assert(request_play(service, play, error) == 503); assert(!service.playback_pending()); task_available = true;
   // The catalog is scanned entry by entry; pagination and search cover all rows.
   audio.stop(); reset_http();
   std::string reciters = "{\"reciters\":[";
@@ -182,7 +195,9 @@ int main() {
   chapters += "]}";
   http_replies[base + "suwar?language=eng"] = {200, "", chapters};
   auto catalog = input(R"({"kind":"reciters","offset":0,"query":""})");
-  assert(service.action("catalog", catalog.as<JsonObjectConst>(), error) == 200); execute(service);
+  assert(service.action("catalog", catalog.as<JsonObjectConst>(), error) == 200);
+  assert(!service.playback_pending()); // Catalog jobs do not reserve playback.
+  execute(service);
   state.clear(); service.catalog_snapshot(state.to<JsonObject>());
   assert(state["state"] == "ready" && state["data"]["total"] == 25 && state["data"]["reciters"].size() == 20);
   assert(state["data"]["surahs"].size() == 114 && state["data"]["next_offset"] == 20);

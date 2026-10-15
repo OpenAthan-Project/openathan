@@ -23,7 +23,41 @@ template<typename Pixel> void draw_text(Pixel &pixel, const char *value, int y, 
   const int x = (width - static_cast<int>(std::strlen(value)) * 8 * scale) / 2;
   draw_text_at(pixel, value, x, y, scale, color);
 }
+template<typename Pixel> void draw_wrapped(Pixel &pixel, const char *value, int y, size_t columns, int width) {
+  const std::string_view text(value);
+  for (size_t start = 0; start < text.size(); start += columns, y += 12) {
+    std::array<char, 33> line{};
+    const auto length = std::min(columns, text.size() - start);
+    std::copy_n(text.data() + start, length, line.data());
+    draw_text(pixel, line.data(), y, 1, 0xFFFFFF, width);
+  }
+}
+template<typename Pixel> void draw_qr(Pixel &pixel, const ConnectionFrame &connection, int x, int y, int scale) {
+  // Version 3 is 29 modules. The white four-module quiet zone is part of the
+  // painted square, not transparent space that a ring/text could intrude upon.
+  constexpr int modules = 29, border = 4;
+  for (int row = -border; row < modules + border; ++row)
+    for (int col = -border; col < modules + border; ++col) {
+      const uint32_t rgb = qrcodegen_getModule(connection.qr.data(), col, row) ? 0x000000 : 0xFFFFFF;
+      for (int dy = 0; dy < scale; ++dy) for (int dx = 0; dx < scale; ++dx)
+        pixel(x + (col + border)*scale + dx, y + (row + border)*scale + dy, rgb);
+    }
+}
+template<typename Pixel> void render_connection(const Frame &frame, Pixel &pixel) {
+  const auto &connection = frame.connection;
+  if (frame.page == Page::QR && connection.connected && connection.qr_valid) {
+    draw_qr(pixel, connection, 8, 8, 3);
+    return;
+  }
+  draw_text(pixel, "Speaker page", 6, 1, 0xD0D8D8);
+  draw_text(pixel, connection.connected ? "Same Wi-Fi" : "Offline", 24, 1, 0xD0D8D8);
+  if (connection.available) draw_wrapped(pixel, connection.hostname.data(), 42, 16, 128);
+  if (connection.connected && connection.ipv4[0]) draw_text(pixel, connection.ipv4.data(), 104, 1, 0xFFFFFF);
+  else draw_text(pixel, "openathan.com", 104, 1, 0xFFFFFF);
+  draw_text(pixel, connection.connected && connection.available ? "Press for clock" : "Use website USB", 116, 1, 0xD0D8D8);
+}
 template<typename Pixel> void render(const Frame &frame, Pixel pixel) {
+  if (frame.page != Page::STATUS) { render_connection(frame, pixel); return; }
   draw_text(pixel, frame.clock.data(), 6, 1, 0xD0D8D8);
   if (frame.upcoming) {
     draw_text(pixel, frame.detail.data(), 30, 1, 0xD0D8D8);
@@ -48,6 +82,24 @@ template<typename Pixel> void render_round(const Frame &frame, Pixel pixel) {
     const int distance = dx*dx + dy*dy;
     if (distance <= 344*344 && distance >= 328*328) pixel(x, y, color);
   }
+  if (frame.page != Page::STATUS) {
+    const auto &connection = frame.connection;
+    if (connection.connected && connection.qr_valid && std::strlen(connection.hostname.data()) <= 27) {
+      draw_text(pixel, "Open speaker page", 48, 1, 0xD0D8D8, 360);
+      draw_qr(pixel, connection, 69, 69, 6);
+      draw_text(pixel, connection.hostname.data(), 294, 1, 0xFFFFFF, 360);
+      draw_text(pixel, connection.ipv4.data(), 310, 1, 0xD0D8D8, 360);
+      draw_text(pixel, "Same Wi-Fi", 326, 1, 0xD0D8D8, 360);
+    } else {
+      draw_text(pixel, "Speaker page", 76, 2, 0xFFFFFF, 360);
+      draw_text(pixel, connection.connected ? "Use address" : "Offline", 112, 2, 0xD0D8D8, 360);
+      if (connection.available) draw_wrapped(pixel, connection.hostname.data(), 160, 32, 360);
+      if (connection.connected) draw_text(pixel, connection.ipv4.data(), 224, 1, 0xFFFFFF, 360);
+      draw_text(pixel, "openathan.com", 258, 2, 0xFFFFFF, 360);
+      draw_text(pixel, "Use website USB", 294, 1, 0xD0D8D8, 360);
+    }
+    return;
+  }
   if (frame.upcoming && frame.countdown[0]) {
     draw_text(pixel, frame.clock.data(), 64, 2, 0xD0D8D8, 360);
     draw_text(pixel, frame.detail.data(), 112, 2, 0xD0D8D8, 360);
@@ -60,7 +112,7 @@ template<typename Pixel> void render_round(const Frame &frame, Pixel pixel) {
     // The uppercase/digit glyphs occupy rows 0–6; align their visible baselines.
     draw_text_at(pixel, frame.meridiem.data(), x + time_width + gap, 216, 2, 0xD0D8D8);
     draw_text(pixel, frame.countdown.data(), 252, 2, 0xD0D8D8, 360);
-    draw_text(pixel, frame.footer.data(), 310, 2, 0xD0D8D8, 360);
+    draw_text(pixel, frame.footer.data(), 310, std::strcmp(frame.footer.data(), "Press for page") == 0 ? 1 : 2, 0xD0D8D8, 360);
     return;
   }
   render(frame, [&pixel](int x, int y, uint32_t rgb) {

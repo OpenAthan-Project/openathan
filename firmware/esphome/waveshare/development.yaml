@@ -2,3 +2,6 @@
 packages:
   product: !include audio.yaml
   screen: !include ../boards/waveshare-box-v2-display.yaml
+
+openathan_display:
+  device_id: athan_device
