@@ -8,7 +8,9 @@
 #include "setup_store.h"
 #include "esphome/components/time/posix_tz.h"
 #include "esphome/components/json/json_util.h"
+#include <functional>
 #include <memory>
+#include <utility>
 
 namespace esphome::openathan_component {
 class OpenAthan : public PollingComponent, public ::openathan::Clock {
@@ -71,6 +73,11 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void stop();
   bool skip_next();
   bool cancel_skip();
+  // Optional physical-control navigation stays in adapters, outside prayer policy.
+  void set_physical_control_handler(std::function<void(unsigned)> handler) {
+    physical_control_handler_ = std::move(handler);
+  }
+  void physical_control(unsigned kind);
   bool local_date(int64_t utc, const ::openathan::Timezone &timezone, ::openathan::CivilDate &date) const;
   std::string format_local(int64_t utc, const ::openathan::Timezone &timezone) const;
   bool local_date(int64_t utc, ::openathan::CivilDate &date) const;
@@ -123,6 +130,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   ::openathan::DayCalculator *calculator_source_{&calculator_};
   ::openathan::StateStore *state_store_{&store_};
   std::unique_ptr<::openathan::Scheduler> scheduler_;
+  std::function<void(unsigned)> physical_control_handler_;
   std::string last_status_;
   std::string last_conflicts_;
 };
@@ -134,6 +142,14 @@ template<typename... Ts> class ControlAction : public Action<Ts...> {
     else if (kind_ == 1) parent_->skip_next();
     else parent_->cancel_skip();
   }
+ private:
+  OpenAthan *parent_;
+  unsigned kind_;
+};
+template<typename... Ts> class PhysicalControlAction : public Action<Ts...> {
+ public:
+  PhysicalControlAction(OpenAthan *parent, unsigned kind) : parent_(parent), kind_(kind) {}
+  void play(const Ts &...args) override { parent_->physical_control(kind_); }
  private:
   OpenAthan *parent_;
   unsigned kind_;

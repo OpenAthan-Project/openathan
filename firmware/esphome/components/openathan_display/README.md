@@ -83,11 +83,42 @@ There are no animation, scrolling, remote fonts or graphical UI framework.
 
 Faults take precedence over setup, then playback, clock readiness, disabled
 prayers and next-event status. Playback remains visible if time becomes invalid;
-the clock then displays `--:--`. The connected footer stays blank: successful
-Wi-Fi connection needs no label during normal operation. Wi-Fi loss alone changes
+the clock then displays `--:--`. Without connection navigation, the connected
+footer stays blank. With a device reader, the idle footer instead offers
+"Press for page." Wi-Fi loss alone changes
 the footer to Offline: valid-clock standalone scheduling continues. An
-unrelated/stale skip does not label a different event. Front-button stop/skip/cancel behavior is
-unchanged, and the display introduces no additional controls.
+unrelated/stale skip does not label a different event. Stop during active or
+pending audio and the existing skip/cancel holds retain their behavior.
+
+### Speaker-page connection view
+
+When an optional device reader is configured, an online idle status screen shows
+"Press for page." A short physical button press opens connection information:
+
+- Atom uses a dedicated 111×111 QR area including its white border, followed by
+  a separate text screen with the complete wrapped hostname and current IPv4.
+- Waveshare uses a centered 222×222 QR area with native-resolution text beneath
+  it. Its live prayer ring remains visible around the connection view.
+
+The QR contains the existing `http://openathan-<suffix>.local/` address, with no
+password or token. A phone must use the same LAN. Offline/invalid-IP states clear
+the QR and current IP while keeping the hostname and USB/website guidance.
+Encoding failure falls back to manual address information. Navigation expires
+after 60 seconds of monotonic inactivity and starts on the normal view at boot.
+
+The display reads connection and pending-audio state through an optional callback;
+it does not reconstruct the MAC suffix or change credentials, settings or history.
+The `openathan.button` physical action accepts `stop`, `skip_next` or
+`cancel_skip`; boards retain their existing press durations. It retains Stop,
+including accepted Quran requests
+still resolving their audio URL. Starting audio dismisses connection information;
+skip/cancel holds close it before performing their existing action. The ordinary
+`openathan.stop`, `openathan.skip_next` and `openathan.cancel_skip` automation
+actions retain their existing meanings. Missing/failed displays preserve controls.
+
+The [dated validation report](../../../../docs/development/speaker-page-discovery-validation-2026-10-14.md)
+separates renderer/adapter checks and firmware measurements from pending physical
+scanning, readability and runtime-memory qualification.
 
 ### Waveshare round layout
 

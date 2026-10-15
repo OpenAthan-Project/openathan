@@ -146,12 +146,19 @@ The BOOT button uses the same release-triggered controls as the reference Atom:
 
 | Press duration | Action on release |
 | --- | --- |
-| 50 ms–1 second | Stop current playback |
+| 50 ms–1 second | Stop active/pending audio; while idle, open or close connection information in firmware with that feature |
 | 2–5 seconds | Skip the next scheduled Athan |
 | 6–10 seconds | Cancel the skip |
 | Other durations | No application action |
 
 These actions use existing scheduler safeguards and do not start manual playback.
+The connection screen contains a QR code, hostname and current IPv4 address,
+keeps the prayer ring visible, and closes after 60 seconds without interaction.
+Scan it using a phone on the same LAN. Offline speakers retain the hostname and
+USB recovery guidance without showing an old IP. See the
+[connection-screen validation](speaker-page-discovery-validation-2026-10-14.md)
+for automated evidence and pending physical checks; the earlier attended results
+below cover the original Stop/skip/cancel behavior.
 BOOT's GPIO0 connection follows the linked V2 schematic; holding it during reset
 or power-on still enters ROM download mode. RESET is wired to the chip reset
 input and retains its hardware restart function. Attended stop, skip, cancel-skip

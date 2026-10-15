@@ -71,15 +71,18 @@ binary_sensor:
       - min_length: 50ms
         max_length: 1s
         then:
-          - openathan.stop:
+          - openathan.button:
               id: athan_scheduler
+              action: stop
       - min_length: 2s
         max_length: 5s
         then:
-          - openathan.skip_next:
+          - openathan.button:
               id: athan_scheduler
+              action: skip_next
       - min_length: 6s
         max_length: 10s
         then:
-          - openathan.cancel_skip:
+          - openathan.button:
               id: athan_scheduler
+              action: cancel_skip

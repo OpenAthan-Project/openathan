@@ -76,7 +76,7 @@ class WaveshareCapacityTests(unittest.TestCase):
             self.assertIn(f'{pin}->set_flags((gpio::Flags::FLAG_INPUT | gpio::Flags::FLAG_PULLUP))', source)
             self.assertIn('boot_button->set_trigger_on_initial_state(false)', source)
             clicks = re.findall(r'ClickTrigger\(boot_button, (\d+), (\d+)\);.*?'
-                                r'ControlAction<>\(athan_scheduler, (\d+)\);', source, re.S)
+                                r'PhysicalControlAction<>\(athan_scheduler, (\d+)\);', source, re.S)
             self.assertEqual(clicks, [('50', '1000', '0'), ('2000', '5000', '1'), ('6000', '10000', '2')])
             for override in ('openathan_device:\n  updates_enabled: true\n',
                              'esphome:\n  name: openathan\n',

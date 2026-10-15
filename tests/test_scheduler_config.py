@@ -74,8 +74,28 @@ interval:
           id: athan_test_scheduler
       - openathan.cancel_skip:
           id: athan_test_scheduler
+      - openathan.button:
+          id: athan_test_scheduler
+          action: stop
+      - openathan.button:
+          id: athan_test_scheduler
+          action: skip_next
+      - openathan.button:
+          id: athan_test_scheduler
+          action: cancel_skip
 """
         self.validate(config, True)
+
+    def test_physical_action_requires_supported_kind(self):
+        for action in ("          action: invented\n", ""):
+            with self.subTest(action=action):
+                self.validate(self.config() + """
+interval:
+  - interval: 10s
+    then:
+      - openathan.button:
+          id: athan_test_scheduler
+""" + action, False)
 
     def test_generic_hardware_retains_dac_volume_control(self):
         with tempfile.TemporaryDirectory() as directory:

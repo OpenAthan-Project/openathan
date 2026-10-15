@@ -55,6 +55,26 @@ remains. With no valid clock, configuration can be finished but announcements
 wait for time synchronization. A cold boot without a usable time source cannot
 establish the current time from saved settings alone.
 
+### Finding the speaker page again
+
+The connection-screen feature is an unreleased addition after v0.6.0. Press the
+Atom front button or Waveshare BOOT button briefly while audio is idle. Atom cycles through a QR
+code, the hostname/IP information, and the normal screen. Waveshare shows the QR
+code and both addresses together; press again to return. The information closes
+after 60 seconds without another button action.
+
+Scan the code from a phone on the same local network, or enter the displayed
+`http://` address in a browser. The hostname stays the same across IP changes;
+the IPv4 address is a fallback if `.local` lookup does not work. An offline
+speaker shows its hostname and USB recovery guidance without a stale IP address.
+USB status also returns the available addresses. Wi-Fi and password recovery
+remain available through the public installer.
+
+The short button press continues to stop active, loading or pending audio.
+Opening connection information does not reset the speaker or change settings.
+See the [development validation and physical-test limits](../../../docs/development/speaker-page-discovery-validation-2026-10-14.md)
+before treating this feature as hardware-qualified.
+
 ## Installer integration contract
 
 This repository builds release artifacts; the separate

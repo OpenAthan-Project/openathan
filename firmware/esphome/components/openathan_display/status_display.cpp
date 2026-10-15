@@ -1,5 +1,6 @@
 #include "status_display.h"
 #include "esphome/components/wifi/wifi_component.h"
+#include "esphome/core/hal.h"
 #include <algorithm>
 #include <cstring>
 
@@ -9,6 +10,30 @@ void StatusDisplay::setup() {
   if (!athan_ || !display_ || display_->is_failed() || display_->get_width() != size || display_->get_height() != size) {
     mark_failed(); return;  // An optional screen never changes scheduler health.
   }
+  if (connection_reader_)
+    athan_->set_physical_control_handler([this](unsigned action) { handle_control(action); });
+  update();
+}
+void StatusDisplay::handle_control(unsigned action) {
+  using ::openathan::screen::Page;
+  if (!athan_ || action > 2) return;
+  // Snapshot before Stop, which can synchronously clear a pending/loading
+  // session. The press that stopped playback must never open another page.
+  const auto connection = connection_reader_ ? connection_reader_() : ::openathan::screen::ConnectionInfo{};
+  const bool busy = connection.playback_busy || athan_->status().playing;
+  if (action == 0) {
+    athan_->stop();
+    if (busy || is_failed() || !display_ || display_->is_failed() || !connection_reader_ ||
+        !connection_cache_.read(connection).available) page_ = Page::STATUS;
+    else if (page_ == Page::STATUS) page_ = connection.connected ? Page::QR : Page::ADDRESS;
+    else if (page_ == Page::QR && !round_) page_ = Page::ADDRESS;
+    else page_ = Page::STATUS;
+  } else {
+    page_ = Page::STATUS;
+    if (action == 1) athan_->skip_next();
+    else athan_->cancel_skip();
+  }
+  interaction_at_ = millis();
   update();
 }
 void StatusDisplay::draw(display::Display &canvas) const {
@@ -23,6 +48,13 @@ void StatusDisplay::update() {
   if (is_failed() || !display_ || display_->is_failed()) return;
   const auto clock = athan_->read();
   const auto status = athan_->status();
+  const auto connection = connection_reader_ ? connection_reader_() : ::openathan::screen::ConnectionInfo{};
+  const bool busy = connection.playback_busy || status.playing;
+  if (page_ != ::openathan::screen::Page::STATUS &&
+      (busy || static_cast<uint32_t>(millis() - interaction_at_) >= 60000))
+    page_ = ::openathan::screen::Page::STATUS;
+  if (page_ == ::openathan::screen::Page::QR && !connection.connected)
+    page_ = ::openathan::screen::Page::ADDRESS;
   const auto *service = athan_->settings_service();
   const auto *saved = service && service->saved() ? &*service->saved() : nullptr;
   const auto next_event = round_ ? athan_->next_visual_prayer(clock) : status.next;
@@ -37,12 +69,15 @@ void StatusDisplay::update() {
   };
   const bool enabled = saved && std::any_of(saved->value.prayer.enabled.begin(), saved->value.prayer.enabled.end(),
                                          [](bool value) { return value; });
+  const auto &connection_frame = connection_cache_.read(connection);
   const ::openathan::screen::Inputs input{status, athan_->activated(),
       std::strcmp(athan_->setup_state(), "storage_fault") == 0 || (service && !service->healthy()),
-      clock.valid, wifi::global_wifi_component && wifi::global_wifi_component->is_connected(),
+      clock.valid, connection_reader_ ? connection.connected : wifi::global_wifi_component && wifi::global_wifi_component->is_connected(),
       enabled, hhmm(local), hhmm(next), athan_->time_format_preferences().hours(), stop_button_,
       round_, next_event, clock.utc,
-      athan_->playback() && athan_->playback()->source() == ::openathan::PlaybackSource::QURAN};
+      athan_->playback() && athan_->playback()->source() == ::openathan::PlaybackSource::QURAN,
+      connection_reader_ ? &connection_frame : nullptr, page_,
+      connection_reader_ && stop_button_ && !busy};
   if (cache_.accept(::openathan::screen::present(input))) display_->update();
 }
 }

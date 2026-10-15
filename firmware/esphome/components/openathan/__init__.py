@@ -19,6 +19,7 @@ HighLatitudeRule = core.enum("HighLatitudeRule", is_class=True)
 ns = cg.esphome_ns.namespace("openathan_component")
 OpenAthan = ns.class_("OpenAthan", cg.PollingComponent)
 ControlAction = ns.class_("ControlAction", automation.Action)
+PhysicalControlAction = ns.class_("PhysicalControlAction", automation.Action)
 METHODS = {name.lower(): getattr(Method, name) for name in (
     "MUSLIM_WORLD_LEAGUE", "EGYPTIAN", "KARACHI", "UMM_AL_QURA", "DUBAI",
     "MOONSIGHTING_COMMITTEE", "NORTH_AMERICA", "KUWAIT", "QATAR", "SINGAPORE", "TEHRAN", "TURKEY")}
@@ -104,3 +105,15 @@ def register_control(name, kind):
 register_control("openathan.stop", 0)
 register_control("openathan.skip_next", 1)
 register_control("openathan.cancel_skip", 2)
+
+
+PHYSICAL_CONTROL_KINDS = {"stop": 0, "skip_next": 1, "cancel_skip": 2}
+
+
+@automation.register_action("openathan.button", PhysicalControlAction, cv.Schema({
+    cv.Required(CONF_ID): cv.use_id(OpenAthan),
+    cv.Required("action"): cv.one_of(*PHYSICAL_CONTROL_KINDS),
+}), synchronous=True)
+async def physical_control_to_code(config, action_id, template_arg, args):
+    parent = await cg.get_variable(config[CONF_ID])
+    return cg.new_Pvariable(action_id, template_arg, parent, PHYSICAL_CONTROL_KINDS[config["action"]])
