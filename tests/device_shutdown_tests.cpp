@@ -4,6 +4,8 @@
 #include <cassert>
 #include <iostream>
 namespace esphome::openathan_device {
+unsigned dns_stop_calls{};
+void Device::phone_stop_dns_() { ++dns_stop_calls; }
 void Device::setup() {
   server_ = this;  // Started server, not the uninitialized nullptr case.
   std::string error; upgrade_.action("arm_safe_worker", {}, error);
@@ -29,8 +31,10 @@ int main() {
   using esphome::openathan_device::Device;
   Device device; device.setup(); pending_main_loop_request = true;
   device.on_shutdown(); // Must return with no wait for the now-stopped loop.
+  assert(esphome::openathan_device::dns_stop_calls == 1);
   device.loop(); // Real Upgrade::shutdown must cancel and revoke the safe window.
   assert(stop_calls == 0);
   Device idle; idle.on_shutdown(); idle.loop();
+  assert(esphome::openathan_device::dns_stop_calls == 2);
   std::cout << "Device shutdown returns with a pending authenticated HTTP request and cancels updater work\n";
 }

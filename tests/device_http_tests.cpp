@@ -48,6 +48,9 @@ struct Device {
     auth_.configure("OpenAthan-test", md5_hex("admin:OpenAthan-test:test password"));
   }
   void handle_http_(HttpExchange &request);
+  // The dedicated phone HTTP harness exercises AP enrollment. This existing
+  // suite retains its focus on authenticated LAN access during USB updates.
+  bool handle_phone_http_(HttpExchange &) { return false; }
   bool valid_host_(const std::string &host) const;
   std::string ip_() const { return "192.0.2.1"; }
   bool maintenance_{};

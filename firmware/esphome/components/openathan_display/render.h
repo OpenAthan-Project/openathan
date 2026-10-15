@@ -56,7 +56,31 @@ template<typename Pixel> void render_connection(const Frame &frame, Pixel &pixel
   else draw_text(pixel, "openathan.com", 104, 1, 0xFFFFFF);
   draw_text(pixel, connection.connected && connection.available ? "Press for clock" : "Use website USB", 116, 1, 0xD0D8D8);
 }
+inline const char *setup_heading(const ConnectionFrame &connection) {
+  return connection.setup_error ? "Setup error" : connection.setup_connecting ? "Connecting..." : "Phone setup";
+}
+template<typename Pixel> void render_setup(const Frame &frame, Pixel &pixel) {
+  const auto &connection = frame.connection;
+  if (connection.setup_connecting) {
+    draw_text(pixel, "Connecting...", 32, 1, 0xFFFFFF);
+    draw_text(pixel, "Follow phone", 58, 1, 0xD0D8D8);
+    draw_text(pixel, "instructions", 74, 1, 0xD0D8D8);
+    draw_text(pixel, "Keep power on", 100, 1, 0xD0D8D8);
+    return;
+  }
+  if (frame.page == Page::QR && connection.qr_valid) {
+    draw_qr(pixel, connection, 8, 8, 3);
+    return;
+  }
+  draw_text(pixel, setup_heading(connection), 6, 1, 0xFFFFFF);
+  draw_text(pixel, connection.setup_error ? "Open setup page" : connection.setup_connecting ? "Please wait" : "Join Wi-Fi", 24, 1, 0xD0D8D8);
+  draw_wrapped(pixel, connection.setup_ssid.data(), 42, 16, 128);
+  draw_text(pixel, "Then open", 78, 1, 0xD0D8D8);
+  draw_text(pixel, connection.ipv4[0] ? connection.ipv4.data() : "openathan.com", 94, 1, 0xFFFFFF);
+  draw_text(pixel, connection.qr_valid ? "Press for QR" : "Use website USB", 116, 1, 0xD0D8D8);
+}
 template<typename Pixel> void render(const Frame &frame, Pixel pixel) {
+  if (frame.connection.setup_active) { render_setup(frame, pixel); return; }
   if (frame.page != Page::STATUS) { render_connection(frame, pixel); return; }
   draw_text(pixel, frame.clock.data(), 6, 1, 0xD0D8D8);
   if (frame.upcoming) {
@@ -81,6 +105,30 @@ template<typename Pixel> void render_round(const Frame &frame, Pixel pixel) {
     const int dx = 2*x + 1 - 360, dy = 2*y + 1 - 360;
     const int distance = dx*dx + dy*dy;
     if (distance <= 344*344 && distance >= 328*328) pixel(x, y, color);
+  }
+  if (frame.connection.setup_active) {
+    const auto &connection = frame.connection;
+    if (connection.setup_connecting) {
+      draw_text(pixel, "Connecting...", 112, 2, 0xFFFFFF, 360);
+      draw_text(pixel, "Follow phone steps", 180, 2, 0xD0D8D8, 360);
+      draw_text(pixel, "Keep power on", 248, 2, 0xD0D8D8, 360);
+      return;
+    }
+    if (frame.page != Page::ADDRESS && connection.qr_valid && std::strlen(connection.setup_ssid.data()) <= 27) {
+      draw_text(pixel, connection.setup_error ? "Setup error" : connection.setup_connecting ? "Connecting..." : "Join setup Wi-Fi", 48, 1, 0xD0D8D8, 360);
+      draw_qr(pixel, connection, 69, 69, 6);
+      draw_text(pixel, connection.setup_ssid.data(), 294, 1, 0xFFFFFF, 360);
+      draw_text(pixel, connection.ipv4.data(), 310, 1, 0xD0D8D8, 360);
+      draw_text(pixel, "Open if needed", 326, 1, 0xD0D8D8, 360);
+    } else {
+      draw_text(pixel, setup_heading(connection), 76, 2, 0xFFFFFF, 360);
+      draw_text(pixel, connection.setup_error ? "Open setup page" : connection.setup_connecting ? "Please wait" : "Join Wi-Fi", 112, 2, 0xD0D8D8, 360);
+      draw_wrapped(pixel, connection.setup_ssid.data(), 160, 32, 360);
+      draw_text(pixel, "Then open", 208, 2, 0xD0D8D8, 360);
+      draw_text(pixel, connection.ipv4[0] ? connection.ipv4.data() : "openathan.com", 248, 2, 0xFFFFFF, 360);
+      draw_text(pixel, connection.qr_valid ? "Press for QR" : "Use website USB", 294, 1, 0xD0D8D8, 360);
+    }
+    return;
   }
   if (frame.page != Page::STATUS) {
     const auto &connection = frame.connection;

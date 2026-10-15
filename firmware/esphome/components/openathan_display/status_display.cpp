@@ -25,6 +25,9 @@ void StatusDisplay::handle_control(unsigned action) {
     athan_->stop();
     if (busy || is_failed() || !display_ || display_->is_failed() || !connection_reader_ ||
         !connection_cache_.read(connection).available) page_ = Page::STATUS;
+    else if (connection.setup_connecting) page_ = Page::STATUS;
+    else if (connection.setup_active)
+      page_ = page_ == Page::STATUS ? (round_ ? Page::ADDRESS : Page::QR) : Page::STATUS;
     else if (page_ == Page::STATUS) page_ = connection.connected ? Page::QR : Page::ADDRESS;
     else if (page_ == Page::QR && !round_) page_ = Page::ADDRESS;
     else page_ = Page::STATUS;
@@ -50,10 +53,18 @@ void StatusDisplay::update() {
   const auto status = athan_->status();
   const auto connection = connection_reader_ ? connection_reader_() : ::openathan::screen::ConnectionInfo{};
   const bool busy = connection.playback_busy || status.playing;
+  const bool setup_visible = connection.setup_active || connection.setup_connecting;
+  if (setup_active_ != setup_visible) {
+    page_ = setup_active_ && connection.connected && ::openathan::screen::valid_ipv4(connection.ipv4) ?
+        ::openathan::screen::Page::QR : ::openathan::screen::Page::STATUS;
+    interaction_at_ = millis();
+    setup_active_ = setup_visible;
+  }
   if (page_ != ::openathan::screen::Page::STATUS &&
       (busy || static_cast<uint32_t>(millis() - interaction_at_) >= 60000))
     page_ = ::openathan::screen::Page::STATUS;
-  if (page_ == ::openathan::screen::Page::QR && !connection.connected)
+  if (connection.setup_connecting) page_ = ::openathan::screen::Page::STATUS;
+  if (page_ == ::openathan::screen::Page::QR && !connection.connected && !setup_visible)
     page_ = ::openathan::screen::Page::ADDRESS;
   const auto *service = athan_->settings_service();
   const auto *saved = service && service->saved() ? &*service->saved() : nullptr;

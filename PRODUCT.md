@@ -49,10 +49,12 @@ owns public documentation and the browser installer. It consumes published
 firmware artifacts and does not compile firmware.
 
 The reference device is an M5Stack AtomS3R C126 with a Voice Pyramid A167.
-USB provisioning establishes Wi-Fi and a device password. The user then opens
-the device's unique `openathan-<suffix>.local` address, or its IPv4 address,
-from a phone on the same local network. USB also provides Wi-Fi and password
-recovery.
+USB provisioning establishes Wi-Fi and a device password. Unreleased first-run
+phone setup adds a temporary open setup network for fresh devices, with automatic
+page opening and a manual local-address fallback. Either path leads to the
+device's unique `openathan-<suffix>.local` address, or its IPv4 address,
+from a phone on the same local network. USB continues to provide Wi-Fi and
+password recovery; configured-device outages do not reopen enrollment.
 
 First-run setup asks for location, timezone, and calculation settings. The user
 can preview the timetable before explicitly finishing setup. Ongoing use includes

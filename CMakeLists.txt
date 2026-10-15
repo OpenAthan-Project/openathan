@@ -54,6 +54,11 @@ if(NOT APPLE)
 endif()
 add_test(NAME provisioning_safety COMMAND provisioning_tests)
 
+add_executable(phone_setup_tests tests/phone_setup_tests.cpp
+  firmware/esphome/components/openathan_device/phone_setup.cpp)
+target_include_directories(phone_setup_tests PRIVATE firmware/esphome/components/openathan_device)
+add_test(NAME phone_setup_enrollment_and_dns COMMAND phone_setup_tests)
+
 add_executable(digest_test_bridge tests/digest_test_bridge.cpp
   firmware/esphome/components/openathan_device/digest.cpp)
 target_include_directories(digest_test_bridge PRIVATE tests/stubs firmware/esphome/components/openathan_device)

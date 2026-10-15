@@ -35,6 +35,8 @@ class DisplayConfigTests(unittest.TestCase):
             self.assertIn("athan_status_screen->set_connection_reader(", source)
             for accessor in ("hostname", "ipv4_address", "connected", "playback_busy"):
                 self.assertIn(f"athan_device->{accessor}()", source)
+            for accessor in ("active", "connecting", "error", "ssid", "ip"):
+                self.assertIn(f"athan_device->phone_setup_{accessor}()", source)
             for invalid in (0, 101):
                 config.write_text(base + f'substitutions:\n  display_brightness_percent: "{invalid}"\n')
                 result = subprocess.run([sys.executable, "-m", "esphome", "config", str(config)],

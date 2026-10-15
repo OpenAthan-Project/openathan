@@ -36,6 +36,15 @@ Chromium and WebKit. It covers sustained authentication, client-nonce rotation,
 expiry renewal on reads and writes, revision conflicts, dropped responses and
 narrow-screen layout. Chromium checks that renewal causes no second sign-in prompt.
 
+The device build also runs `tools/check_phone_setup.py --arduinojson PATH` with
+the resolved library. Production and isolated tests execute the bootstrap HTTP,
+credential and connection lifecycle methods against deterministic platform I/O.
+They cover first-run admission, existing-password verification, interrupted
+handoff, failed joins, storage faults and USB/phone transaction exclusion. CTest
+checks the bounded DNS codec and setup admission helpers; Chromium/WebKit exercise
+the separate setup assets, including explicit busy/rate-limit recovery. These
+checks do not establish physical captive-popup or radio-handoff behavior.
+
 Production and isolated host builds exercise the same storage implementations.
 Tests prove cleanup rejects production namespaces, preserves unrelated records,
 and remains safe across interrupted writes/commits. Both settings/API builds

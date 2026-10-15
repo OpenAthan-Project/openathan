@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>OpenAthan · Speaker setup</title>
+  <link rel="stylesheet" href="/setup/style.css">
+  <script src="/setup/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to setup</a>
+  <div class="shell">
+    <header><p class="brand">OpenAthan</p><p class="connection" id="connection">Connecting to your speaker…</p></header>
+    <main id="main" tabindex="-1">
+      <div class="introduction">
+        <h1>Set up your speaker.</h1>
+        <p>Connect OpenAthan to your home Wi-Fi. Then choose your location and prayer settings.</p>
+        <ol class="progress" aria-label="Setup progress">
+          <li id="progress-password" aria-current="step">Speaker password</li>
+          <li id="progress-network">Home Wi-Fi</li>
+          <li id="progress-connect">Connect</li>
+        </ol>
+        <details class="browser-help">
+          <summary>Using a Wi-Fi sign-in window?</summary>
+          <p>If this window does not work, stay connected to the speaker’s setup network and open this address in Safari or Chrome:</p>
+          <p id="setup-address" class="address"></p>
+        </details>
+      </div>
+      <div class="setup">
+        <p id="page-feedback" class="feedback" role="status">Reading speaker status…</p>
+        <button id="retry-status" type="button" hidden>Check speaker status</button>
+        <section id="password-step" hidden aria-labelledby="password-heading">
+          <h2 id="password-heading" tabindex="-1">Protect your speaker</h2>
+          <p id="password-description">Choose a password for the speaker’s settings page. It is separate from your Wi-Fi password.</p>
+          <form id="password-form">
+            <label for="speaker-password" id="password-label">Speaker password</label>
+            <input id="speaker-password" type="password" minlength="12" maxlength="128" required autocomplete="new-password" aria-describedby="password-hint" spellcheck="false" autocapitalize="none">
+            <p class="hint" id="password-hint">Use 12–128 English letters, numbers, spaces or symbols.</p>
+            <div id="confirm-field">
+              <label for="confirm-password">Confirm speaker password</label>
+              <input id="confirm-password" type="password" maxlength="128" required autocomplete="new-password" spellcheck="false" autocapitalize="none">
+            </div>
+            <label class="check"><input type="checkbox" id="show-speaker-password">Show password</label>
+            <p id="password-feedback" class="feedback" role="status"></p>
+            <button class="primary" type="submit">Continue to Wi-Fi</button>
+          </form>
+        </section>
+        <section id="network-step" hidden aria-labelledby="network-heading">
+          <h2 id="network-heading" tabindex="-1">Connect to home Wi-Fi</h2>
+          <p>Choose a password-protected 2.4 GHz network.</p>
+          <form id="network-form">
+            <div id="network-picker">
+              <label for="network">Wi-Fi network</label>
+              <select id="network" required><option value="">Choose a network</option></select>
+            </div>
+            <div id="manual-field" hidden>
+              <label for="manual-ssid">Network name</label>
+              <input id="manual-ssid" maxlength="32" autocomplete="off" spellcheck="false" autocapitalize="none" disabled>
+              <p class="hint">Enter the exact name, including capitals and spaces.</p>
+            </div>
+            <div class="network-actions"><button type="button" id="scan">Scan again</button><button type="button" id="manual-toggle" class="quiet">Enter network name instead</button></div>
+            <p id="scan-feedback" class="feedback" role="status"></p>
+            <label for="wifi-password">Wi-Fi password</label>
+            <input id="wifi-password" type="password" maxlength="64" required autocomplete="off" spellcheck="false" autocapitalize="none">
+            <label class="check"><input type="checkbox" id="show-wifi-password">Show Wi-Fi password</label>
+            <p id="network-feedback" class="feedback" role="status"></p>
+            <div class="actions"><button type="button" id="network-back">Back</button><button class="primary" type="submit">Review connection</button></div>
+          </form>
+        </section>
+        <section id="connect-step" hidden aria-labelledby="connect-heading">
+          <h2 id="connect-heading" tabindex="-1">Keep your speaker’s address</h2>
+          <p id="before-connect">The setup network will close while the speaker tries your home Wi-Fi. Keep these steps handy before continuing.</p>
+          <div class="handoff">
+            <p class="hint">Speaker page</p>
+            <a id="speaker-link" class="address"></a>
+            <p class="hint">After choosing <strong>Connect speaker</strong>:</p>
+            <ol>
+              <li>Join <strong id="home-name">your home Wi-Fi</strong> on your phone.</li>
+              <li>Open the speaker page above.</li>
+              <li>Sign in with username <strong>admin</strong> and your speaker password to finish prayer setup.</li>
+            </ol>
+          </div>
+          <p id="connect-feedback" class="feedback" role="status"></p>
+          <div class="actions" id="connect-actions"><button id="connect-back" type="button">Back</button><button id="connect" class="primary" type="button">Connect speaker</button></div>
+          <div id="connection-recovery" hidden>
+            <p>If the speaker page does not open, rejoin <strong id="recovery-ssid">the speaker’s setup network</strong> when it is available again to check setup.</p>
+            <button id="check-connection" type="button">Check setup status</button>
+          </div>
+        </section>
+        <section id="unavailable-step" hidden aria-labelledby="unavailable-heading">
+          <h2 id="unavailable-heading" tabindex="-1">Setup needs attention</h2>
+          <p>The speaker could not read or save its setup information. Connect it by USB and use the OpenAthan website to recover access.</p>
+        </section>
+        <noscript><p>Open this page in Safari or Chrome with JavaScript enabled, while connected to the speaker’s setup network.</p></noscript>
+      </div>
+    </main>
+    <footer>Setup happens directly on your speaker. Keep it connected to power.</footer>
+  </div>
+</body>
+</html>

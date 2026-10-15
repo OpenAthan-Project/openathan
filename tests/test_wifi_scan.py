@@ -27,6 +27,14 @@ class WifiScanTests(unittest.TestCase):
                 generated = (directory / "build" / name / "src/main.cpp").read_text()
                 self.assertTrue("wifi::global_wifi_component->set_keep_scan_results(true);" in generated,
                                 "Connected USB recovery must request full scan results")
+                # SoftAP is compiled for product-controlled first run, with no
+                # static ESPHome fallback that could enroll after an outage.
+                defines = (directory / "build" / name / "src/esphome/core/defines.h").read_text()
+                self.assertIn("#define USE_WIFI_AP", defines)
+                self.assertNotIn("#define USE_CAPTIVE_PORTAL", defines)
+                self.assertNotIn("->set_ap(", generated)
+                for index in (3, 4, 5):
+                    self.assertIn(f"athan_device->set_asset({index}, OA_ASSET_{index},", generated)
 
     def test_pinned_connected_and_disconnected_scan_policy(self):
         import esphome

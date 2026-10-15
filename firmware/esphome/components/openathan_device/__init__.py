@@ -36,7 +36,7 @@ def validate(config):
     if full["wifi"].get("networks") or "ap" in full["wifi"] or full["wifi"]["enable_on_boot"]:
         raise cv.Invalid("OpenAthan owns Wi-Fi credentials; omit networks/AP and set enable_on_boot false")
     if "web_server" in full or "captive_portal" in full or "esp32_improv" in full:
-        raise cv.Invalid("OpenAthan owns the local server and USB-only provisioning")
+        raise cv.Invalid("OpenAthan owns provisioning and the local server")
     return config
 
 
@@ -62,6 +62,12 @@ def timezone_entries():
 
 async def to_code(config):
     cg.add_define("OPENATHAN_QURAN")
+    # Compile SoftAP support without a configured fallback AP. Runtime product
+    # policy opens it only for an unconfigured, healthy first-run device.
+    cg.add_define("USE_WIFI_AP")
+    esp32.request_wifi(ap=True)
+    esp32.add_idf_sdkconfig_option("CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT", False)
+    esp32.add_idf_sdkconfig_option("CONFIG_LWIP_DHCPS_ADD_DNS", True)
     root = Path(__file__).resolve().parents[4]
     release = json.loads((root / "release/firmware.json").read_text())
     version = release["version"]
@@ -110,7 +116,10 @@ async def to_code(config):
     root = root / "web/device-ui"
     for index, (name, mime) in enumerate((("index.html", "text/html; charset=utf-8"),
                                          ("app.js", "text/javascript; charset=utf-8"),
-                                         ("style.css", "text/css; charset=utf-8"))):
+                                         ("style.css", "text/css; charset=utf-8"),
+                                         ("setup/index.html", "text/html; charset=utf-8"),
+                                         ("setup/style.css", "text/css; charset=utf-8"),
+                                         ("setup/app.js", "text/javascript; charset=utf-8"))):
         data = gzip.compress((root / name).read_bytes(), mtime=0)
         symbol = f"OA_ASSET_{index}"
         cg.add_global(cg.RawStatement(f"static const uint8_t {symbol}[] = {{"+",".join(map(str,data))+"};"))

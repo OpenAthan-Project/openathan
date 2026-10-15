@@ -135,13 +135,19 @@ before any retry.
 
 The reference firmware embeds a responsive UI at a unique
 `openathan-<suffix>.local` hostname, with an IPv4 fallback. The product layer
-provides USB Wi-Fi/password provisioning, protected local access, and an explicit
+provides first-run phone and USB Wi-Fi/password provisioning, protected local access, and an explicit
 setup gate. New devices persist an incomplete marker before settings seeding;
 until activation they neither announce nor consume prayers. Recognized existing
 settings migrate as configured. Generic/developer builds retain their existing
 initialization behavior. HTTP work reaches settings and scheduling only on the
 ESPHome main loop. See the [provisioning contract](../../firmware/esphome/provisioning/README.md)
 for serial ownership, authentication, persistence, and hardware acceptance limits.
+
+The product layer also owns the temporary first-run setup network and its narrow
+bootstrap HTTP/DNS service. Enrollment requires incomplete setup, healthy
+credential storage and no saved home Wi-Fi. It never follows an ordinary network
+outage. The optional display presents setup instructions; the scheduler does not
+depend on the display or on the public website. See [phone setup](phone-setup.md).
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 
@@ -178,7 +184,7 @@ acceptance or release readiness.
 
 Core Athan scheduling must not require Home Assistant or a cloud service. Internet may be used for initial/periodic time sync, Quran streaming, firmware downloads, or optional services.
 
-The generic ESPHome package does not configure Wi-Fi. Reference firmware provides USB provisioning, while ESPHome integrators keep their existing network configuration. Atom needs internet time synchronization after a cold boot; saved settings cannot establish the current time. The [Waveshare profile](waveshare-box-v2.md#rtc-and-offline-restart) can restore previously initialized RTC time after a powered reset. [Attended RTC RESET validation](waveshare-rtc-validation-2026-10-10.md#attended-powered-reset-validation) passed; retention while unplugged remains unverified. With a valid clock, prayer calculation and stored-recording playback remain local.
+The generic ESPHome package does not configure Wi-Fi. Reference firmware provides phone and USB provisioning, while ESPHome integrators keep their existing network configuration. Atom needs internet time synchronization after a cold boot; saved settings cannot establish the current time. The [Waveshare profile](waveshare-box-v2.md#rtc-and-offline-restart) can restore previously initialized RTC time after a powered reset. [Attended RTC RESET validation](waveshare-rtc-validation-2026-10-10.md#attended-powered-reset-validation) passed; retention while unplugged remains unverified. With a valid clock, prayer calculation and stored-recording playback remain local.
 
 ## Public website boundary
 
