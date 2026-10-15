@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <lwip/sockets.h>
 
 #include "esphome/components/wifi/scan_list.h"
 #include "esphome/core/application.h"
@@ -45,6 +46,10 @@ const char* http_status(int code) {
   switch (code) {
     case 200:
       return "200 OK";
+    case 202:
+      return "202 Accepted";
+    case 302:
+      return "302 Found";
     case 400:
       return "400 Bad Request";
     case 401:
@@ -71,11 +76,16 @@ void Device::setup() {
   quran_.begin(athan_, random_nonce());
   api_->set_quran(&quran_);
   hostname_ = std::string(App.get_name().c_str()) + ".local";
-  realm_ = "OpenAthan-" + get_mac_address();
+  const std::string mac = get_mac_address();
+  realm_ = "OpenAthan-" + mac;
+  phone_ssid_ = "OpenAthan-Setup-" + mac.substr(mac.size() - 6);
+  std::transform(phone_ssid_.end() - 6, phone_ssid_.end(), phone_ssid_.end() - 6,
+                 [](unsigned char c) { return c >= 'A' && c <= 'F' ? c + ('a' - 'A') : c; });
   wifi_record_ = store_.load_wifi(saved_wifi_);
   password_record_ = store_.load_password(password_);
   auth_.configure(realm_, password_record_ == ::openathan::LoadResult::LOADED ? password_.ha1 : "");
   auto* wifi = wifi::global_wifi_component;
+  wifi->set_ap_timeout(0);  // Never turn a configured-device outage into enrollment.
   wifi->add_scan_results_listener(this);
   wifi->add_connect_state_listener(this);
   restore_wifi_();
@@ -109,6 +119,13 @@ void Device::restore_wifi_() {
   auto* wifi = wifi::global_wifi_component;
   wifi->disable();
   wifi->clear_sta();
+  if (phone_session_ && (phone_eligible_() || phone_state_ == phone_setup::State::STORAGE_FAULT)) {
+    wifi::WiFiAP ap;
+    ap.set_ssid(phone_ssid_);
+    wifi->set_ap(ap);
+    wifi->enable();
+    return;
+  }
   if (wifi_record_ == ::openathan::LoadResult::LOADED) {
     wifi::WiFiAP network;
     network.set_ssid(saved_wifi_.ssid);
@@ -196,6 +213,10 @@ void Device::serial_request(const Frame& request) {
   if (request.extension && command == ::openathan::usb_upgrade::INFO && fields.empty()) {
     result_(true, command, upgrade_.usb_info()); return;
   }
+  if ((phone_response_ || phone_attempt_) &&
+      ((request.extension && command != 1) || (!request.extension && command != 2 && command != 3 && command != 7))) {
+    send_(request.extension, 2, {255}); return;
+  }
   if (request.extension && command >= ::openathan::usb_upgrade::BEGIN && command <= ::openathan::usb_upgrade::ABORT) {
     if (maintenance_ || (command == ::openathan::usb_upgrade::BEGIN && (wifi_attempt_.active() || scanning_))) {
       send_(true, 2, {255}); return;
@@ -238,6 +259,7 @@ void Device::serial_request(const Frame& request) {
       if (!store_.save_password(candidate)) {
         password_record_ = ::openathan::LoadResult::ERROR;
         auth_.configure(realm_, "");
+        if (phone_session_) { phone_state_ = phone_setup::State::STORAGE_FAULT; phone_error_ = "Password could not be saved. Restart or use website USB recovery."; }
         send_(true, 2, {255});
         return;
       }
@@ -295,16 +317,19 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
   for (const auto& scan : results) {
     bool secured = false;
     if (!wifi::should_show_scan_entry(results, scan, secured)) continue;
-    result_(false, 4, {scan.get_ssid().c_str(), std::to_string(scan.get_rssi()), secured ? "YES" : "NO"});
+    if (phone_scan_) phone_networks_.push_back({std::string(scan.get_ssid().c_str()), scan.get_rssi(), secured});
+    else result_(false, 4, {scan.get_ssid().c_str(), std::to_string(scan.get_rssi()), secured ? "YES" : "NO"});
     if (++count >= 32) break;
   }
-  result_(false, 4, {});
+  if (!phone_scan_) result_(false, 4, {});
+  phone_scan_ = false;
   scanning_ = false;
 }
 void Device::loop() {
   upgrade_.loop(wifi::global_wifi_component->is_connected());
   quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || upgrade_.streaming_blocked());
   const auto now = now_ms();
+  phone_loop_(now);
   if (wifi_attempt_.active()) {
     auto* wifi = wifi::global_wifi_component;
     char ssid[wifi::SSID_BUFFER_SIZE];
@@ -325,24 +350,30 @@ void Device::loop() {
       }
       wifi_attempt_.finish();
       if (saved) {
-        send_(false, 1, {4});
-        result_(false, 1, urls_());
+        phone_session_ = false; phone_state_ = phone_setup::State::CLOSED; phone_stop_dns_();
+        if (!phone_attempt_) { send_(false, 1, {4}); result_(false, 1, urls_()); }
       } else {
+        if (phone_attempt_) {
+          phone_state_ = phone_setup::State::STORAGE_FAULT;
+          phone_error_ = "Wi-Fi connected but could not be saved. Restart or use website USB recovery.";
+        }
         restore_wifi_();
-        send_(false, 2, {255});
-        send_(false, 1, {wifi_state_()});
+        if (!phone_attempt_) { send_(false, 2, {255}); send_(false, 1, {wifi_state_()}); }
       }
+      phone_attempt_ = false;
     } else if (result == WifiAttempt::Result::TIMED_OUT) {
       wifi_attempt_.finish();
+      if (phone_attempt_) { phone_state_ = phone_setup::State::FAILED; phone_error_ = "Could not connect. Check the Wi-Fi name and password, then try again."; }
       restore_wifi_();
-      send_(false, 2, {3});
-      send_(false, 1, {wifi_state_()});
+      if (!phone_attempt_) { send_(false, 2, {3}); send_(false, 1, {wifi_state_()}); }
+      phone_attempt_ = false;
     }
   }
   if (scanning_ && now >= scan_deadline_) {
     scanning_ = false;
-    send_(false, 2, {255});
-    result_(false, 4, {});
+    if (!phone_scan_) { send_(false, 2, {255}); result_(false, 4, {}); }
+    else { phone_state_ = phone_setup::State::FAILED; phone_error_ = "Wi-Fi scan timed out. Scan again or enter the name manually."; }
+    phone_scan_ = false;
   }
   std::shared_ptr<HttpExchange> request;
   {
@@ -354,7 +385,10 @@ void Device::loop() {
   }
   if (request) {
     std::lock_guard<std::mutex> lock(request->mutex);
-    if (!request->cancelled) handle_http_(*request);
+    if (!request->cancelled) {
+      handle_http_(*request);
+      if (request->phone_connect) phone_response_ = request;
+    }
     xSemaphoreGive(request->done);
   }
 }
@@ -373,6 +407,11 @@ esp_err_t Device::http_handler_(httpd_req_t* raw) {
   request->site = header(raw, "Sec-Fetch-Site", 32);
   request->authorization = header(raw, "Authorization");
   request->content_type = header(raw, "Content-Type", 80);
+  sockaddr_in local{}; socklen_t local_size = sizeof(local);
+  if (getsockname(httpd_req_to_sockfd(raw), reinterpret_cast<sockaddr *>(&local), &local_size) == 0 && local.sin_family == AF_INET) {
+    char address[16];
+    if (inet_ntop(AF_INET, &local.sin_addr, address, sizeof(address))) request->local_ip = address;
+  }
   request->body.resize(raw->content_len);
   size_t received = 0;
   while (received < request->body.size()) {
@@ -391,6 +430,7 @@ esp_err_t Device::http_handler_(httpd_req_t* raw) {
   if (xSemaphoreTake(request->done, pdMS_TO_TICKS(5000)) != pdTRUE) {
     std::lock_guard<std::mutex> lock(request->mutex);
     request->cancelled = true;
+    request->response_result = 2;
     httpd_resp_set_status(raw, "503 Service Unavailable");
     return httpd_resp_send(raw, "Read device state before retrying", HTTPD_RESP_USE_STRLEN);
   }
@@ -404,7 +444,10 @@ esp_err_t Device::http_handler_(httpd_req_t* raw) {
                      "form-action 'self'; frame-ancestors 'none'");
   if (!request->challenge.empty()) httpd_resp_set_hdr(raw, "WWW-Authenticate", request->challenge.c_str());
   if (request->gzip) httpd_resp_set_hdr(raw, "Content-Encoding", "gzip");
-  return httpd_resp_send(raw, request->response.data(), request->response.size());
+  if (!request->redirect.empty()) httpd_resp_set_hdr(raw, "Location", request->redirect.c_str());
+  const auto result = httpd_resp_send(raw, request->response.data(), request->response.size());
+  request->response_result = result == ESP_OK ? 1 : 2;
+  return result;
 }
 bool Device::valid_host_(const std::string& host) const {
   return host == hostname_ || host == hostname_ + ":80" || host == ip_() || host == ip_() + ":80";
@@ -414,6 +457,7 @@ void Device::handle_http_(HttpExchange& request) {
     error(request, 503, "Test maintenance requires a physical restart");
     return;
   }
+  if (handle_phone_http_(request)) return;
   if (!valid_host_(request.host)) {
     error(request, 403, "Use the device's local address");
     return;

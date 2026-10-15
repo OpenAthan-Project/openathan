@@ -1,7 +1,7 @@
-# USB provisioning and local settings
+# Provisioning and local settings
 
 [`openathan.yaml`](../openathan.yaml) is the reference release entry point for
-AtomS3R C126 + Voice Pyramid A167. It includes USB provisioning, local
+AtomS3R C126 + Voice Pyramid A167. It includes phone and USB provisioning, local
 setup/settings, first-run activation, optional lights and signed firmware updates.
 The public [browser installer](https://openathan.com/install/) consumes published
 artifacts from this repository. See the [current release evidence and limits](../../../docs/development/release-validation-2026-10-03.md)
@@ -12,6 +12,35 @@ observation remains relevant to recovery guidance.
 For existing-device acceptance, use the [isolated test build and hardware runbook](HARDWARE_TEST.md).
 It keeps test prayer, activation and credential records separate and includes a
 USB-only maintenance helper. Production builds reject those maintenance commands.
+
+## Phone setup (unreleased)
+
+Fresh devices offer an open `OpenAthan-Setup-<suffix>` Wi-Fi network. Join it from
+the phone's Wi-Fi settings or scan the screen's Wi-Fi QR code. If setup does not
+open automatically, open `http://192.168.4.1/setup/` in a browser. The temporary
+network has no internet connection; keep the phone connected while entering setup.
+Atom shows instructions and a button-accessible QR; Waveshare shows them together.
+
+Choose a device password and enter home Wi-Fi credentials. Before connecting, the
+page shows the permanent speaker address and instructions for the next step.
+Reconnect the phone to home Wi-Fi, open that address, and sign in as **admin**
+with the device password. Complete the existing location, calculation and review
+steps, then choose **Finish setup**. The speaker's button can show its local
+address again afterward.
+
+The network opens only while setup is incomplete, credential storage is healthy,
+and no home Wi-Fi record exists. A password saved during an earlier attempt must
+be entered again; phone setup cannot replace it. Wrong home Wi-Fi credentials
+restore the temporary network for another attempt. Configured speakers never
+reopen enrollment after an outage. Saved Wi-Fi with a missing device password,
+forgotten credentials and storage faults continue to use USB recovery.
+
+The setup network is open and its HTTP traffic is unencrypted. Set up the speaker
+in a trusted place. Only the limited bootstrap interface is available through
+this network; the normal settings API retains its device-password protection.
+See the [phone setup contract](../../../docs/development/phone-setup.md) for
+interfaces, storage boundaries and physical acceptance requirements. This feature
+does not change the published installer until supported firmware is released.
 
 ## Build and developer access
 

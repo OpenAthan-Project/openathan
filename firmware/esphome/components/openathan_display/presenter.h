@@ -100,7 +100,11 @@ inline Frame present(const Inputs &in) {
     text(f.heading, "Athan"); text(f.main, "Waiting"); text(f.detail, "No time set");
   }
   if (in.connection) {
-    if (in.page != Page::STATUS) {
+    if (in.connection->setup_active) {
+      f.page = in.page;
+      f.connection = *in.connection;
+      f.proximity = LightMode::OFF;
+    } else if (in.page != Page::STATUS) {
       f.page = in.page;
       f.connection = *in.connection;
     } else if (in.page_hint && in.connection->available && in.connection->connected && !in.status.playing) {

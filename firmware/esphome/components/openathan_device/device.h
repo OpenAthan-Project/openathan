@@ -4,6 +4,7 @@
 #include <freertos/semphr.h>
 
 #include <deque>
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -17,6 +18,7 @@
 #include "wifi_attempt.h"
 #include "upgrade.h"
 #include "quran.h"
+#include "phone_setup.h"
 
 namespace esphome::openathan_device {
 struct Asset {
@@ -30,9 +32,12 @@ struct HttpExchange : public ApiExchange {
     if (done) vSemaphoreDelete(done);
   }
   SemaphoreHandle_t done;
-  std::string host, origin, site, authorization, content_type;
+  std::string host, origin, site, authorization, content_type, local_ip;
   std::string type{"application/json"}, challenge;
+  std::string redirect;
   bool gzip{};
+  bool phone_connect{};
+  std::atomic<unsigned> response_result{};  // 0 pending, 1 sent, 2 failed.
   // This lock serializes timeout/cancellation with a mutating main-loop action.
   std::mutex mutex;
   bool cancelled{};
@@ -48,7 +53,7 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
     zone_count_ = count;
   }
   void set_asset(unsigned index, const uint8_t* value, size_t count, const char* type) {
-    assets_[index] = {value, count, type};
+    if (index < 6) assets_[index] = {value, count, type};
   }
   void set_sender(std::function<void(const std::vector<uint8_t>&)> sender) { sender_ = std::move(sender); }
   float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
@@ -62,11 +67,21 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   std::string ipv4_address() const;
   bool connected() const;
   bool playback_busy() const;
+  bool phone_setup_active() const;
+  bool phone_setup_connecting() const { return phone_state_ == phone_setup::State::CONNECTING; }
+  bool phone_setup_error() const { return phone_state_ == phone_setup::State::FAILED || phone_state_ == phone_setup::State::STORAGE_FAULT; }
+  const std::string &phone_setup_ssid() const { return phone_ssid_; }
+  std::string phone_setup_ip() const { return std::string(phone_setup::IP); }
 
  private:
   static esp_err_t http_handler_(httpd_req_t* request);
   void handle_http_(HttpExchange& request);
   bool valid_host_(const std::string& host) const;
+  bool phone_eligible_() const;
+  void phone_loop_(uint64_t now);
+  void phone_stop_dns_();
+  void phone_dns_();
+  bool handle_phone_http_(HttpExchange &request);
   void send_(bool extension, uint8_t type, const std::vector<uint8_t>& data);
   void result_(bool extension, uint8_t command, const std::vector<std::string>& fields);
   void restore_wifi_();
@@ -84,12 +99,22 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   std::string realm_, hostname_;
   std::function<void(const std::vector<uint8_t>&)> sender_;
   bool scanning_{};
+  bool phone_scan_{}, phone_attempt_{}, phone_session_{}, phone_initialized_{};
+  phone_setup::State phone_state_{phone_setup::State::CLOSED};
+  std::string phone_ssid_, phone_error_;
+  struct PhoneNetwork { std::string ssid; int rssi; bool secured; };
+  std::vector<PhoneNetwork> phone_networks_;
+  WifiCredentials phone_candidate_;
+  std::shared_ptr<HttpExchange> phone_response_;
+  uint64_t phone_response_at_{}, phone_auth_window_{};
+  unsigned phone_auth_attempts_{};
+  int phone_dns_socket_{-1};
   bool maintenance_{};
   uint64_t scan_deadline_{}, auth_window_{};
   unsigned auth_attempts_{};
   const ZoneEntry* zones_{};
   size_t zone_count_{};
-  Asset assets_[3];
+  Asset assets_[6];
   std::unique_ptr<LocalApi> api_;
   Upgrade upgrade_;
   Quran quran_;

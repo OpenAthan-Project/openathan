@@ -28,6 +28,7 @@ class StatusDisplay : public PollingComponent {
   std::function<::openathan::screen::ConnectionInfo()> connection_reader_;
   ::openathan::screen::Page page_{::openathan::screen::Page::STATUS};
   uint32_t interaction_at_{};
+  bool setup_active_{};
   bool round_{};
   bool stop_button_{true};
 };

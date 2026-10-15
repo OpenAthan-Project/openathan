@@ -268,13 +268,15 @@ void capture(const char *name, const Frame &frame, const char *directory, bool u
 }
 static void connection_capture(const char *name, const Frame &frame, bool round, const char *directory) {
   const int size = round ? 360 : 128;
+  const uint32_t ring = frame.proximity == LightMode::GREEN ? 0x00FF00 : frame.proximity == LightMode::ORANGE ?
+      0xFF6000 : frame.proximity == LightMode::RED ? 0xFF0000 : 0x606060;
   std::vector<uint32_t> pixels(size*size);
   const auto pixel = [&](int x, int y, uint32_t rgb) {
     CHECK(x >= 0 && x < size && y >= 0 && y < size);
     if (round) {
       const int dx = 2*x+1-360, dy = 2*y+1-360;
       const int distance = dx*dx + dy*dy;
-      if (rgb == 0x00FF00) CHECK(distance >= 328*328 && distance <= 344*344);
+      if (rgb == ring) CHECK(distance >= 328*328 && distance <= 344*344);
       else CHECK(distance < 328*328);
     }
     pixels[y*size+x] = rgb;
@@ -283,11 +285,13 @@ static void connection_capture(const char *name, const Frame &frame, bool round,
   if (round) {
     for (int y=0; y<size; ++y) for (int x=0; x<size; ++x) {
       const int dx = 2*x+1-360, dy = 2*y+1-360, distance = dx*dx+dy*dy;
-      if (distance >= 328*328 && distance <= 344*344) CHECK(pixels[y*size+x] == 0x00FF00);
+      if (distance >= 328*328 && distance <= 344*344) CHECK(pixels[y*size+x] == ring);
       else if (distance >= 328*328) CHECK(pixels[y*size+x] == 0);
     }
   }
-  if (frame.connection.connected && frame.connection.qr_valid && frame.page == Page::QR) {
+  const bool setup_qr = frame.connection.setup_active && frame.connection.qr_valid &&
+      (round ? frame.page != Page::ADDRESS : frame.page == Page::QR);
+  if (setup_qr || (!frame.connection.setup_active && frame.connection.connected && frame.connection.qr_valid && frame.page == Page::QR)) {
     const int offset=round ? 69 : 8, scale=round ? 6 : 3;
     // Quiet-zone pixels must be explicitly white, including all corners.
     for (int y=0; y<37*scale; ++y) for (int x=0; x<37*scale; ++x) {
@@ -308,6 +312,65 @@ static void connection_capture(const char *name, const Frame &frame, bool round,
     file.write(bytes,3);
   }
   CHECK(file.good());
+}
+static void phone_setup_pages(const char *directory) {
+  ConnectionInfo info;
+  info.setup_active=true;
+  info.setup_ssid="OpenAthan-Setup-a1b2c3";
+  info.setup_ipv4="192.168.4.1";
+  ConnectionCache cache;
+  auto connection=cache.read(info);
+  CHECK(connection.setup_active && connection.available && !connection.connected && connection.qr_valid);
+  CHECK(qrcodegen_getSize(connection.qr.data())==29);
+  CHECK(equal(connection.setup_ssid,info.setup_ssid.c_str()) && equal(connection.ipv4,"192.168.4.1"));
+  Inputs in;
+  in.connection=&connection;
+  in.round=true;
+  auto frame=present(in);
+  CHECK(frame.connection.setup_active && frame.proximity==LightMode::OFF);
+  connection_capture("phone-atom-instructions",frame,false,directory);
+  connection_capture("phone-round-qr",frame,true,directory);
+  in.page=Page::QR;
+  connection_capture("phone-atom-qr",present(in),false,directory);
+  in.page=Page::ADDRESS;
+  connection_capture("phone-round-instructions",present(in),true,directory);
+  in.page=Page::STATUS;
+  FrameCache frames; CHECK(frames.accept(present(in))); CHECK(!frames.accept(present(in)));
+  info.setup_active=false; info.setup_connecting=true; connection=cache.read(info);
+  CHECK(connection.setup_active && !connection.connected);
+  CHECK(!connection.qr_valid && !connection.ipv4[0]);
+  CHECK(frames.accept(present(in)));
+  connection_capture("phone-atom-connecting",present(in),false,directory);
+  connection_capture("phone-round-connecting",present(in),true,directory);
+  info.setup_active=true; info.setup_connecting=false; info.setup_error=true; connection=cache.read(info);
+  CHECK(frames.accept(present(in)));
+  connection_capture("phone-atom-error",present(in),false,directory);
+  connection_capture("phone-round-error",present(in),true,directory);
+  // AP state is independent of a simultaneously connected STA. The code still
+  // joins the temporary setup network rather than pointing at the LAN page.
+  auto setup_qr=connection.qr;
+  info.connected=true; info.hostname="openathan-a1b2c3.local"; info.ipv4="192.168.1.40";
+  connection=cache.read(info);
+  CHECK(connection.qr==setup_qr && equal(connection.ipv4,"192.168.4.1"));
+  info.setup_active=false; connection=cache.read(info);
+  CHECK(!connection.setup_active && connection.qr_valid && connection.qr!=setup_qr && equal(connection.ipv4,info.ipv4.c_str()));
+  in.page=Page::QR;
+  connection_capture("phone-atom-lan-handoff",present(in),false,directory);
+  connection_capture("phone-round-lan-handoff",present(in),true,directory);
+  // Invalid or oversized setup data cannot create a truncated Wi-Fi QR.
+  info.setup_active=true;
+  for (const auto *bad_ssid : {"", "Bad;SSID", "Wrong\\name", "Too-long-OpenAthan-Setup-01234567890"}) {
+    info.setup_ssid=bad_ssid; connection=cache.read(info);
+    CHECK(!connection.qr_valid);
+    connection_capture("phone-atom-invalid-setup",present(in),false,nullptr);
+    connection_capture("phone-round-invalid-setup",present(in),true,nullptr);
+  }
+  info.setup_ssid=std::string(32,'A'); connection=cache.read(info);
+  CHECK(connection.available && !connection.qr_valid && equal(connection.setup_ssid,info.setup_ssid.c_str()));
+  connection_capture("phone-atom-long-ssid",present(in),false,directory);
+  connection_capture("phone-round-long-ssid",present(in),true,directory);
+  info.setup_ssid="OpenAthan-Setup-a1b2c3"; info.setup_ipv4="0.0.0.0"; connection=cache.read(info);
+  CHECK(connection.available && !connection.qr_valid && !connection.ipv4[0]);
 }
 static void connection_pages(const char *directory) {
   ConnectionInfo info{"openathan-a1b2c3.local", "255.255.255.255", true, false};
@@ -377,6 +440,7 @@ int main(int argc, char **argv) {
   round_countdown(directory);
   persistent_round_ring(directory);
   connection_pages(directory);
+  phone_setup_pages(directory);
   Inputs in;
   in.setup_complete = in.clock_valid = in.wifi_connected = in.prayers_enabled = true;
   in.local_time = "12:04"; in.next_time = "12:30";

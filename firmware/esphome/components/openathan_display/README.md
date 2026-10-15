@@ -120,6 +120,23 @@ The [dated validation report](../../../../docs/development/speaker-page-discover
 separates renderer/adapter checks and firmware measurements from pending physical
 scanning, readability and runtime-memory qualification.
 
+### First-run phone setup (unreleased)
+
+The optional product connection reader also supplies temporary setup-network
+state. Atom shows the open network's name and manual setup IP, with a short press
+for its full-screen Wi-Fi QR. Waveshare combines the QR and instructions inside
+its neutral prayer ring. The payload joins `OpenAthan-Setup-<suffix>`; opening
+the setup webpage is a separate action, with automatic captive detection and
+`http://192.168.4.1/setup/` as the manual fallback.
+
+During a home Wi-Fi attempt the AP is closed and the screen shows connection
+progress without an unavailable-network QR. A failed attempt restores setup
+instructions; a successful saved connection shows the permanent speaker-page QR.
+The 60-second navigation timeout returns to setup instructions while enrollment
+remains available. These read-only views never activate setup or change records.
+See the [phone setup contract](../../../../docs/development/phone-setup.md) for
+enrollment gates and the separate physical acceptance requirements.
+
 ### Waveshare round layout
 
 Upcoming-prayer screens retain the existing text sizes: local clock at y=64

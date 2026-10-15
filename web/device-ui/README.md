@@ -131,7 +131,10 @@ playback identity or stopped playback are inferred from missing information.
 ### Local access and optional location helper
 
 Assets work without the public website or a CDN. Device access uses the password
-chosen over USB and browser-native Digest login with username `admin`.
+chosen during phone or USB setup and browser-native Digest login with username `admin`.
+The separate [`setup/`](setup/) assets provide the limited first-run Wi-Fi
+bootstrap page. They do not expose ordinary settings or activate prayer playback.
+See the [phone setup contract](../../docs/development/phone-setup.md).
 An optional **Find my location** link opens the public HTTPS helper in a new tab.
 It can suggest browser coordinates or an approximate IP location, then returns
 proposed values in a versioned URL fragment. A proposal does not replace a dirty

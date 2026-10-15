@@ -33,4 +33,6 @@ async def to_code(config):
         device = await cg.get_variable(config["device_id"])
         cg.add(var.set_connection_reader(cg.RawExpression(
             f"[=]() {{ return ::openathan::screen::ConnectionInfo{{{device}->hostname(), "
-            f"{device}->ipv4_address(), {device}->connected(), {device}->playback_busy()}}; }}")))
+            f"{device}->ipv4_address(), {device}->connected(), {device}->playback_busy(), "
+            f"{device}->phone_setup_active(), {device}->phone_setup_connecting(), {device}->phone_setup_error(), "
+            f"{device}->phone_setup_ssid(), {device}->phone_setup_ip()}}; }}")))

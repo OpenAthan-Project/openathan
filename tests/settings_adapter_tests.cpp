@@ -476,6 +476,37 @@ static void connection_navigation_adapter(bool round) {
   restarted.set_connection_reader(read_connection);
   lcd.set_writer([&](esphome::display::Display &canvas) { restarted.draw(canvas); });
   restarted.setup(); CHECK(restarted.page() == Page::STATUS);
+  // The setup AP is a separate read-only presentation state. No station
+  // connection is required to keep its QR visible or return to instructions.
+  const auto setup_records = nvs_test::committed;
+  connection.setup_active = true;
+  connection.setup_ssid = "OpenAthan-Setup-aabbcc";
+  connection.setup_ipv4 = "192.168.4.1";
+  connection.connected = false;
+  connection.ipv4.clear();
+  restarted.update();
+  CHECK(restarted.page() == Page::STATUS);
+  const auto instructions = lcd.pixels;
+  press.play(); CHECK(restarted.page() == (round ? Page::ADDRESS : Page::QR));
+  for (unsigned i = 0; i < 5; ++i) restarted.update();
+  CHECK(restarted.page() == (round ? Page::ADDRESS : Page::QR));
+  esphome::mock_millis += 60000;
+  restarted.update(); CHECK(restarted.page() == Page::STATUS && lcd.pixels == instructions);
+  connection.setup_connecting = true;
+  restarted.update(); CHECK(lcd.pixels != instructions);
+  const auto connecting = lcd.pixels;
+  connection.setup_connecting = false;
+  connection.setup_error = true;
+  restarted.update(); CHECK(lcd.pixels != connecting && lcd.pixels != instructions);
+  // A confirmed AP-to-station transition presents the permanent URL. An
+  // ordinary timeout afterward returns to the existing status screen.
+  connection.setup_active = connection.setup_error = false;
+  connection.connected = true;
+  connection.ipv4 = "192.0.2.11";
+  restarted.update(); CHECK(restarted.page() == Page::QR);
+  esphome::mock_millis += 60000;
+  restarted.update(); CHECK(restarted.page() == Page::STATUS);
+  CHECK(nvs_test::committed == setup_records);
   const auto before_failure = audio.stops;
   lcd.mark_failed();
   audio.unresolved = true;

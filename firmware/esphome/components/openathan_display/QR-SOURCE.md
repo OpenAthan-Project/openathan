@@ -16,5 +16,8 @@ The display uses fixed version 3, medium error correction, automatic mask
 selection and no error-correction boosting. Each caller buffer is 107 bytes.
 The renderer adds a white four-module quiet zone on every side; 3px modules on
 Atom produce a 111px square and 6px modules on Waveshare produce a 222px square.
-The payload is exactly the existing `http://<device-hostname>/` local page URL.
+The payload is the existing `http://<device-hostname>/` local page URL, or the
+first-run open-network payload `WIFI:T:nopass;S:OpenAthan-Setup-<six-hex-suffix>;;`.
+The latter is 40 bytes and fits the unchanged version-3 medium-correction bound.
+It contains no home-network or permanent device password.
 Encoding failure falls back to the complete manual address/website guidance.

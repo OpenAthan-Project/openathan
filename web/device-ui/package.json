@@ -1,6 +1,6 @@
 {
   "name": "openathan-device-ui-tests",
   "private": true,
-  "scripts": {"test": "node --test ../../tests/device_ui.test.cjs"},
+  "scripts": {"test": "node --test ../../tests/device_ui.test.cjs ../../tests/phone_setup_ui.test.cjs"},
   "devDependencies": {"playwright": "1.62.1"}
 }
