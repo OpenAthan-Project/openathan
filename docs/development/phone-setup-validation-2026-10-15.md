@@ -31,6 +31,10 @@ simulated endpoints: [phone password](phone-setup/setup-password-phone.png),
   real password verification and real credential-store commits. Cases include
   startup admission, AP/station exclusion, existing-password rejection, response
   interruption, 30-second retry, failed commits and USB transaction conflicts.
+  Buffered USB Wi-Fi, scan and update requests before the first device loop defer
+  enrollment until idle. The regression reproduced a displaced USB join before
+  the fix; success now leaves setup Wi-Fi closed, while failed joins and expired
+  scans allow first-run enrollment afterward.
 - Existing production HTTP authentication, updater ownership and rollback/runtime
   regression checks passed. The shutdown check still returns without waiting on
   HTTP work and now observes DNS revocation.
@@ -61,24 +65,24 @@ Static RAM below is the capacity checker's linked-RAM measure, not runtime heap.
 
 | Profile | Baseline OTA bytes | Final OTA bytes | Delta | Budget remaining | Static RAM delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Atom production | 1,318,608 | 1,385,952 | +67,344 | 186,912 | +524 |
-| Provisioning validation | 1,320,000 | 1,387,440 | +67,440 | 185,424 | +524 |
-| Upgrade qualification | 1,324,720 | 1,392,288 | +67,568 | 180,576 | +532 |
-| Upgrade startup failure | 1,324,720 | 1,392,288 | +67,568 | 180,576 | +532 |
-| Waveshare production | 1,322,400 | 1,389,696 | +67,296 | 183,168 | +532 |
-| Waveshare display development | 1,300,464 | 1,368,096 | +67,632 | 204,768 | +524 |
-| Waveshare diagnostics | 1,387,424 | 1,455,696 | +68,272 | 117,168 | +532 |
-| Quran qualification | 1,389,904 | 1,458,224 | +68,320 | 114,640 | +532 |
+| Atom production | 1,318,608 | 1,385,984 | +67,376 | 186,880 | +524 |
+| Provisioning validation | 1,320,000 | 1,387,472 | +67,472 | 185,392 | +524 |
+| Upgrade qualification | 1,324,720 | 1,392,320 | +67,600 | 180,544 | +532 |
+| Upgrade startup failure | 1,324,720 | 1,392,320 | +67,600 | 180,544 | +532 |
+| Waveshare production | 1,322,400 | 1,389,728 | +67,328 | 183,136 | +532 |
+| Waveshare display development | 1,300,464 | 1,368,128 | +67,664 | 204,736 | +524 |
+| Waveshare diagnostics | 1,387,424 | 1,455,744 | +68,320 | 117,120 | +532 |
+| Quran qualification | 1,389,904 | 1,458,256 | +68,352 | 114,608 | +532 |
 | Generic scheduler/device | 1,124,528 | 1,124,528 | +0 | 448,336 | +0 |
 | Synthetic scheduler | 1,142,112 | 1,142,112 | +0 | 430,752 | +0 |
-| Waveshare without display | 1,238,544 | 1,304,560 | +66,016 | 268,304 | +428 |
+| Waveshare without display | 1,238,544 | 1,304,592 | +66,048 | 268,272 | +428 |
 
 The three setup assets add **7,552 compressed bytes**, using the existing native
 HTML/CSS/JavaScript system without a framework, font or media dependency. Map
 analysis attributes most other growth to SoftAP MAC/WPA support, the DHCP server
 and the bootstrap implementation. An open AP does not need SAE authentication:
-disabling only AP SAE saved **6,336 bytes** on Waveshare production
-(1,396,032 → 1,389,696). STA SAE, H2E, PK and OWE remain enabled; representative
+an isolated comparison disabling only AP SAE saved **6,336 bytes** on Waveshare
+production (1,396,032 → 1,389,696). STA SAE, H2E, PK and OWE remain enabled; representative
 station-authentication symbols retain identical sizes. No partition or budget
 increase was needed.
 

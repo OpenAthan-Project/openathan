@@ -51,7 +51,8 @@ void Device::phone_dns_() {
                      reinterpret_cast<sockaddr *>(&peer), size);
 }
 void Device::phone_loop_(uint64_t now) {
-  if (!phone_initialized_ && App.is_setup_complete()) {
+  if (!phone_initialized_ && App.is_setup_complete() && !wifi_attempt_.active() && !scanning_ &&
+      !upgrade_.usb_busy()) {
     phone_initialized_ = true;
     if (phone_eligible_()) {
       phone_session_ = true;

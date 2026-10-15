@@ -38,17 +38,22 @@ struct WiFiAP {
   void set_hidden(bool) {}
 };
 struct WiFiProbe {
-  bool ap{}, connected{};
+  bool ap{}, connected{}, enabled{true};
   std::string ssid, ip{"192.168.1.42"};
   WiFiAP access_point, candidate;
   unsigned scans{}, joins{}, disables{};
   bool is_ap_active() const { return ap; }
   bool is_connected() const { return connected; }
-  void disable() { ++disables; ap=connected=false; }
+  void disable() { ++disables; ap=connected=enabled=false; }
   void clear_sta() { candidate={}; }
   void set_sta(const WiFiAP &value) { candidate=value; }
   void set_ap(const WiFiAP &value) { access_point=value; }
-  void enable() { ap=candidate.ssid.empty() && !access_point.ssid.empty(); if (!candidate.ssid.empty()) ++joins; }
+  void enable() {
+    if (enabled) return;  // Pinned WiFiComponent::enable() is idempotent.
+    enabled=true;
+    ap=candidate.ssid.empty() && !access_point.ssid.empty();
+    if (!candidate.ssid.empty()) ++joins;
+  }
   void start_scanning() { ++scans; }
   void start_connecting(const WiFiAP &value) { candidate=value; ++joins; ap=false; connected=false; }
   const char *wifi_ssid_to(char *out) const { std::strcpy(out,ssid.c_str()); return out; }
@@ -190,6 +195,54 @@ void closed_startup() {
   { Fixture f(false);f.device.password_record_=LoadResult::ERROR;f.device.loop();assert(!f.device.phone_setup_active()); }
   { Fixture f(false);f.athan.settings.ok=false;f.device.loop();assert(!f.device.phone_setup_active()); }
 }
+bool usb_before_first_loop() {
+  bool passed=true;
+  for (bool succeeds : {false,true}) {
+    Fixture f(false);
+    f.device.serial_request({false,3,rpc(1,{"Home","wifi password"})});
+    assert(f.device.wifi_attempt_.active());
+    f.device.loop();
+    if (f.device.phone_initialized_ || f.device.phone_setup_active() || esphome::wifi::wifi_probe.joins!=1) {
+      std::cerr << "USB Wi-Fi before first Device::loop: initialized=" << f.device.phone_initialized_
+                << ", AP=" << esphome::wifi::wifi_probe.ap << ", joins=" << esphome::wifi::wifi_probe.joins << '\n';
+      passed=false;continue;
+    }
+    if (succeeds) {
+      f.join();f.device.loop();
+      assert(f.device.wifi_record_==LoadResult::LOADED && f.device.phone_initialized_ && !f.device.phone_setup_active());
+    } else {
+      now_us=30000000;f.device.loop();f.device.loop();
+      assert(f.device.wifi_record_==LoadResult::EMPTY && f.device.phone_initialized_ && f.device.phone_setup_active());
+    }
+    f.preserved();
+  }
+  {
+    Fixture f(false);
+    f.device.serial_request({false,3,rpc(4,{})});
+    assert(f.device.scanning_);
+    f.device.loop();
+    if (f.device.phone_initialized_ || f.device.phone_setup_active()) {
+      std::cerr << "USB scan before first Device::loop: initialized=" << f.device.phone_initialized_
+                << ", AP=" << esphome::wifi::wifi_probe.ap << ", scanning=" << f.device.scanning_ << '\n';
+      passed=false;
+    } else {
+      now_us=10000000;f.device.loop();f.device.loop();
+      assert(!f.device.scanning_ && f.device.phone_initialized_ && f.device.phone_setup_active());
+      f.preserved();
+    }
+  }
+  {
+    Fixture f(false);f.device.upgrade_.busy=true;f.device.loop();
+    if (f.device.phone_initialized_ || f.device.phone_setup_active()) {
+      std::cerr << "USB update before first Device::loop consumed the initializer\n";
+      passed=false;
+    } else {
+      f.device.upgrade_.busy=false;f.device.loop();
+      assert(f.device.phone_initialized_ && f.device.phone_setup_active());f.preserved();
+    }
+  }
+  return passed;
+}
 void success_and_usb_race() {
   Fixture f;auto request=f.connect();assert(request->code==202 && request->body.empty());
   assert(nvs_test::commits==1 && f.device.password_record_==LoadResult::LOADED);
@@ -233,6 +286,7 @@ void interruptions_and_storage_faults() {
   { Fixture f;f.athan.incomplete=false;f.device.loop();assert(!f.device.phone_session_ && !f.device.phone_setup_active());f.preserved(); }
 }
 int main() {
+  if (!usb_before_first_loop()) return 1;
   closed_startup();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
   std::cout << "Production phone HTTP, AP admission, password protection, deferred join, storage faults and USB exclusion passed\n";
 }
