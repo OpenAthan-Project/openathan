@@ -174,16 +174,28 @@ def audio_payloads(media):
     return payloads
 
 
-def make_manifest(commit, tag, factory, audio, hardware=HARDWARE):
+def phone_setup_version(metadata):
+    require(isinstance(metadata, dict), "Invalid phone setup metadata")
+    if "phoneSetup" not in metadata:
+        return None
+    value = metadata["phoneSetup"]
+    require(type(value) is int and value == 1, "Unsupported phoneSetup capability")
+    return value
+
+
+def make_manifest(commit, tag, factory, audio, hardware=HARDWARE, *, phone_setup=None):
     require(isinstance(commit, str) and SHA.fullmatch(commit), "An exact source commit is required")
     require(isinstance(tag, str) and TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
-    return dict(schema=1, repository=REPOSITORY, tag=tag, commit=commit, hardware=hardware,
+    manifest = dict(schema=1, repository=REPOSITORY, tag=tag, commit=commit, hardware=hardware,
                 chip="ESP32-S3", flashBytes=profile(hardware)["flash_bytes"], layout=LAYOUT, provisioningProtocol=1,
                 media=dict(redistributionApproved=True,
                            licenseUrl=f"https://github.com/{REPOSITORY}/blob/{commit}/{LICENSE_PATH}"),
                 parts=[dict(role=role, file=asset_name(hardware, name), offset=offset, bytes=len(data), sha256=digest(data))
                        for role, name, offset, data in (("factory", ASSETS[1], 0, factory),
                                                        ("audio", ASSETS[2], PARTITION_OFFSET, audio))])
+    if phone_setup is not None:
+        manifest["phoneSetup"] = phone_setup_version({"phoneSetup": phone_setup})
+    return manifest
 
 
 def checksums(files):
@@ -221,7 +233,8 @@ def validate_profile_files(all_files, hardware):
     manifest = read_json(data("manifest.json"))
     require(isinstance(manifest, dict), "Invalid release manifest")
     expected = make_manifest(manifest.get("commit"), manifest.get("tag"),
-                             data("firmware.factory.bin"), data("athan-audio.bin"), hardware)
+                             data("firmware.factory.bin"), data("athan-audio.bin"), hardware,
+                             phone_setup=phone_setup_version(manifest))
     require(json_bytes(manifest) == json_bytes(expected), "Release manifest does not match the supported contract and files")
     app = validate_firmware_images(data("firmware.factory.bin"),
                                   flash_bytes=profile(hardware)["flash_bytes"], hardware=hardware)
