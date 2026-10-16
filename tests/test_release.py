@@ -257,6 +257,17 @@ class ReleaseTests(unittest.TestCase):
                 self.upload()
         self.assertFalse(self.github.calls)
 
+    def test_phone_setup_claim_cannot_be_added_to_legacy_source(self):
+        self.package()
+        manifest = artifacts.read_json((self.bundle / 'manifest.json').read_bytes())
+        manifest['phoneSetup'] = 1
+        (self.bundle / 'manifest.json').write_bytes(artifacts.json_bytes(manifest))
+        self.rewrite_checksums()
+        artifacts.validate_bundle(self.bundle)  # Structurally valid, but not source-approved.
+        with self.assertRaisesRegex(ValueError, 'differs from committed'):
+            self.upload()
+        self.assertFalse(self.github.calls)
+
     def test_corrupt_audio_is_rejected_after_hashes_are_updated(self):
         self.package()
         files = {p.name: p.read_bytes() for p in self.bundle.iterdir()}

@@ -19,7 +19,7 @@ import check_feasibility
 from release_artifacts import (ASSETS, HARDWARE, WAVESHARE, PROFILES, profile, asset_name,
                                configuration_hardware, validate_profile_files, LICENSE_PATH, MEDIA_REGISTRY, PINS_PATH,
                                REPOSITORY, SHA, TAG, approved_tracks, checksums, digest,
-                               json_bytes, make_manifest, read_file, read_json, require,
+                               json_bytes, make_manifest, phone_setup_version, read_file, read_json, require,
                                validate_bundle)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -187,18 +187,20 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_bu
     hardware = configuration_hardware(record["configuration"])
     upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
     require(not upgrade_capable or signing_key is not None, "Upgrade-capable releases require --signing-key")
+    release_config = read_json(source_file(commit, "release/firmware.json")) if upgrade_capable else {}
+    phone_setup = phone_setup_version(release_config)
     payloads = (audio_image.read_recording(normal), audio_image.read_recording(fajr))
     approved_tracks(read_json(source_file(commit, MEDIA_REGISTRY)), source_file(commit, LICENSE_PATH), payloads)
     media, _ = audio_image.build_image(*payloads)
     factory = (build_dir / ASSETS[1]).read_bytes()
     with fresh_output(output) as stage:
         files = {ASSETS[1]: factory, ASSETS[2]: media,
-                 "manifest.json": json_bytes(make_manifest(commit, tag, factory, media, hardware)),
+                 "manifest.json": json_bytes(make_manifest(commit, tag, factory, media, hardware,
+                                                            phone_setup=phone_setup)),
                  "build-report.json": json_bytes(public_report(record))}
         if signing_key is not None:
             require(not signing_key.resolve().is_relative_to(ROOT.resolve()), "Keep the private signing key outside the repository")
             from upgrade_artifacts import sign
-            release_config = read_json(source_file(commit, "release/firmware.json"))
             require(release_config["version"] == tag, "Release tag differs from committed firmware version")
             public = source_file(commit, "release/upgrade-public-key.pem")
             bootloaders = read_json(source_file(commit, "release/rollback-bootloaders.json"))
@@ -298,8 +300,12 @@ def upload_draft(bundle, github=None):
     source_commit(commit)
     groups = (HARDWARE, WAVESHARE) if asset_name(WAVESHARE, "manifest.json") in files and "manifest.json" in files else (manifest["hardware"],)
     upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
+    release_config = read_json(source_file(commit, "release/firmware.json")) if upgrade_capable else {}
+    phone_setup = phone_setup_version(release_config)
     for hardware in groups:
-        _, board_report, _ = validate_profile_files(files, hardware)
+        board_manifest, board_report, _ = validate_profile_files(files, hardware)
+        require(phone_setup_version(board_manifest) == phone_setup,
+                "Manifest phoneSetup capability differs from committed release configuration")
         descriptor = asset_name(hardware, "upgrade.json")
         require(not upgrade_capable or descriptor in files, "Upgrade-capable release is missing signed upgrade assets")
         if descriptor in files:

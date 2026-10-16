@@ -121,6 +121,24 @@ checksum list. The report excludes raw logs, credentials and personal paths.
 Existing outputs and symlink files are rejected; regenerate a changed bundle
 into a fresh directory.
 
+### Phone setup capability
+
+The optional installer-manifest field `phoneSetup: 1` declares that this source
+supports first-run setup over the speaker's setup Wi-Fi, including setting a
+speaker password, joining home Wi-Fi and continuing on the local speaker page.
+On the reference displays, it also includes the setup Wi-Fi QR and the later
+webpage QR, hostname and current IP address for finding the page again.
+Packaging copies this capability only from an explicit `phoneSetup: 1` in the
+selected commit's [release configuration](../../release/firmware.json), for both
+production profiles. Draft upload checks it against that same committed value.
+Omitting the field preserves the legacy manifest; other values are rejected.
+The tool never infers support from a version number or a newer working tree.
+
+The website must offer phone setup only after validating a release manifest with
+this capability. Older published bundles remain unchanged and use their existing
+computer setup flow. This source opt-in prepares future release metadata; it does
+not change the current release version or publish a new firmware release.
+
 ## Upload a draft
 
 Rebase and review the implementation before its PR; merge is a separate decision.
