@@ -45,6 +45,11 @@ ownership rather than audible playback alone. `playback_source` additionally
 supports `dua`. Optional device displays show “Dua / Starting” during the pause
 and “Dua / Playing” during playback; the calculated prayer ring is unchanged.
 
+The `supported` observation describes media installation availability, independently
+of preference storage. An owner can save enabled intent or turn it off while media
+is unavailable, provided the preference store is healthy. Saving the preference
+does not establish that a recording is ready.
+
 The portable sequence controller wraps only scheduler starts and has no network,
 ESPHome or board dependencies. Optional adapter methods provide a verified dua
 file and a session-specific completion result. Adapters without this capability
@@ -87,7 +92,8 @@ Downloads start after firmware startup confirmation with valid time, healthy
 scheduling and at least 15 minutes until the next announcement. They exclude
 playback, firmware/USB updates and provisioning transactions. Safety is published
 by the main loop and rechecked after network operations and before bounded flash
-operations. Cancellation stops staging; network failures retry after five minutes.
+operations. Cancellation stops staging; network failures, including errors while
+reading the signed descriptor, retry after five minutes.
 Verification, layout and persistent HTTP failures require explicit Retry.
 Internal-RAM buffers are used for flash operations. Ordinary isolated builds and
 development identities cannot fetch production media. The explicitly selected

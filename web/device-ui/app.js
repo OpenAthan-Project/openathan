@@ -1254,7 +1254,7 @@ function canSaveDomain(key) {
   return (
     (key !== "settings" || !actionUncertain) &&
     d?.confirmed &&
-    d.supported !== false &&
+    (key === "dua" || d.supported !== false) &&
     !storageFault(d) &&
     !d.blocked &&
     !d.operation &&

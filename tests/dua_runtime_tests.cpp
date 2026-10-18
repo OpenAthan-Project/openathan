@@ -87,6 +87,54 @@ void installed() {
   assert(audio.size==4097 && std::string(reinterpret_cast<const char *>(audio.bytes),audio.size)==application_response);
   assert(std::equal(original.begin(),original.begin()+DUA_BANK_START,flash.begin()));
 }
+void descriptor_failures() {
+  for (const auto steps : {std::vector<int>{-1}, std::vector<int>{64, -1}}) {
+    reset(); Audio audio; esphome::openathan_component::OpenAthan athan;
+    enable(athan, audio); DuaMedia media; media.begin(&athan);
+    http_replies[RELEASE + "dua.json"].read_steps = steps;
+    media.loop(true, true); run_worker();
+    assert(state(media) == "failed" && !operation && flash == original);
+    http_replies[RELEASE + "dua.json"].read_steps.clear();
+    now_us = 299999000; media.loop(true, true); assert(!pending_worker);
+    now_us = 300000000;
+    media.loop(false, true); assert(!pending_worker);
+    media.loop(true, false); assert(!pending_worker);
+    media.loop(true, true); assert(pending_worker);
+    run_worker(); media.loop(true, true); assert(audio.installed);
+  }
+  // Disabling intent prevents an elapsed transient retry from starting.
+  reset(); Audio audio; esphome::openathan_component::OpenAthan athan;
+  enable(athan, audio); DuaMedia media; media.begin(&athan);
+  http_replies[RELEASE + "dua.json"].read_steps = {-1};
+  media.loop(true, true); run_worker();
+  assert(athan.dua_prefs.update(false, 2) == DuaSaveResult::SAVED);
+  media.preference_changed(); now_us = 300000000; media.loop(true, true);
+  assert(!pending_worker && !operation && state(media) == "off");
+
+  // Cancellation wins even if the blocked read also reports a transport error.
+  reset(); Audio cancelled_audio; esphome::openathan_component::OpenAthan cancelled_athan;
+  enable(cancelled_athan, cancelled_audio); DuaMedia cancelled; cancelled.begin(&cancelled_athan);
+  http_replies[RELEASE + "dua.json"].read_steps = {-1};
+  on_each_read = [&] { cancelled.shutdown(); };
+  cancelled.loop(true, true); run_worker(); cancelled.loop(false, false);
+  JsonDocument snapshot; cancelled.snapshot(snapshot.to<JsonObject>());
+  assert(snapshot["error"].as<std::string>().empty() && !operation && flash == original);
+
+  for (unsigned failure = 0; failure < 3; ++failure) {
+    reset(); Audio invalid_audio; esphome::openathan_component::OpenAthan invalid_athan;
+    enable(invalid_athan, invalid_audio); DuaMedia invalid; invalid.begin(&invalid_athan);
+    if (failure == 0) http_replies[RELEASE + "dua.json"].data = std::string(DUA_ENVELOPE_MAX + 1, 'x');
+    if (failure == 1) http_replies[RELEASE + "dua.json"].data = "broken";
+    if (failure == 2) signature_valid = false;
+    invalid.loop(true, true); run_worker();
+    assert(state(invalid) == "failed" && !operation);
+    http_replies[RELEASE + "dua.json"].data = descriptor(); signature_valid = true;
+    now_us = 301000000; invalid.loop(true, true); assert(!pending_worker);
+    std::string error; assert(invalid.retry(error) == 200);
+    invalid.loop(true, true); assert(pending_worker);
+    run_worker(); invalid.loop(true, true); assert(invalid_audio.installed);
+  }
+}
 int main(int argc,char **argv) {
   assert(argc==2);std::ifstream in(argv[1],std::ios::binary);original={std::istreambuf_iterator<char>(in),{}};assert(original.size()==AUDIO_PARTITION_SIZE);
 #if defined(OPENATHAN_PROVISIONING_TEST_STORAGE) && !defined(OPENATHAN_UPGRADE_QUALIFICATION)
@@ -94,6 +142,7 @@ int main(int argc,char **argv) {
   blocked.loop(true,true);assert(!pending_worker && !operation && http_requests.empty());
   std::cout<<"Ordinary isolated firmware refuses production dua downloads\n";return 0;
 #endif
+  descriptor_failures();
   reset();installed();const int writes=operation;
   {
     const auto installed_flash=flash;reset_http();const auto before=operation;

@@ -183,7 +183,9 @@ void DuaMedia::run_() {
     const auto deadline = now_ms() + 30000;
     while (allowed_() && now_ms() < deadline) {
       const int count = esp_http_client_read(response.client, reinterpret_cast<char *>(buffer.get()), 1024);
-      if (count < 0 || envelope.size() + count > DUA_ENVELOPE_MAX) { fail_("Invalid dua descriptor", false); return; }
+      if (!allowed_()) return;
+      if (count < 0) { fail_("Dua download interrupted", true); return; }
+      if (envelope.size() + count > DUA_ENVELOPE_MAX) { fail_("Invalid dua descriptor", false); return; }
       if (!count) break;
       envelope.append(reinterpret_cast<char *>(buffer.get()), count);
     }

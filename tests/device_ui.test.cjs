@@ -1722,6 +1722,31 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
 
 }
 
+for (const name of ['chromium','webkit']) {
+ test(name+' dua preferences save independently of media availability',async()=>{
+  const f=await fixture();
+  f.state.device.dua={schema:1,revision:1,enabled:true,ready:false,supported:false,application:'applied',state:'unavailable',phase:'idle'};
+  const o=await open(f,name),{page}=o;
+  try {
+   await settings(page);
+   await page.locator('#dua-enabled').uncheck(); await saved(page,'dua');
+   assert.equal(f.state.duaMutations,1);assert.equal(f.state.device.dua.enabled,false);
+   await refresh(page);await settings(page);assert.ok(!(await page.locator('#dua-enabled').isChecked()));
+   f.state.duaDrop=true;await page.locator('#dua-enabled').check();await saved(page,'dua');
+   assert.equal(f.state.duaMutations,2);assert.equal(f.state.device.dua.enabled,true);
+   assert.ok((await page.locator('#dua-install-status').textContent()).includes('unavailable'));
+   f.state.device.dua.application='storage_fault';
+   await refresh(page);await settings(page);assert.ok(await page.locator('#dua-enabled').isDisabled());
+   assert.equal(f.state.duaMutations,2);
+  }finally{await o.close();}
+ });
+ test(name+' older firmware hides dua preferences',async()=>{
+  const f=await fixture(),o=await open(f,name),{page}=o;
+  try{await settings(page);assert.ok(await page.locator('#dua-group').isHidden());}
+  finally{await o.close();}
+ });
+}
+
 for (const name of ['chromium','webkit']) test(name+' dua saves reconcile and pause retains Stop',async()=>{
  const f=await fixture();
  f.state.device.dua={schema:1,revision:1,enabled:false,ready:false,supported:true,application:'applied',state:'waiting',phase:'idle'};

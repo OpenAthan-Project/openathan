@@ -78,6 +78,54 @@ is relative to 1,572,864 bytes; slot headroom is a further 524,288 bytes larger.
 No recording enters an application image. Actual approved-media packaging remains
 pending; media-bank payload size does not consume application budget.
 
+## Review-fix validation
+
+The follow-up fixes separate transient descriptor read failures from invalid
+metadata and allow healthy dua preference saves when media reports
+`supported: false`. Cancellation after a blocked read wins over its transport
+error. Media availability feedback remains independent of saved intent.
+
+- Both new regressions reproduced on reviewed head
+  `49a44b5e6f41c36a61e464290633ce12a1b32428` before the fixes.
+- All 22 UBSan CTests and 152 pinned Python tests passed. The full browser matrix
+  covered all 564 registered cases: 282 Chromium and 282 WebKit. WebKit coverage
+  was completed across continued runs, with every case accounted for.
+- Production downloader checks cover immediate and partial descriptor read
+  failures, the five-minute retry boundary, disconnected/unsafe/disabled retry
+  admission, cancellation during a failing read, and explicit Retry for oversized,
+  malformed and unverifiable descriptors. Existing 68-point interrupted-write,
+  isolated-storage and private-qualification checks passed.
+- Browser regressions cover enabling/disabling intent with unavailable media,
+  uncertain-save readback without duplicate POSTs, preference-storage faults and
+  older firmware without dua. Existing unsupported display/light guards passed.
+- Production pipeline, updater/USB, Quran and Atom volume continuity checks passed.
+  Whitespace and relative documentation links were checked.
+
+The matrix below compares rebuilt reviewed-head applications with the fixes,
+using the same pinned toolchain, compile-only settings and synthetic media on
+both sides. Baseline sizes and static RAM match the earlier reviewed-head
+measurements above. All 22 actual OTA images passed capacity checks; final loaded
+downloader sources and compressed UI matched the workspace. These incremental
+measurements supersede the final sizes above while retaining the original feature
+comparison with main. No application slot or shared-audio layout changed.
+
+| Variant | Before OTA bytes | After OTA bytes | Fix delta | Application budget remaining | Static RAM delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| atom | 1,400,976 | 1,400,976 | 0 | 171,888 | 0 |
+| waveshare | 1,404,736 | 1,404,752 | +16 | 168,112 | 0 |
+| device | 1,127,840 | 1,127,840 | 0 | 445,024 | 0 |
+| validation | 1,145,456 | 1,145,456 | 0 | 427,408 | 0 |
+| provisioning | 1,402,480 | 1,402,496 | +16 | 170,368 | 0 |
+| upgrade | 1,411,696 | 1,411,680 | -16 | 161,184 | 0 |
+| upgrade-failure | 1,411,696 | 1,411,680 | -16 | 161,184 | 0 |
+| waveshare-audio | 1,321,056 | 1,321,056 | 0 | 251,808 | 0 |
+| waveshare-display | 1,384,624 | 1,384,624 | 0 | 188,240 | 0 |
+| waveshare-diagnostics | 1,472,048 | 1,472,048 | 0 | 100,816 | 0 |
+| quran | 1,474,448 | 1,474,464 | +16 | 98,400 | 0 |
+
+No hardware was accessed or qualified for these fixes. The remaining media,
+physical playback/recovery and runtime-memory limits below still apply.
+
 ## Remaining qualification
 
 The final recording, exact text, redistribution permission, attribution and
