@@ -1,11 +1,12 @@
 # Firmware release preparation
 
-[v0.5.0](../releases/v0.5.0.md) is the published stable release for Atom and
-Waveshare Box V2. The [release qualification report](release-validation-2026-10-10.md)
-records exact production images, attended Waveshare installation/update results,
-public delivery and remaining limits.
-The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md) records the next
-review candidate and the evidence/checks required before its publication.
+[v0.6.0](../releases/v0.6.0.md) is the published stable release for Atom and
+Waveshare Box V2. The [v0.7.0 preparation](v0.7.0-preparation-2026-10-17.md)
+records the next review candidate, source-bound phone checks and remaining
+publication requirements. The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md)
+retains its earlier review/build evidence. The previous
+[release qualification report](release-validation-2026-10-10.md) records v0.5.0
+production images, attended installation/update results and remaining limits.
 The [v0.4.0 preparation record](v0.4.0-preparation-2026-10-07.md) records its
 automated builds and physical-validation limits. The earlier
 [release evidence](release-validation-2026-10-04.md) records reference-device
@@ -136,8 +137,8 @@ The tool never infers support from a version number or a newer working tree.
 
 The website must offer phone setup only after validating a release manifest with
 this capability. Older published bundles remain unchanged and use their existing
-computer setup flow. This source opt-in prepares future release metadata; it does
-not change the current release version or publish a new firmware release.
+computer setup flow. This capability flag alone does not publish firmware or
+enable phone setup on an older release.
 
 ## Upload a draft
 

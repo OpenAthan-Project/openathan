@@ -5,6 +5,11 @@ main `5ac1802d9251596375caece5186f5637a0c4c3fa`. It records automated checks and
 compile-only firmware measurements. No hardware installation, physical phone
 handoff, public website change or release qualification occurred.
 
+Subsequent attended phone and restart observations are reconciled in the
+[v0.7.0 preparation report](v0.7.0-preparation-2026-10-17.md). They retain their
+tested development sources and do not retroactively qualify these compile-only
+images or the exact future release.
+
 ## Behavior and previews
 
 A healthy fresh speaker offers an open setup network, automatic captive-page

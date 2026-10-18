@@ -21,15 +21,19 @@ def main():
     module = (args.website / pin['path']).resolve()
     require(head == pin['commit'] and digest(module.read_bytes()) == pin['sha256'], 'Installer contract pin differs')
     with tempfile.TemporaryDirectory(prefix='openathan-contract-test-') as temporary:
-        output = Path(temporary)
         audio, _ = build_image(b'ID3-non-decodable-normal-fixture', b'ID3-non-decodable-fajr-fixture')
         for hardware, profile in PROFILES.items():
             factory, _ = firmware(profile['flash_bytes'])
-            files = {asset_name(hardware, 'firmware.factory.bin'): factory, 'athan-audio.bin': audio,
-                     asset_name(hardware, 'manifest.json'): json_bytes(make_manifest('a' * 40, 'v0.1.0', factory, audio, hardware))}
-            for name, data in files.items():
-                (output / name).write_bytes(data)
-            subprocess.run([os.environ.get('NODE', 'node'), ROOT / 'tests/installer_contract.mjs', module, output, hardware], check=True)
+            for capability in (None, 1):
+                output = Path(temporary) / hardware / ('legacy' if capability is None else 'phone')
+                output.mkdir(parents=True)
+                manifest = make_manifest('a' * 40, 'v0.1.0', factory, audio, hardware,
+                                         phone_setup=capability)
+                files = {asset_name(hardware, 'firmware.factory.bin'): factory, 'athan-audio.bin': audio,
+                         asset_name(hardware, 'manifest.json'): json_bytes(manifest)}
+                for name, data in files.items():
+                    (output / name).write_bytes(data)
+                subprocess.run([os.environ.get('NODE', 'node'), ROOT / 'tests/installer_contract.mjs', module, output, hardware], check=True)
 
 
 if __name__ == '__main__':

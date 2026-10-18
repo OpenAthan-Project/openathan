@@ -9,9 +9,12 @@ const pin = parsePin({ schema: 1, release: {
   hardware, tag: JSON.parse(new TextDecoder().decode(bytes)).tag, manifestSha256: await sha256(bytes), mediaReviewed: true, hardwareQualified: true,
 }});
 const manifest = await checkedManifest(bytes, pin);
+assert.equal(manifest.phoneSetup ?? null, JSON.parse(new TextDecoder().decode(bytes)).phoneSetup ?? null);
+const unsupported = new TextEncoder().encode(JSON.stringify({ ...manifest, phoneSetup: 2 }));
+await assert.rejects(checkedManifest(unsupported, { ...pin, manifestSha256: await sha256(unsupported) }));
 const inputs = new Map();
 for (const part of manifest.parts) inputs.set(part.file, new Uint8Array(await readFile(`${bundle}/${part.file}`)));
 assert.equal((await verifyBundle(manifest, inputs)).parts.length, 2);
 inputs.get('athan-audio.bin')[4096] ^= 1;
 await assert.rejects(verifyBundle(manifest, inputs));
-console.log('Pinned installer accepts producer output and rejects changed audio. No device access.');
+console.log('Pinned installer accepts legacy/phone producer output and rejects unsupported capability and changed audio. No device access.');
