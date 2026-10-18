@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: OpenAthan-Project/website
-          ref: 407d6bb165b1e6bed91a0486a1eb37870004aef6
+          ref: 8b96c6c7d8239d5e6aa67b5042b900e24e66568d
           path: .installer-contract
           persist-credentials: false
       - name: Verify producer output with the real installer validator
