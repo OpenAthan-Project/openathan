@@ -13,7 +13,7 @@ function initial(){
  return {time_format:{schema:1,revision:1,hours:24,application:'applied'},schema:1,revision:1,setup:'active',application:'applied',automatic_ready:true,clock_ready:true,local_date:'2026-09-25',scheduler_fault:'none',playing:false,wifi_connected:true,hostname:'openathan-test.local',settings:{latitude:0,longitude:0,timezone:'UTC',timezone_rules:rules,method:'muslim_world_league',asr_method:'standard',high_latitude:'auto',volume:70,offsets:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},enabled:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}},schedule:{state:'ready',times,conflicts:[]},next:{day:20721,prayer:2,name:'Asr',local:times[3].local,utc:times[3].utc}};
 }
 function stopQuran(device){
- device.playing=false;if(device.quran||'playback_source' in device)device.playback_source='none';
+ device.playing=false;if("playback_busy" in device)device.playback_busy=false;if(device.dua)device.dua.phase="idle";if(device.quran||'playback_source' in device)device.playback_source='none';
  if(device.quran){device.quran.state='idle';if(device.quran.playback_token){const [boot,epoch]=device.quran.playback_token.split(':');device.quran.playback_token=boot+':'+(Number(epoch)+1);}}
 }
 async function fixture(){
@@ -35,6 +35,7 @@ async function fixture(){
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
     if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
+    if(req.method==='GET' && req.url==='/api/dua'){send(200,state.device.dua);return;}
     if(req.method==='GET' && req.url==='/api/time-format'){if(state.timeFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.time_format);return;}
     if(req.method==='GET' && req.url==='/api/display'){if(state.screenFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.display||{supported:false});return;}
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
@@ -58,6 +59,13 @@ async function fixture(){
       if(state.firmwareDrop){state.firmwareDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
       send(200,firmware);return;
     }
+    if(req.url==='/api/dua'){
+      if(payload.expected_revision!==state.device.dua.revision){send(409,{error:'Reload dua before saving'});return;}
+      state.duaMutations=(state.duaMutations||0)+1;state.device.dua.enabled=payload.enabled;state.device.dua.revision++;
+      if(state.duaDrop){state.duaDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
+      send(200,state.device.dua);return;
+    }
+    if(req.url==='/api/dua/retry'){state.device.dua.state='waiting';send(200,state.device.dua);return;}
     if(req.url==='/api/time-format'){
       if(payload.expected_revision!==state.device.time_format.revision){send(409,{error:'Reload time format before saving'});return;}
       state.timeMutations=(state.timeMutations||0)+1;state.device.time_format.hours=payload.hours;state.device.time_format.revision++;
@@ -1713,6 +1721,52 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
  });
 
 }
+
+for (const name of ['chromium','webkit']) {
+ test(name+' dua preferences save independently of media availability',async()=>{
+  const f=await fixture();
+  f.state.device.dua={schema:1,revision:1,enabled:true,ready:false,supported:false,application:'applied',state:'unavailable',phase:'idle'};
+  const o=await open(f,name),{page}=o;
+  try {
+   await settings(page);
+   await page.locator('#dua-enabled').uncheck(); await saved(page,'dua');
+   assert.equal(f.state.duaMutations,1);assert.equal(f.state.device.dua.enabled,false);
+   await refresh(page);await settings(page);assert.ok(!(await page.locator('#dua-enabled').isChecked()));
+   f.state.duaDrop=true;await page.locator('#dua-enabled').check();await saved(page,'dua');
+   assert.equal(f.state.duaMutations,2);assert.equal(f.state.device.dua.enabled,true);
+   assert.ok((await page.locator('#dua-install-status').textContent()).includes('unavailable'));
+   f.state.device.dua.application='storage_fault';
+   await refresh(page);await settings(page);assert.ok(await page.locator('#dua-enabled').isDisabled());
+   assert.equal(f.state.duaMutations,2);
+  }finally{await o.close();}
+ });
+ test(name+' older firmware hides dua preferences',async()=>{
+  const f=await fixture(),o=await open(f,name),{page}=o;
+  try{await settings(page);assert.ok(await page.locator('#dua-group').isHidden());}
+  finally{await o.close();}
+ });
+}
+
+for (const name of ['chromium','webkit']) test(name+' dua saves reconcile and pause retains Stop',async()=>{
+ const f=await fixture();
+ f.state.device.dua={schema:1,revision:1,enabled:false,ready:false,supported:true,application:'applied',state:'waiting',phase:'idle'};
+ const o=await open(f,name,{viewport:{width:390,height:844}}),{page}=o;
+ try {
+  await settings(page); assert.ok(await page.locator('#dua-group').isVisible());
+  f.state.duaDrop=true; await page.locator('#dua-enabled').check(); await saved(page,'dua');
+  assert.equal(f.state.duaMutations,1);assert.ok(await page.locator('#dua-enabled').isChecked());
+  f.state.device.dua.state='downloading';f.state.device.dua.total_bytes=2000;f.state.device.dua.received_bytes=1000;
+  await refresh(page);await settings(page);await page.waitForFunction(()=>document.querySelector('#dua-install-status').textContent.includes('50%'));
+  if(process.env.OPENATHAN_DUA_CAPTURE && name==='chromium'){for(const width of [390,1280]){await page.setViewportSize({width,height:844});await page.locator('#dua-group').screenshot({path:join(process.env.OPENATHAN_DUA_CAPTURE,`dua-${width}.png`)});}}
+  f.state.device.dua.state='ready';f.state.device.dua.ready=true;f.state.device.dua.phase='pause';f.state.device.playback_busy=true;f.state.device.playing=false;f.state.device.playback_source='dua';
+  await refresh(page);await page.locator('#stop').waitFor({state:'visible'});await page.locator('#stop').click();await page.locator('#stop').waitFor({state:'hidden'});
+  assert.equal(f.state.device.playback_busy,false);
+  await settings(page);f.state.device.dua.state='failed';f.state.device.dua.ready=false;f.state.device.dua.error='Interrupted download';
+  await refresh(page);await settings(page);await page.locator('#dua-retry').waitFor({state:'visible'});await page.locator('#dua-retry').click();
+  await page.waitForFunction(()=>document.querySelector('#dua-retry').hidden);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ } finally {await o.close();}
+});
 
 if(process.env.OPENATHAN_UI_CAPTURE)test('production UI visual evidence with simulated APIs',async()=>{
  const f=await fixture(),o=await open(f,'chromium'),{page}=o,out=process.env.OPENATHAN_UI_CAPTURE;

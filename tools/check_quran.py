@@ -16,6 +16,7 @@ def check(arduinojson):
             "-I" + str(ROOT / "tests/stubs"), "-I" + arduinojson,
             "-I" + str(ROOT / "lib/openathan-core/include"),
             "-I" + str(ROOT / "firmware/esphome/components/openathan_device"),
+            str(ROOT / "lib/openathan-core/src/dua.cpp"),
             str(ROOT / "tests/quran_service_tests.cpp"),
             str(ROOT / "firmware/esphome/components/openathan_device/quran.cpp"),
             "-o", str(binary)], check=True)
@@ -63,6 +64,7 @@ def check(arduinojson):
             "-I" + arduinojson, "-I" + str(ROOT / "firmware"),
             "-I" + str(ROOT / "firmware/esphome/components/openathan_device"),
             "-I" + str(ROOT / "lib/openathan-core/include"),
+            str(ROOT / "lib/openathan-core/src/dua.cpp"),
             str(ROOT / "tests/quran_qualification_tests.cpp"),
             str(ROOT / "firmware/esphome/components/openathan_quran_qualification/qualification.cpp"),
             "-o", str(qualified)], check=True)

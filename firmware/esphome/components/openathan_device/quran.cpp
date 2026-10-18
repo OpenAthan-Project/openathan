@@ -145,7 +145,7 @@ int Quran::action(const std::string &action, JsonObjectConst input, std::string 
   if (!athan_->activated() || !athan_->upgrade_health() || !athan_->settings_service() || !athan_->settings_service()->healthy()) {
     error = "Finish setup and resolve device faults before streaming"; return 409;
   }
-  if (blocked_ || job_ || playback->source() == ::openathan::PlaybackSource::ATHAN) {
+  if (blocked_ || job_ || (playback->source() == ::openathan::PlaybackSource::ATHAN || playback->source() == ::openathan::PlaybackSource::DUA)) {
     error = "Wait for Athan, the current request or firmware maintenance to finish"; return 409;
   }
   std::shared_ptr<Job> job;

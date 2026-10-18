@@ -21,6 +21,7 @@ struct Inputs {
   const ConnectionFrame *connection{};
   Page page{Page::STATUS};
   bool page_hint{};
+  bool dua{}, dua_pending{};
 };
 struct Frame {
   std::array<char, 9> clock{};
@@ -78,8 +79,8 @@ inline Frame present(const Inputs &in) {
     text(f.detail, "Use device page");
   } else if (!in.setup_complete) {
     text(f.heading, "Setup"); text(f.main, "Needed"); text(f.detail, "Use phone setup");
-  } else if (in.status.playing) {
-    text(f.heading, in.quran ? "Quran" : "Athan"); text(f.main, "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
+  } else if (in.status.playing || in.dua_pending) {
+    text(f.heading, in.dua || in.dua_pending ? "Dua" : in.quran ? "Quran" : "Athan"); text(f.main, in.dua_pending ? "Starting" : "Playing"); text(f.detail, in.stop_button ? "Button to stop" : "Use phone");
   } else if (!in.clock_valid) {
     text(f.heading, "Time"); text(f.main, "Waiting"); text(f.detail, in.wifi_connected ? "Syncing clock" : "Connect Wi-Fi");
   } else if (!in.prayers_enabled && !in.round) {
@@ -107,7 +108,7 @@ inline Frame present(const Inputs &in) {
     } else if (in.page != Page::STATUS) {
       f.page = in.page;
       f.connection = *in.connection;
-    } else if (in.page_hint && in.connection->available && in.connection->connected && !in.status.playing) {
+    } else if (in.page_hint && in.connection->available && in.connection->connected && !in.status.playing && !in.dua_pending) {
       text(f.footer, "Press for page");
     }
   }

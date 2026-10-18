@@ -27,9 +27,9 @@ The reference firmware supports:
 - clean interruption/dismiss behavior.
 
 Application-only firmware updates retain installed recordings. A newer recording
-in a fresh-install bundle does not replace audio on an existing speaker. There
-is no owner-facing audio update flow; replacing shared audio requires a separately
-reviewed preserving procedure. Keep recordings outside application slots.
+in a fresh-install bundle does not replace audio on an existing speaker. The optional [dua feature](dua.md) installs only its own signed recording over
+Wi-Fi into reserved tail banks. It never replaces normal/Fajr recordings;
+replacing those requires a separately reviewed preserving procedure. Keep recordings outside application slots.
 
 ## Quran
 

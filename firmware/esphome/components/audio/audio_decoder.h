@@ -153,7 +153,7 @@ class AudioDecoder {
   uint32_t playback_ms_{0};
 
   bool end_of_file_{false};
-#if defined(OPENATHAN_QURAN) && defined(USE_AUDIO_MP3_SUPPORT)
+#ifdef USE_AUDIO_MP3_SUPPORT
   bool mp3_audio_decoded_{false};
 #endif
 

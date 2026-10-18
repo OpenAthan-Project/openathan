@@ -180,7 +180,19 @@ def validate_audio_cpp(commit, path):
         command([build_dir / "audio_validator", path.resolve()])
 
 
-def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_build_dir=None):
+def validate_dua_recording(path):
+    # Reuse the existing release prerequisite, FFmpeg. Never transcode or change
+    # a supplied recording without a new explicit media/listening approval.
+    probe = command(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
+                     "stream=codec_name:format=duration", "-of", "json", path])
+    info = read_json(probe)
+    require(info.get("streams") and info["streams"][0].get("codec_name") == "mp3", "Dua must contain MP3 audio")
+    duration = float(info.get("format", {}).get("duration", "nan"))
+    require(0 < duration <= 30, "Dua recording must be at most 30 seconds")
+    command(["ffmpeg", "-v", "error", "-xerror", "-i", path, "-f", "null", "-"])
+
+
+def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_build_dir=None, dua=None, dua_envelope=None):
     require(TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
     record = validate_build(build_dir)
     commit = record["commit"]
@@ -190,8 +202,15 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_bu
     release_config = read_json(source_file(commit, "release/firmware.json")) if upgrade_capable else {}
     phone_setup = phone_setup_version(release_config)
     payloads = (audio_image.read_recording(normal), audio_image.read_recording(fajr))
+    if dua is not None:
+        validate_dua_recording(dua)
+        payloads += (audio_image.read_recording(dua),)
     approved_tracks(read_json(source_file(commit, MEDIA_REGISTRY)), source_file(commit, LICENSE_PATH), payloads)
-    media, _ = audio_image.build_image(*payloads)
+    if dua is not None and dua_envelope is None:
+        require(signing_key is not None, "Dua requires a production signing key")
+        from dua_media import sign as sign_dua
+        dua_envelope = sign_dua(tag, payloads[2], signing_key.read_bytes(), source_file(commit, "release/upgrade-public-key.pem"))
+    media, _ = audio_image.build_image(*payloads[:2], dua=payloads[2] if dua is not None else None, dua_envelope=dua_envelope)
     factory = (build_dir / ASSETS[1]).read_bytes()
     with fresh_output(output) as stage:
         files = {ASSETS[1]: factory, ASSETS[2]: media,
@@ -210,6 +229,8 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_bu
             files["firmware.ota.bin"] = app
             files["upgrade.json"] = sign(tag, commit, app, signing_key.read_bytes(), public, hardware)
         files = {asset_name(hardware, name): data for name, data in files.items()}
+        if dua is not None:
+            files.update({"dua.json": dua_envelope, "dua.mp3": payloads[2]})
         checksum_name = asset_name(hardware, "SHA256SUMS")
         files[checksum_name] = checksums(files)
         if waveshare_build_dir is not None:
@@ -219,7 +240,7 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_bu
                     "Combined packaging requires the same-commit Waveshare production build")
             with tempfile.TemporaryDirectory(prefix="openathan-waveshare-package-") as temporary:
                 destination = Path(temporary) / "bundle"
-                package(waveshare_build_dir, tag, normal, fajr, destination, signing_key)
+                package(waveshare_build_dir, tag, normal, fajr, destination, signing_key, dua=dua, dua_envelope=dua_envelope)
                 for path in destination.iterdir():
                     if path.name in files:
                         require(files[path.name] == path.read_bytes(), "Shared release asset differs")
@@ -366,6 +387,7 @@ def main():
     package_parser.add_argument("--tag", required=True)
     package_parser.add_argument("--signing-key", type=Path, help="Private P-256 key outside the repository")
     package_parser.add_argument("--normal", required=True, type=Path)
+    package_parser.add_argument("--dua", type=Path, help="Approved optional dua MP3, maximum 252 KiB")
     package_parser.add_argument("--fajr", required=True, type=Path)
     package_parser.add_argument("--output-dir", required=True, type=Path)
     upload_parser = commands.add_parser("upload-draft", help="Upload approved assets to a GitHub draft; never publish")
@@ -375,7 +397,7 @@ def main():
         if args.action == "build":
             result = build(args.commit, args.output_dir, args.hardware)
         elif args.action == "package":
-            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key, args.waveshare_build_dir)
+            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key, args.waveshare_build_dir, args.dua)
         else:
             result = upload_draft(args.bundle)
         print(json.dumps(result, indent=2))

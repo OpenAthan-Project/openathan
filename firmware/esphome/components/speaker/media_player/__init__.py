@@ -183,6 +183,7 @@ FINAL_VALIDATE_SCHEMA = cv.All(
 
 
 async def to_code(config):
+    cg.add_define("OPENATHAN_DUA_PIPELINE")
     if CONF_ON_TURN_OFF in config or CONF_ON_TURN_ON in config:
         cg.add_define("USE_SPEAKER_MEDIA_PLAYER_ON_OFF", True)
 

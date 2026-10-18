@@ -16,6 +16,9 @@ void Device::loop() {
 void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanResult>&) {}
 void Device::on_wifi_connect_state(StringRef, std::span<const uint8_t,6>) {}
 Upgrade::~Upgrade() = default;
+void DuaMedia::snapshot(JsonObject) {}
+int DuaMedia::retry(std::string &) { return 503; }
+bool Quran::playback_pending() const { return false; }
 void Quran::shutdown() {}
 void Quran::snapshot(JsonObject) {}
 void Quran::catalog_snapshot(JsonObject) {}

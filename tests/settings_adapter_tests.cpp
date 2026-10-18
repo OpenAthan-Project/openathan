@@ -806,6 +806,39 @@ static void display_api() {
   f.device.set_display_output(nullptr); CHECK(call("POST",R"({"schema":1,"expected_revision":4,"brightness_percent":50})").code==404);
   CHECK(!deserializeJson(response,call("GET").response)); CHECK(!response["supported"].as<bool>());
 }
+static void dua_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
+  struct Probe : DuaApi {
+    decltype(f.device) *device; unsigned changes{}, retries{};
+    explicit Probe(decltype(f.device) *value) : device(value) {}
+    void preference_changed() override { ++changes; }
+    void snapshot(JsonObject root) override {
+      const auto &p=device->dua_preferences();root["schema"]=1;
+      root["revision"]=p.saved()?p.saved()->revision:0;root["enabled"]=p.enabled();
+    }
+    int retry(std::string &) override { ++retries;return 200; }
+  } probe(&f.device);
+  api.set_dua(&probe);
+  const auto prayer=*f.device.settings_service()->saved();
+  auto call=[&](const char *uri,const char *body) {
+    ApiExchange r;r.method="POST";r.uri=uri;r.body=body;api.handle(r);return r;
+  };
+  CHECK(call("/api/dua",R"({"schema":1,"expected_revision":1,"enabled":true})").code==200);
+  CHECK(probe.changes==1 && f.device.dua_preferences().enabled());
+  CHECK(call("/api/dua",R"({"schema":1,"expected_revision":1,"enabled":false})").code==409);
+  CHECK(probe.changes==1);
+  CHECK(call("/api/dua",R"({"schema":1,"expected_revision":2,"enabled":1})").code==400);
+  CHECK(call("/api/dua/retry","{}").code==200 && probe.retries==1);
+  CHECK(call("/api/dua/retry",R"({"extra":1})").code==400);
+  CHECK(*f.device.settings_service()->saved()==prayer);
+  nvs_test::fail_commit=true;
+  CHECK(call("/api/dua",R"({"schema":1,"expected_revision":2,"enabled":false})").code==503);
+  CHECK(!f.device.dua_preferences().enabled() && f.device.status().automatic_ready);
+  f.audio.active=true; const auto stops=f.audio.stops;
+  f.device.on_shutdown();
+  CHECK(!f.device.playback_busy() && !f.audio.active && f.audio.stops==stops+1);
+}
 static void time_format_api() {
   using namespace esphome::openathan_device;
   Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
@@ -1165,6 +1198,6 @@ int main() {
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
+  dua_api(); display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
 #endif
 }

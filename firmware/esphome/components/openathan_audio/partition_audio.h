@@ -13,6 +13,23 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   void setup() override;
   void loop() override;
   bool play(::openathan::Track track);
+  ::openathan::PlaybackCompletion completion() const override { return completion_; }
+  bool dua_supported() const override {
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
+    return true;
+#else
+    return false;
+#endif
+  }
+  bool dua_ready() const override { return ready() && dua_file_.data && dua_file_.length; }
+  bool set_dua_data(const uint8_t *data, size_t size) override {
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
+    if (source_ != ::openathan::PlaybackSource::NONE || playing() || (player_ && !player_->playback_stopped())) return false;
+    dua_file_ = {data, size, audio::AudioFileType::MP3}; return true;
+#else
+    return false;
+#endif
+  }
   bool ready() const override { return ready_ && player_ && player_->is_ready(); }
   bool playing() const override;
   bool start(::openathan::Track track) override;
@@ -44,13 +61,15 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   ::openathan::PlaybackSource source_{::openathan::PlaybackSource::NONE};
   ::openathan::StreamState stream_state_{::openathan::StreamState::IDLE};
   bool observed_playing_{};
-#ifdef OPENATHAN_QURAN
+  ::openathan::PlaybackCompletion completion_;
+  audio::AudioFile dua_file_{};
+  uint32_t submitted_session_{};
+  uint32_t start_ms_{};
   // Reserve ownership while the outgoing commands and pipelines drain. Only
   // one replacement survives; Stop clears its recording and owned URL.
   bool awaiting_stop_{};
   audio::AudioFile *pending_file_{};
   std::string pending_url_;
   uint32_t stream_started_{};
-#endif
 };
 }  // namespace esphome::openathan_audio

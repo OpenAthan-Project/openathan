@@ -81,6 +81,8 @@ void LocalApi::lights_(JsonObject root) {
   }
 }
 void LocalApi::snapshot_(JsonObject root) {
+  if (dua_) dua_->snapshot(root["dua"].to<JsonObject>());
+  root["playback_busy"] = athan_->playback_busy() || (quran_ && quran_->playback_pending());
   if (upgrade_) upgrade_->snapshot(root["firmware"].to<JsonObject>());
   time_format_(root["time_format"].to<JsonObject>());
   lights_(root["lights"].to<JsonObject>());
@@ -101,7 +103,7 @@ void LocalApi::snapshot_(JsonObject root) {
   root["playing"] = status.playing;
   const auto source = athan_->playback() ? athan_->playback()->source() : ::openathan::PlaybackSource::NONE;
   root["playback_source"] = source == ::openathan::PlaybackSource::QURAN ? "quran" :
-      source == ::openathan::PlaybackSource::ATHAN ? "athan" : "none";
+      source == ::openathan::PlaybackSource::ATHAN ? "athan" : source == ::openathan::PlaybackSource::DUA ? "dua" : "none";
   if (quran_) quran_->snapshot(root["quran"].to<JsonObject>());
   if (status.next) {
     auto next = root["next"].to<JsonObject>();
@@ -133,6 +135,8 @@ void LocalApi::handle(ApiExchange& request) {
   auto root = output.to<JsonObject>();
   if (request.method == "GET" && request.uri == "/api/status")
     snapshot_(root);
+  else if (request.method == "GET" && request.uri == "/api/dua" && dua_)
+    dua_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/firmware" && upgrade_)
     upgrade_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/quran/catalog" && quran_)
@@ -167,6 +171,21 @@ void LocalApi::handle(ApiExchange& request) {
       const int code = upgrade_->action(request.uri.substr(14), payload, message);
       if (code != 200) { error(request, code, message.c_str()); return; }
       upgrade_->snapshot(root);
+    } else if (request.uri == "/api/dua" && dua_) {
+      if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
+          !payload["expected_revision"].is<uint32_t>() || !payload["enabled"].is<bool>()) {
+        error(request, 400, "Invalid dua preference"); return;
+      }
+      const auto result = athan_->change_dua(payload["enabled"].as<bool>(), payload["expected_revision"].as<uint32_t>());
+      if (result == ::openathan::DuaSaveResult::SAVED || result == ::openathan::DuaSaveResult::STORAGE) dua_->preference_changed();
+      if (result == ::openathan::DuaSaveResult::CONFLICT) { error(request, 409, "Reload dua before saving"); return; }
+      if (result == ::openathan::DuaSaveResult::STORAGE) { error(request, 503, "Dua preference could not be saved; restart the device"); return; }
+      dua_->snapshot(root);
+    } else if (request.uri == "/api/dua/retry" && dua_) {
+      if (payload.size()) { error(request, 400, "Invalid retry request"); return; }
+      std::string message; const int code = dua_->retry(message);
+      if (code != 200) { error(request, code, message.c_str()); return; }
+      dua_->snapshot(root);
     } else if (request.uri == "/api/time-format") {
       if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
           !payload["expected_revision"].is<uint32_t>() || !payload["hours"].is<unsigned>() ||

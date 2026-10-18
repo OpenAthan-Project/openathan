@@ -141,9 +141,9 @@ def validate_firmware_images(factory, app=None, *, allow_qualification=False, al
 def approved_tracks(registry, license_bytes, payloads):
     require(isinstance(registry, dict) and registry.get("schema") == 1, "Unsupported recording registry")
     entries = registry.get("tracks")
-    require(isinstance(entries, list) and len(entries) == 2, "Both approved recordings are required")
+    require(isinstance(entries, list) and len(entries) == len(payloads) and len(entries) in (2, 3), "All bundled recordings require approval")
     require(license_bytes.strip(), "Committed audio attribution is missing")
-    for role, entry, payload in zip(("normal", "fajr"), entries, payloads):
+    for role, entry, payload in zip(("normal", "fajr", "dua"), entries, payloads):
         require(isinstance(entry, dict) and entry.get("role") == role and entry.get("approved") is True,
                 f"The {role} recording has not been approved")
         require(entry.get("sha256") == digest(payload), f"The {role} recording does not match its approved hash")
@@ -157,7 +157,7 @@ def approved_tracks(registry, license_bytes, payloads):
     return entries
 
 
-def audio_payloads(media):
+def audio_payloads(media, public_pem=None):
     require(len(media) == PARTITION_SIZE and media[:8] == b"OAUDIO01", "Invalid audio partition")
     require(struct.unpack_from("<I", media, 12)[0] == 2 and hashlib.sha256(media[:112]).digest() == media[112:144],
             "Invalid audio metadata")
@@ -170,7 +170,16 @@ def audio_payloads(media):
         require(hashlib.sha256(payload).digest() == sha, "Audio track hash mismatch")
         payloads.append(payload)
     # Canonical reconstruction also checks overlap, alignment, used length and padding.
-    require(build_image(*payloads)[0] == media, "Noncanonical audio partition")
+    from dua_media import BANK_START, BANK_SIZE, read_bank
+    if struct.unpack_from("<I", media, 8)[0] <= BANK_START and media[BANK_START:] != b"\xff" * (PARTITION_SIZE - BANK_START):
+        require(public_pem is not None, "Dua banks require the source-bound production trust key")
+        dua, envelope, generation = read_bank(media[BANK_START:BANK_START + BANK_SIZE], public_pem)
+        require(generation == 1 and media[BANK_START + BANK_SIZE:] == b"\xff" * BANK_SIZE,
+                "Fresh-install dua must use only bank zero at generation one")
+        require(build_image(*payloads, dua=dua, dua_envelope=envelope)[0] == media, "Noncanonical audio partition")
+        payloads.append(dua)
+    else:
+        require(build_image(*payloads)[0] == media, "Noncanonical audio partition")
     return payloads
 
 
@@ -209,7 +218,9 @@ def validate_bundle(directory):
     combined = asset_name(WAVESHARE, "manifest.json") in names and "manifest.json" in names
     hardware = HARDWARE if "manifest.json" in names else WAVESHARE
     groups = (HARDWARE, WAVESHARE) if combined else (hardware,)
-    allowed = set()
+    dua_assets = {"dua.json", "dua.mp3"}
+    has_dua = bool(names & dua_assets)
+    allowed = set(dua_assets) if has_dua else set()
     for board in groups:
         allowed.update(asset_name(board, name) for name in ASSETS)
         if asset_name(board, "upgrade.json") in names:
@@ -219,6 +230,10 @@ def validate_bundle(directory):
     limits.update({"firmware.ota.bin": 1572864, "upgrade.json": 8192})
     files = {asset_name(board, name): read_file(directory / asset_name(board, name), limit)
              for board in groups for name, limit in limits.items() if asset_name(board, name) in names}
+    if has_dua:
+        require(dua_assets <= names, "Incomplete dua release assets")
+        files["dua.json"] = read_file(directory / "dua.json", 2048)
+        files["dua.mp3"] = read_file(directory / "dua.mp3", 258048)
     results = [validate_profile_files(files, board) for board in groups]
     if combined:
         require(results[0][0]["commit"] == results[1][0]["commit"] and
@@ -240,10 +255,19 @@ def validate_profile_files(all_files, hardware):
                                   flash_bytes=profile(hardware)["flash_bytes"], hardware=hardware)
     if asset_name(hardware, "firmware.ota.bin") in all_files:
         require(data("firmware.ota.bin") == app, "Upgrade application differs from factory image")
-    payloads = audio_payloads(data("athan-audio.bin"))
+    from dua_media import BANK_START, BANK_SIZE, read_bank, validate as validate_dua
+    from release import source_file
+    has_dua = "dua.json" in all_files
+    public_pem = source_file(manifest["commit"], "release/upgrade-public-key.pem") if has_dua else None
+    payloads = audio_payloads(data("athan-audio.bin"), public_pem)
+    require((len(payloads) == 3) == has_dua, "Dua bank and downloadable assets must be bundled together")
+    if has_dua:
+        validate_dua(all_files["dua.json"], all_files["dua.mp3"], public_pem, manifest["tag"])
+        audio, envelope, _ = read_bank(data("athan-audio.bin")[BANK_START:BANK_START + BANK_SIZE], public_pem)
+        require(audio == all_files["dua.mp3"] and envelope == all_files["dua.json"], "Dua assets differ from installed bank")
     require(all(payload[:4096] not in app for payload in payloads), "Recording data found in application")
     board_files = {name: value for name, value in all_files.items()
-                   if name == "athan-audio.bin" or
+                   if name in ("athan-audio.bin", "dua.json", "dua.mp3") or
                    (name.startswith(profile(hardware)["prefix"]) if hardware == WAVESHARE else
                     not name.startswith(profile(WAVESHARE)["prefix"]))}
     checksum_name = asset_name(hardware, "SHA256SUMS")

@@ -62,6 +62,10 @@ class Audio : public Component, public ::openathan::Playback {
   bool ready() const override { return healthy() && phase_ == Phase::IDLE; }
   bool playing() const override { return playback_ && playback_->playing(); }
   bool start(::openathan::Track track) override { return ready() && playback_->start(track); }
+  ::openathan::PlaybackCompletion completion() const override { return playback_ ? playback_->completion() : ::openathan::PlaybackCompletion{}; }
+  bool dua_supported() const override { return playback_ && playback_->dua_supported(); }
+  bool dua_ready() const override { return playback_ && playback_->dua_ready(); }
+  bool set_dua_data(const uint8_t *data, size_t size) override { return playback_ && playback_->set_dua_data(data, size); }
   bool stream_supported() const override { return playback_ && playback_->stream_supported(); }
   uint32_t playback_epoch() const override { return playback_ ? playback_->playback_epoch() : 0; }
   ::openathan::PlaybackSource source() const override { return playback_ ? playback_->source() : ::openathan::PlaybackSource::NONE; }

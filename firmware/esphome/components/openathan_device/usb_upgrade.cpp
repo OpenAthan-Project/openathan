@@ -26,7 +26,7 @@ bool Upgrade::usb_safe_() {
   const auto *settings = athan_->settings_service();
   if (!server_ready_ || athan_->is_failed() || !settings || !settings->healthy() ||
       std::string(athan_->setup_state()) == "storage_fault" || !athan_->upgrade_health()) return false;
-  if (status.playing || !boot_scheduler_healthy(status.fault)) return false;
+  if (audio_busy_ || athan_->playback_busy() || !boot_scheduler_healthy(status.fault)) return false;
   const auto clock = athan_->read();
   // With no clock, automatic prayer playback is blocked. USB needs no network.
   return !clock.valid || upgrade_window(false, true, athan_->activated(), status.automatic_ready,

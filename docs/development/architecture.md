@@ -162,6 +162,16 @@ Quran resume. The shared-audio partition is unchanged. See the
 [streaming contract](quran-streaming.md) for HTTPS restrictions, local APIs,
 the pinned reader patch and separate hardware qualification gates.
 
+### Dua after Athan
+
+The portable optional sequence controller wraps scheduled Athan requests, then
+waits for session-specific successful completion and a monotonic pause before
+playing stored dua. It owns cancellation and priority independently of prayer
+calculation and consumption. The product layer installs signed optional media
+into the reserved tail of shared audio; the audio adapter supplies playback.
+Dua preference/media faults never gate required Athan or startup health. See the
+[dua contract](dua.md) for storage, local APIs and qualification boundaries.
+
 ### Upgrade qualification boundary
 
 The production updater remains the single update engine. The separately selected

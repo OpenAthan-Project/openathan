@@ -79,6 +79,7 @@ class AudioImageTests(unittest.TestCase):
             handle.write(self.image)
             handle.flush()
             subprocess.run([adapter, handle.name], check=True)
+            subprocess.run([str(Path(adapter).with_name("audio_adapter_no_quran_tests")), handle.name], check=True)
 
 
 if __name__ == "__main__":

@@ -55,11 +55,7 @@ static std::vector<uint8_t> complete(const std::vector<uint8_t> &bytes, bool chu
   return sink.pcm;
 }
 static void invalid(const std::vector<uint8_t> &bytes) {
-#ifdef OPENATHAN_QURAN
   constexpr auto expected = AudioDecoderState::FAILED;
-#else
-  constexpr auto expected = AudioDecoderState::FINISHED;
-#endif
   for (bool chunked : {false, true}) {
     AudioDecoder decoder(7, 512); Sink sink;
     check(decoder.start(AudioFileType::MP3) == ESP_OK && decoder.add_sink(&sink) == ESP_OK);
@@ -111,11 +107,7 @@ int main(int argc, char **argv) {
   size_t previous = sink.pcm.size();
   check(reused.start(AudioFileType::MP3) == ESP_OK);
   check(reused.add_source(reinterpret_cast<const uint8_t *>(text.data()), text.size()) == ESP_OK);
-#ifdef OPENATHAN_QURAN
   check(finish(reused) == AudioDecoderState::FAILED);
-#else
-  check(finish(reused) == AudioDecoderState::FINISHED);
-#endif
   check(sink.pcm.size() == previous);
   std::cout << "MP3 EOF, real PCM, chunked input, partial EOF, backpressure and reuse passed\n";
 }

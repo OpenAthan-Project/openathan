@@ -8,8 +8,10 @@
 #include "protocol.h"
 #include "wifi_attempt.h"
 #include "phone_setup.h"
+#include "upgrade_policy.h"
 #include "test_maintenance.h"
 #include "openathan/usb_upgrade.h"
+#include "openathan/scheduler.h"
 #include "nvs_memory.h"
 #include <algorithm>
 #include <atomic>
@@ -66,6 +68,11 @@ struct OpenAthan {
   bool incomplete{true}; SettingsProbe settings;
   const char *setup_state() const { return incomplete ? "incomplete" : "active"; }
   SettingsProbe *settings_service() { return &settings; }
+  bool playback_busy() const { return false; }
+  bool activated() const { return !incomplete; }
+  struct Sample { bool automatic_ready{true}; std::optional<::openathan::Event> next; };
+  Sample status() const { return {}; }
+  ::openathan::ClockSample read() const { return {true, 1000, 0, {2026, 10, 18}, 0}; }
   void quiesce_for_maintenance() {}
 };
 }
@@ -83,12 +90,15 @@ struct UpgradeProbe {
   bool busy{},blocked{}; unsigned commands{};
   bool usb_busy() const { return busy; }
   bool streaming_blocked() const { return busy || blocked; }
+  void set_audio_busy(bool) {}
+  bool confirmed() const { return true; }
   void loop(bool) {}
   std::vector<std::string> usb_info() { return {"info"}; }
   uint8_t usb_command(uint8_t,const std::vector<std::string>&,std::vector<std::string>&) { ++commands; return 0; }
   bool usb_chunk(const ::openathan::usb_upgrade::Chunk &) { return false; }
 };
-struct QuranProbe { void loop(bool,bool) {} };
+struct DuaProbe { bool active() const { return false; } void shutdown() {} void loop(bool, bool) {} };
+struct QuranProbe { bool playback_pending() const { return false; } void loop(bool,bool) {} };
 struct ApiProbe {
   unsigned calls{};
   void set_context(const std::string &,bool) {}
@@ -123,6 +133,8 @@ struct Device {
   struct Network { std::string ssid; int rssi; bool secured; }; std::vector<Network> phone_networks_;
   struct Asset { const uint8_t *data{};size_t size{};const char *type{}; } assets_[6];
   std::shared_ptr<HttpExchange> phone_response_;
+  DuaProbe dua_;
+  bool playback_busy() const { return false; }
   UpgradeProbe upgrade_; QuranProbe quran_; ApiProbe api_storage; ApiProbe *api_{&api_storage};
   std::mutex queue_mutex_; std::deque<std::shared_ptr<HttpExchange>> requests_;
 };

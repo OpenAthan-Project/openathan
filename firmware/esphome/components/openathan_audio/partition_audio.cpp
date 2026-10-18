@@ -5,9 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include "quran_policy.h"
-#ifdef OPENATHAN_QURAN
 #include "esphome/core/hal.h"
-#endif
 
 namespace esphome::openathan_audio {
 static const char *const TAG = "openathan_audio";
@@ -84,19 +82,17 @@ void PartitionAudio::setup() {
 
 bool PartitionAudio::play(::openathan::Track track) {
   const auto id = static_cast<unsigned>(track);
-  if (!ready() || id < 1 || id > files_.size()) {
-    ESP_LOGW(TAG, "Playback unavailable or invalid track");
-    return false;
-  }
-#ifdef OPENATHAN_QURAN
+  if (!ready() || id < 1 || id > 3 || (id == 3 && !dua_ready())) return false;
   stop();
+  completion_ = {epoch_, ::openathan::PlaybackOutcome::NONE};
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
   awaiting_stop_ = true;
-  pending_file_ = &files_[id - 1];
+  pending_file_ = id == 3 ? &dua_file_ : &files_[id - 1];
 #else
   player_->play_file(&files_[id - 1], true, false);
-  ++epoch_;
 #endif
-  source_ = ::openathan::PlaybackSource::ATHAN;
+  source_ = id == 3 ? ::openathan::PlaybackSource::DUA : ::openathan::PlaybackSource::ATHAN;
+  start_ms_ = millis();
   stream_state_ = ::openathan::StreamState::IDLE;
   observed_playing_ = false;
   ESP_LOGI(TAG, "Playback queued: track=%u", id);
@@ -108,15 +104,14 @@ bool PartitionAudio::playing() const {
                      player_->state == media_player::MEDIA_PLAYER_STATE_ANNOUNCING);
 }
 void PartitionAudio::stop() {
+  completion_ = {epoch_, ::openathan::PlaybackOutcome::CANCELLED};
   ++epoch_;
   source_ = ::openathan::PlaybackSource::NONE;
   stream_state_ = ::openathan::StreamState::IDLE;
   observed_playing_ = false;
-#ifdef OPENATHAN_QURAN
   awaiting_stop_ = false;
   pending_file_ = nullptr;
   pending_url_.clear();
-#endif
   if (!player_ || !player_->is_ready()) return;
   // Stop both pipelines before submitting any replacement recording.
   for (bool announcement : {false, true}) {
@@ -141,38 +136,40 @@ bool PartitionAudio::start_stream(const std::string &url) {
 #endif
 }
 void PartitionAudio::loop() {
-#ifdef OPENATHAN_QURAN
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
   if (source_ == ::openathan::PlaybackSource::NONE) return;
   const bool streaming = source_ == ::openathan::PlaybackSource::QURAN;
-  if (!ready() || (streaming && !observed_playing_ && millis() - stream_started_ >= 30000)) {
-    stop();
+  auto fail = [&]() {
+    const auto epoch = epoch_;
+    stop(); completion_ = {epoch, ::openathan::PlaybackOutcome::FAILED};
     if (streaming) stream_state_ = ::openathan::StreamState::ERROR;
-    return;
-  }
+  };
+  const auto started = streaming ? stream_started_ : start_ms_;
+  if (!ready() || (!observed_playing_ && millis() - started >= 30000)) { fail(); return; }
   if (awaiting_stop_) {
-    // Outgoing PLAYING/error observations belong to the previous session.
     if (!player_->playback_stopped()) return;
+    submitted_session_ = player_->announcement_session();
     if (pending_file_) player_->play_file(pending_file_, true, false);
     else {
-      auto call = player_->make_call();
-      call.set_media_url(pending_url_);
-      call.set_announcement(true);
-      call.perform();
+      auto call = player_->make_call(); call.set_media_url(pending_url_);
+      call.set_announcement(true); call.perform();
     }
-    awaiting_stop_ = false;
-    pending_file_ = nullptr;
-    pending_url_.clear();
-    return;  // Observe the new pipeline only after submitting its start.
+    awaiting_stop_ = false; pending_file_ = nullptr; pending_url_.clear();
+    return;
   }
+  // The previous pipeline's latched result must not settle this queued start.
+  if (player_->announcement_session() == submitted_session_) return;
   const auto state = player_->announcement_state();
-  if (state == speaker::AudioPipelineState::ERROR_READING || state == speaker::AudioPipelineState::ERROR_DECODING) {
-    stop();
-    if (streaming) stream_state_ = ::openathan::StreamState::ERROR;
-  } else if (state == speaker::AudioPipelineState::PLAYING) {
+  const auto outcome = player_->announcement_outcome();
+  if (outcome == speaker::PipelineOutcome::FAILED || state == speaker::AudioPipelineState::ERROR_READING ||
+      state == speaker::AudioPipelineState::ERROR_DECODING) { fail(); return; }
+  if (state == speaker::AudioPipelineState::PLAYING) {
     observed_playing_ = true;
-    if (streaming)
-      stream_state_ = ::openathan::StreamState::PLAYING;
-  } else if (observed_playing_ && state == speaker::AudioPipelineState::STOPPED) {
+    if (streaming) stream_state_ = ::openathan::StreamState::PLAYING;
+  }
+  if (state == speaker::AudioPipelineState::STOPPED && outcome != speaker::PipelineOutcome::NONE && player_->playback_stopped()) {
+    completion_ = {epoch_, outcome == speaker::PipelineOutcome::COMPLETED ? ::openathan::PlaybackOutcome::COMPLETED :
+        ::openathan::PlaybackOutcome::CANCELLED};
     source_ = ::openathan::PlaybackSource::NONE;
     stream_state_ = ::openathan::StreamState::IDLE;
   }
@@ -183,11 +180,5 @@ void PartitionAudio::loop() {
   }
 #endif
 }
-bool PartitionAudio::start(::openathan::Track track) {
-  if (!ready() || (track != ::openathan::Track::NORMAL && track != ::openathan::Track::FAJR)) return false;
-#ifndef OPENATHAN_QURAN
-  stop();
-#endif
-  return play(track);
-}
+bool PartitionAudio::start(::openathan::Track track) { return play(track); }
 }  // namespace esphome::openathan_audio

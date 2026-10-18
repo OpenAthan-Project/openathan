@@ -8,6 +8,7 @@ const specs = {
   settings: { path: "/api/settings", read: "/api/status", groups: ["volume", "preferences"] },
   display: { path: "/api/display", read: "/api/display", groups: ["screen"] },
   lights: { path: "/api/lights", read: "/api/lights", groups: ["lights"] },
+  dua: { path: "/api/dua", read: "/api/dua", groups: ["dua"] },
   time_format: { path: "/api/time-format", read: "/api/time-format", groups: ["format"] }
 };
 const domains = {},
@@ -101,6 +102,7 @@ function calculation(value) {
 function valueFrom(key, state) {
   if (!state) return null;
   if (key === "settings" || key === "lights") return state.settings || null;
+  if (key === "dua") return typeof state.enabled === "boolean" ? { enabled: state.enabled } : null;
   if (key === "display")
     return Number.isFinite(state.brightness_percent)
       ? { brightness_percent: state.brightness_percent }
@@ -292,7 +294,7 @@ function acceptDomain(key, data, order) {
   const older = order < d.order;
   // Unsupported hardware has no loaded preference revision. Accept capability
   // freshness without turning its defaults into confirmed saved values.
-  if (data.supported === false) {
+  if (data.supported === false && key !== "dua") {
     if (!older) {
       d.order = order;
       d.supported = false;
@@ -341,6 +343,7 @@ function acceptDomain(key, data, order) {
     d.supported = data.supported;
     d.mode = data.mode;
     d.observedRevision = data.revision;
+    if (key === "dua") d.observation = clone(data);
   }
   return { stale, lower: !!lower, fault };
 }
@@ -356,12 +359,12 @@ function domainData(key) {
   if (key === "settings") return { ...data, setup: d.setup, ...(value ? { settings: value } : {}) };
   if (d.supported !== undefined) data.supported = d.supported;
   if (d.mode !== undefined) data.mode = d.mode;
-  return { ...data, ...(value ? (key === "lights" ? { settings: value } : value) : {}) };
+  return { ...(key === "dua" ? d.observation : {}), ...data, ...(value ? (key === "lights" ? { settings: value } : value) : {}) };
 }
 function projectSnapshot() {
   if (!observedStatus.data) return;
   snapshot = { ...observedStatus.data, ...domainData("settings") };
-  for (const key of ["display", "lights", "time_format"]) snapshot[key] = domainData(key);
+  for (const key of ["display", "lights", "time_format", "dua"]) snapshot[key] = domainData(key);
   snapshot.firmware = firmware.data;
 }
 function acceptResponse({ data, order }, resource = "status", allowPlayback = true) {
@@ -374,7 +377,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
       throw new Error("Device status is incomplete");
     const previousRevision = domains.settings?.confirmed?.revision ?? 0;
     accepted.settings = acceptDomain("settings", data, order);
-    for (const key of ["display", "lights", "time_format"])
+    for (const key of ["display", "lights", "time_format", "dua"])
       if (data[key]) accepted[key] = acceptDomain(key, data[key], order);
     // Prayer observations belong to their saved revision. A newly accepted
     // revision carries its timetable even if its request preceded a Stop reply.
@@ -398,7 +401,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
         ...operational
       } = data;
       observedStatus.data = { ...operational, playing: observedStatus.data?.playing,
-        quran: observedStatus.data?.quran, playback_source: observedStatus.data?.playback_source };
+        quran: observedStatus.data?.quran, playback_busy: observedStatus.data?.playback_busy, playback_source: observedStatus.data?.playback_source };
       observedStatus.order = order;
       if (actionUncertain && order >= actionOrder) {
         actionUncertain = false;
@@ -407,7 +410,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
     }
     if (allowPlayback && order >= Math.max(observedStatus.playbackOrder, playbackReadFloor)) {
       observedStatus.data = { ...observedStatus.data, playing: data.playing,
-        quran: data.quran, playback_source: data.playback_source };
+        quran: data.quran, playback_busy: data.playback_busy, playback_source: data.playback_source };
       observedStatus.playbackOrder = order;
       playbackAccepted = true;
     }
@@ -501,6 +504,7 @@ function renderPreferences() {
     settings: ["volume", "settings-volume"],
     display: ["screen-brightness"],
     lights: ["lights-brightness"],
+    dua: [],
     time_format: []
   })) {
     const value = current(key);
@@ -530,6 +534,8 @@ function renderPreferences() {
         "error"
       );
   }
+  $("dua-enabled").checked = current("dua")?.enabled ?? false;
+  $("dua-enabled").disabled = !current("dua") || firstRun || !connected;
   $("time-format").value = current("time_format")?.hours ?? "";
   for (const [key, d] of Object.entries(domains)) {
     const fault =
@@ -554,7 +560,7 @@ function renderPreferences() {
           ? ["screen-brightness"]
           : key === "lights"
             ? ["lights-enabled", "lights-brightness"]
-            : ["time-format"];
+            : key === "dua" ? ["dua-enabled"] : ["time-format"];
     elements.forEach((id) => ($(id).disabled = fault || firstRun));
   }
   if (settingsFault()) {
@@ -575,6 +581,19 @@ function renderPreferences() {
   $("hardware-group").hidden = !snapshot?.display?.supported && !snapshot?.lights?.supported;
   $("screen-controls").hidden = !snapshot?.display?.supported;
   $("light-controls").hidden = !snapshot?.lights?.supported;
+  $("dua-group").hidden = !snapshot?.dua;
+  const dua = snapshot?.dua;
+  if (dua) {
+    const progress = dua.total_bytes ? ` ${Math.floor(100 * dua.received_bytes / dua.total_bytes)}%` : "";
+    const message = !connected ? "Connection lost · dua status is stale." : dua.playback_error ? "Dua playback failed. Athan scheduling continues."
+      : dua.ready ? "Recording installed · available offline." : dua.state === "downloading" ? "Downloading recording…" + progress
+      : dua.state === "failed" ? dua.error || "Download failed. Try again."
+      : dua.state === "unavailable" ? dua.error || "Dua recording storage is unavailable. Athan scheduling continues."
+      : current("dua")?.enabled ? "Waiting for Wi-Fi and a safe time between prayers." : "Off · enabling downloads the recording.";
+    text("dua-install-status", message);
+    $("dua-retry").hidden = dua.state !== "failed" || !current("dua")?.enabled;
+    $("dua-retry").disabled = !connected || writing();
+  }
   $("format-group").hidden = !snapshot?.time_format;
 }
 function renderTimes(id, schedule, settings, isPreview = false) {
@@ -716,10 +735,12 @@ function render() {
     state?.automatic_ready && connected && !skipped ? "var(--good)" : "var(--amber)";
   const detail =
     !connected && state
-      ? "Last observed: " + (state.playing ? "playing" : "idle") + ". Playback may still be active."
+      ? "Last observed: " + (state.playback_busy ? "playback pending or active" : state.playing ? "playing" : "idle") + ". Playback may still be active."
       : settingsFault()
         ? (state.playing ? "Playback is active. " : "") +
           "Saved prayer storage is unavailable. Restart the speaker and check saved state."
+        : state?.dua?.phase === "pause" ? "Dua starts shortly. Stop cancels it."
+        : state?.playback_source === "dua" ? "Dua is playing on the speaker."
         : state?.playing
           ? "Playback is active on the speaker."
           : state?.application === "volume_failed"
@@ -739,9 +760,9 @@ function render() {
   }
   $("settings-playing").hidden = !playbackControlsNeeded();
   $("settings-playing").querySelector("strong").textContent = playbackIntent ? "Checking playback"
-    : state?.quran?.state === "loading" ? "Starting Quran" : "Playing";
+    : state?.dua?.phase === "pause" ? "Dua starts shortly" : state?.quran?.state === "loading" ? "Starting Quran" : "Playing";
   $("settings-playing").querySelector(".hint").textContent = connected
-    ? playbackIntent ? quran.playMessage : state?.quran?.state === "loading" ? "Quran is starting on the speaker."
+    ? state?.dua?.phase === "pause" ? "Dua starts shortly. Stop cancels it." : state?.playback_source === "dua" ? "Dua is playing on the speaker." : playbackIntent ? quran.playMessage : state?.quran?.state === "loading" ? "Quran is starting on the speaker."
       : state?.playback_source === "quran" ? "Quran is playing on the speaker." : "Playback is active on the speaker."
     : "Connection lost · playback may still be active.";
   const skipKey = state?.skip,
@@ -806,7 +827,7 @@ try {
 function quranPlaybackFeedback(message, tone = "") {
   quran.playMessage = message; quran.playTone = tone;
 }
-function playbackActive() { return !!snapshot?.playing || snapshot?.quran?.state === "loading"; }
+function playbackActive() { return !!snapshot?.playback_busy || !!snapshot?.playing || snapshot?.quran?.state === "loading"; }
 function playbackControlsNeeded() { return playbackActive() || !!playbackIntent || stopBusy || stopAwaiting; }
 function playbackToken() {
   const token = snapshot?.quran?.playback_token;
@@ -840,7 +861,7 @@ function settlePlaybackIntent() {
     quranPlaybackFeedback(intent.error ? intent.error + ". Check playback before trying again."
       : snapshot.quran?.state === "idle" ? "Playback finished or stopped."
         : "Quran requested. Checking speaker playback…", intent.error ? "error" : "");
-  } else if (snapshot.playing === false && !["loading", "playing"].includes(snapshot.quran?.state) &&
+  } else if (!snapshot.playback_busy && snapshot.playing === false && !["loading", "playing"].includes(snapshot.quran?.state) &&
       (!intent.cancelToken || token && token !== intent.cancelToken)) {
     playbackIntent = null;
     stoppedFeedback(intent.uncertain);
@@ -915,7 +936,7 @@ function renderQuran() {
   $("quran-edition").disabled = disabled || catalogBusy || !quran.editions.length;
   $("quran-surah").disabled = disabled || catalogBusy || !$("quran-edition").value;
   $("quran-play").disabled = disabled || catalogBusy || stopBusy || stopAwaiting || !playbackToken() || !$("quran-surah").value ||
-    snapshot?.playback_source === "athan" || state?.state === "loading";
+    ["athan", "dua"].includes(snapshot?.playback_source) || state?.state === "loading";
   $("quran-stop").hidden = !playbackControlsNeeded();
   $("quran-stop").disabled = !connected || stopBusy;
   text("quran-count", quran.reciters.length ? `${quran.reciters.length} of ${quran.total} reciters loaded` : "");
@@ -924,7 +945,7 @@ function renderQuran() {
   const message = !connected ? (playbackIntent || stopAwaiting) && quran.playMessage || "Connection lost · playback may still be active."
     : playbackIntent || stopBusy || stopAwaiting ? quran.playMessage : state?.state === "loading"
     ? "Starting Quran on the speaker…" : state?.state === "playing" ? `Playing ${surahName || "surah " + state.surah} on the speaker`
-      : snapshot?.playback_source === "athan" ? "Athan is playing on the speaker."
+      : ["athan", "dua"].includes(snapshot?.playback_source) ? "Athan is playing on the speaker."
         : state?.state === "error" ? state.error : state?.supported && !playbackToken()
           ? "Reload the page and check device firmware before pressing Play." : quran.playMessage;
   text("quran-feedback", message);
@@ -947,7 +968,7 @@ async function quranCatalog(payload) {
 }
 function quranCatalogAvailable() {
   return !quran.busy && !playbackIntent && !stopBusy && !stopAwaiting && connected && !firstRun && snapshot?.quran?.supported &&
-    snapshot.quran.state !== "loading" && snapshot.playback_source !== "athan";
+    snapshot.quran.state !== "loading" && ! ["athan", "dua"].includes(snapshot.playback_source);
 }
 function drainQuranSearch() {
   if (quran.pendingSearch && quran.searchReady && quranCatalogAvailable())
@@ -1233,7 +1254,7 @@ function canSaveDomain(key) {
   return (
     (key !== "settings" || !actionUncertain) &&
     d?.confirmed &&
-    d.supported !== false &&
+    (key === "dua" || d.supported !== false) &&
     !storageFault(d) &&
     !d.blocked &&
     !d.operation &&
@@ -1911,6 +1932,16 @@ function renderFirmware(state = firmware.data) {
     $("firmware-notes").href =
       `https://github.com/OpenAthan-Project/openathan/releases/tag/${encodeURIComponent(state.available.version)}`;
 }
+$("dua-enabled").addEventListener("change", () => enqueue("dua", { enabled: $("dua-enabled").checked }));
+$("dua-retry").addEventListener("click", async () => {
+  $("dua-retry").disabled = true;
+  try { acceptResponse(await request("/api/dua/retry", {}), "dua"); }
+  catch (error) {
+    text("dua-install-status", error.message + ". Checking status before retrying.");
+    try { acceptResponse(await request("/api/dua"), "dua"); } catch (readError) { connectionFailure(readError); }
+  }
+  render();
+});
 async function firmwareAction(action) {
   if (firmwareBusy || firmwareUncertain || !firmware.data || firmware.data.updates_enabled === false || writing()) return;
   firmwareBusy = true;
