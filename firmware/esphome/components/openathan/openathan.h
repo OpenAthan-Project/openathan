@@ -73,6 +73,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   void set_offset(size_t index, int value) { if (index < 6) settings_.offsets[index] = value; }
   void set_enabled(size_t index, bool value) { if (index < 5) settings_.enabled[index] = value; }
   float get_setup_priority() const override { return setup_priority::LATE; }
+  void on_shutdown() override { sequence_.stop(); }
   void setup() override;
   void loop() override;
   void update() override;

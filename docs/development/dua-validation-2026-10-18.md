@@ -16,7 +16,8 @@ or played, and no release was published.
   visually inspected at phone and desktop widths using simulated device state.
 - The unchanged production pipeline state-machine bodies passed host checks for
   reader EOF, decoder success, drained output, latched errors, queued cancellation,
-  stale startup flags and delayed task deletion. The production MP3 decoder passed
+  stale startup flags and delayed task deletion. Core-owned shutdown cancellation
+  is checked through the production settings adapter. The production MP3 decoder passed
   real-codec PCM, invalid/empty input, partial EOF, chunking, backpressure and reuse
   checks with and without Quran. Adapter tests separately cover stored completion
   without Quran and the original unmodified-player fallback.
@@ -62,17 +63,17 @@ is relative to 1,572,864 bytes; slot headroom is a further 524,288 bytes larger.
 
 | Variant | Before OTA bytes | After OTA bytes | Delta | Application budget remaining | Static RAM delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| atom | 1,385,952 | 1,400,944 | +14,992 | 171,920 | +256 |
-| waveshare | 1,389,696 | 1,404,704 | +15,008 | 168,160 | +256 |
-| device | 1,124,528 | 1,127,808 | +3,280 | 445,056 | +136 |
-| validation | 1,142,112 | 1,145,408 | +3,296 | 427,456 | +136 |
-| provisioning | 1,387,456 | 1,402,464 | +15,008 | 170,400 | +256 |
-| upgrade | 1,392,288 | 1,411,680 | +19,392 | 161,184 | +256 |
-| upgrade-failure | 1,392,288 | 1,411,680 | +19,392 | 161,184 | +256 |
-| waveshare-audio | 1,304,560 | 1,321,040 | +16,480 | 251,824 | +256 |
-| waveshare-display | 1,368,096 | 1,384,592 | +16,496 | 188,272 | +256 |
-| waveshare-diagnostics | 1,455,712 | 1,472,032 | +16,320 | 100,832 | +256 |
-| quran | 1,458,224 | 1,474,416 | +16,192 | 98,448 | +256 |
+| atom | 1,385,952 | 1,400,976 | +15,024 | 171,888 | +256 |
+| waveshare | 1,389,696 | 1,404,736 | +15,040 | 168,128 | +256 |
+| device | 1,124,528 | 1,127,840 | +3,312 | 445,024 | +136 |
+| validation | 1,142,112 | 1,145,456 | +3,344 | 427,408 | +136 |
+| provisioning | 1,387,456 | 1,402,480 | +15,024 | 170,384 | +256 |
+| upgrade | 1,392,288 | 1,411,696 | +19,408 | 161,168 | +256 |
+| upgrade-failure | 1,392,288 | 1,411,696 | +19,408 | 161,168 | +256 |
+| waveshare-audio | 1,304,560 | 1,321,056 | +16,496 | 251,808 | +256 |
+| waveshare-display | 1,368,096 | 1,384,624 | +16,528 | 188,240 | +256 |
+| waveshare-diagnostics | 1,455,712 | 1,472,048 | +16,336 | 100,816 | +256 |
+| quran | 1,458,224 | 1,474,448 | +16,224 | 98,416 | +256 |
 
 No recording enters an application image. Actual approved-media packaging remains
 pending; media-bank payload size does not consume application budget.

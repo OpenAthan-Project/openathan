@@ -835,6 +835,9 @@ static void dua_api() {
   nvs_test::fail_commit=true;
   CHECK(call("/api/dua",R"({"schema":1,"expected_revision":2,"enabled":false})").code==503);
   CHECK(!f.device.dua_preferences().enabled() && f.device.status().automatic_ready);
+  f.audio.active=true; const auto stops=f.audio.stops;
+  f.device.on_shutdown();
+  CHECK(!f.device.playback_busy() && !f.audio.active && f.audio.stops==stops+1);
 }
 static void time_format_api() {
   using namespace esphome::openathan_device;
