@@ -50,7 +50,8 @@ class SpeakerMediaPlayer final : public Component,
 #endif
 {
  public:
-#ifdef OPENATHAN_QURAN
+  PipelineOutcome announcement_outcome() const { return announcement_pipeline_ ? announcement_pipeline_->outcome() : PipelineOutcome::NONE; }
+  uint32_t announcement_session() const { return announcement_pipeline_ ? announcement_pipeline_->session() : 0; }
   AudioPipelineState announcement_state() const { return announcement_pipeline_state_; }
   bool playback_stopped() const {
     return this->is_ready() && this->media_control_command_queue_ != nullptr &&
@@ -58,7 +59,6 @@ class SpeakerMediaPlayer final : public Component,
            this->announcement_pipeline_state_ == AudioPipelineState::STOPPED &&
            this->media_pipeline_state_ == AudioPipelineState::STOPPED;
   }
-#endif
   float get_setup_priority() const override { return esphome::setup_priority::PROCESSOR; }
   void setup() override;
   void loop() override;

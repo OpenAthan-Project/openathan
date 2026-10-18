@@ -2,6 +2,7 @@
 #include "../openathan/openathan.h"
 #include "upgrade_api.h"
 #include "quran_api.h"
+#include "dua_api.h"
 
 namespace esphome::openathan_device {
 struct ZoneEntry {
@@ -25,6 +26,7 @@ class LocalApi {
   }
   void handle(ApiExchange& request);
   void set_upgrade(UpgradeApi *upgrade) { upgrade_ = upgrade; }
+  void set_dua(DuaApi *dua) { dua_ = dua; }
   void set_quran(QuranApi *quran) { quran_ = quran; }
 
  private:
@@ -41,5 +43,6 @@ class LocalApi {
   bool wifi_connected_{};
   UpgradeApi *upgrade_{};
   QuranApi *quran_{};
+  DuaApi *dua_{};
 };
 }  // namespace esphome::openathan_device

@@ -14,6 +14,7 @@
 #include "esphome/components/wifi/wifi_component.h"
 #include "esphome/core/component.h"
 #include "local_api.h"
+#include "dua.h"
 #include "protocol.h"
 #include "wifi_attempt.h"
 #include "upgrade.h"
@@ -118,6 +119,7 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   std::unique_ptr<LocalApi> api_;
   Upgrade upgrade_;
   Quran quran_;
+  DuaMedia dua_;
   httpd_handle_t server_{};
   std::mutex queue_mutex_;
   std::deque<std::shared_ptr<HttpExchange>> requests_;

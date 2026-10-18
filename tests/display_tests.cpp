@@ -166,6 +166,10 @@ static void persistent_round_ring(const char *directory) {
   in.visual_next=Event{{20735,Prayer::MAGHRIB},in.utc+2700,true,{}};
   in.status.next=Event{{20735,Prayer::ISHA},in.utc+7200,true,{}};
   in.status.automatic_ready=true; in.status.playing=true;
+  in.dua=true;auto dua=present(in);CHECK(equal(dua.heading,"Dua") && equal(dua.main,"Playing") && dua.proximity==LightMode::GREEN);
+  in.status.playing=false;in.dua_pending=true;dua=present(in);
+  CHECK(equal(dua.heading,"Dua") && equal(dua.main,"Starting") && dua.proximity==LightMode::GREEN);
+  in.dua=in.dua_pending=false;in.status.playing=true;
   for (bool quran : {false, true}) {
     in.quran=quran;
     auto frame=present(in);

@@ -111,7 +111,7 @@ def inspect_firmware(build_dir, log, root=ROOT):
 
 def inspect_audio(app, audio_image):
     from release_artifacts import audio_payloads
-    for payload in audio_payloads(audio_image.read_bytes()):
+    for payload in audio_payloads(audio_image.read_bytes(), (ROOT / "release/upgrade-public-key.pem").read_bytes()):
         if payload[:4096] in app:
             raise ValueError("Recording data found embedded in the application")
     return dict(audio_in_application=False)

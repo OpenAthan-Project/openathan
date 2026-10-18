@@ -2,6 +2,8 @@
 
 namespace esphome::openathan_device {
 void Device::on_shutdown() {
+  dua_.shutdown();
+  if (athan_) athan_->playback()->stop();
   upgrade_.shutdown();
   quran_.shutdown();
   phone_session_ = false;

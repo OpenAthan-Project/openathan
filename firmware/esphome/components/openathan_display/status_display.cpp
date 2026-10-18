@@ -20,7 +20,7 @@ void StatusDisplay::handle_control(unsigned action) {
   // Snapshot before Stop, which can synchronously clear a pending/loading
   // session. The press that stopped playback must never open another page.
   const auto connection = connection_reader_ ? connection_reader_() : ::openathan::screen::ConnectionInfo{};
-  const bool busy = connection.playback_busy || athan_->status().playing;
+  const bool busy = connection.playback_busy || athan_->playback_busy();
   if (action == 0) {
     athan_->stop();
     if (busy || is_failed() || !display_ || display_->is_failed() || !connection_reader_ ||
@@ -52,7 +52,7 @@ void StatusDisplay::update() {
   const auto clock = athan_->read();
   const auto status = athan_->status();
   const auto connection = connection_reader_ ? connection_reader_() : ::openathan::screen::ConnectionInfo{};
-  const bool busy = connection.playback_busy || status.playing;
+  const bool busy = connection.playback_busy || athan_->playback_busy();
   const bool setup_visible = connection.setup_active || connection.setup_connecting;
   if (setup_active_ != setup_visible) {
     page_ = setup_active_ && connection.connected && ::openathan::screen::valid_ipv4(connection.ipv4) ?
@@ -88,7 +88,9 @@ void StatusDisplay::update() {
       round_, next_event, clock.utc,
       athan_->playback() && athan_->playback()->source() == ::openathan::PlaybackSource::QURAN,
       connection_reader_ ? &connection_frame : nullptr, page_,
-      connection_reader_ && stop_button_ && !busy};
+      connection_reader_ && stop_button_ && !busy,
+      athan_->playback() && athan_->playback()->source() == ::openathan::PlaybackSource::DUA,
+      athan_->dua_sequence().phase() == ::openathan::DuaSequence::Phase::PAUSE};
   if (cache_.accept(::openathan::screen::present(input))) display_->update();
 }
 }

@@ -12,7 +12,7 @@ namespace openathan {
 constexpr size_t AUDIO_HEADER_SIZE = 4096;
 constexpr size_t AUDIO_METADATA_SIZE = 112;
 constexpr size_t AUDIO_PARTITION_SIZE = 0x380000;
-enum class Track : uint32_t { NORMAL = 1, FAJR = 2 };
+enum class Track : uint32_t { NORMAL = 1, FAJR = 2, DUA = 3 };
 struct AudioTrack {
   uint32_t offset{};
   uint32_t length{};

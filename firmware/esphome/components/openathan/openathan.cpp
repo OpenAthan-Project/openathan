@@ -15,9 +15,11 @@ static time::DSTRule applied_rule(const ::openathan::DstRule &r) {
 }
 void OpenAthan::setup() {
   time_format_preferences_.begin();
+  dua_preferences_.begin();
+  sequence_.set_enabled(dua_preferences_.enabled());
   if (display_output_) { display_preferences_.begin(); apply_display_(); }
   if (light_output_) light_preferences_.begin();
-  scheduler_ = std::make_unique<::openathan::Scheduler>(*this, *calculator_source_, *state_store_, *playback_);
+  scheduler_ = std::make_unique<::openathan::Scheduler>(*this, *calculator_source_, *state_store_, sequence_);
   settings_service_ = std::make_unique<::openathan::SettingsService>(*settings_store_);
   const auto &tz = time::get_global_tz();
   ::openathan::DeviceSettings defaults{settings_,
@@ -96,7 +98,7 @@ std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz
     ::openathan::CivilDate date;
     return local_date(now.utc, value.timezone, date) && scheduler_->validate_schedule(value.prayer, date);
   });
-  if (result == SettingsResult::STORAGE) scheduler_->block_storage();
+  if (result == SettingsResult::STORAGE) { scheduler_->block_storage(); sequence_.cancel_followup(); }
   if (result != SettingsResult::SAVED) return result;
   const bool schedule_changed = !old || old->value.prayer != candidate.prayer || old->value.timezone != candidate.timezone;
   if (schedule_changed) { scheduler_->configure(candidate.prayer); light_day_ = ::openathan::NEVER_CONSUMED; }
@@ -112,6 +114,7 @@ void OpenAthan::apply_volume_() {
   if (maintenance_) return;
   if (!settings_service_ || !settings_service_->healthy() || !scheduler_) return;
   const unsigned wanted = settings_service_->saved()->value.volume;
+  if (!wanted) sequence_.cancel_followup();
   volume_applied_ = playback_->volume_percent() == std::optional<unsigned>(wanted);
   scheduler_->allow_playback(volume_applied_ && activated());
   if (!volume_applied_) {
@@ -120,6 +123,8 @@ void OpenAthan::apply_volume_() {
   } else volume_attempts_ = 0;
 }
 void OpenAthan::loop() {
+  sequence_.set_enabled(dua_preferences_.enabled() && activated() && settings_service_ && settings_service_->healthy());
+  sequence_.tick(esp_timer_get_time() / 1000);
   update_lights_();
   const auto now = static_cast<uint64_t>(esp_timer_get_time() / 1000);
   if (display_output_ && !maintenance_ && !display_output_ok_ && now >= display_next_check_) apply_display_();
@@ -144,7 +149,7 @@ void OpenAthan::update() {
   log_status_();
 }
 void OpenAthan::stop() {
-  if (scheduler_) scheduler_->stop();
+  sequence_.stop();
   log_status_();
 }
 bool OpenAthan::skip_next() {
@@ -298,6 +303,7 @@ std::optional<::openathan::Event> OpenAthan::next_visual_prayer(const ::openatha
   return light_schedule_ok_ ? light_schedule_.next_event(now.utc) : std::nullopt;
 }
 void OpenAthan::quiesce_for_maintenance() {
+  sequence_.stop();
   maintenance_ = true;
   light_next_frame_ = light_retry_at_ = 0;
   update_lights_();

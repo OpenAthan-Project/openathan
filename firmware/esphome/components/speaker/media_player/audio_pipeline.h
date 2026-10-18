@@ -25,6 +25,8 @@ enum class AudioPipelineType : uint8_t {
   ANNOUNCEMENT,
 };
 
+enum class PipelineOutcome : uint8_t { NONE, COMPLETED, CANCELLED, FAILED };
+
 enum class AudioPipelineState : uint8_t {
   STARTING_FILE,
   STARTING_URL,
@@ -79,6 +81,8 @@ class AudioPipeline final {
   /// @brief Stops the pipeline. Sends a stop signal to each task (if running) and clears the ring buffers.
   /// @return ESP_OK if successful or ESP_ERR_TIMEOUT if the tasks did not indicate they stopped
   esp_err_t stop();
+  PipelineOutcome outcome() const { return outcome_; }
+  uint32_t session() const { return session_; }
 
   /// @brief Processes the state of the audio pipeline based on the info_error_queue_ and event_group_. Handles creating
   /// and stopping the pipeline tasks. Needs to be regularly called to update the internal pipeline state.
@@ -108,6 +112,9 @@ class AudioPipeline final {
 
   uint32_t playback_ms_{0};
 
+  PipelineOutcome outcome_{PipelineOutcome::NONE};
+  uint32_t session_{};
+  bool completion_pending_{};
   bool hard_stop_{false};
   bool is_playing_{false};
   bool is_finishing_{false};

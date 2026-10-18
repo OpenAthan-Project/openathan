@@ -38,7 +38,7 @@ def validate_partitions(path=PARTITIONS):
         raise ValueError("Partition layout does not match the versioned feasibility storage contract")
 
 
-def build_image(normal: bytes, fajr: bytes):
+def build_image(normal: bytes, fajr: bytes, dua=None, dua_envelope=None):
     tracks = []
     cursor = HEADER_SIZE
     for track_id, (name, payload) in enumerate((("normal", normal), ("fajr", fajr)), 1):
@@ -57,9 +57,21 @@ def build_image(normal: bytes, fajr: bytes):
                          track["length"], 1, bytes.fromhex(track["sha256"]))
         image[track["offset"]:track["offset"] + track["length"]] = payload
     image[112:144] = hashlib.sha256(image[:112]).digest()
-    return bytes(image), dict(format="OAUDIO01", partition="athan_audio", partition_offset=PARTITION_OFFSET,
+    if dua is not None:
+        from dua_media import BANK_START, BANK_SIZE, bank
+        if cursor > BANK_START or dua_envelope is None:
+            raise ValueError("Dua banks overlap Athan recordings or lack a signed descriptor")
+        image[BANK_START:BANK_START + BANK_SIZE] = bank(dua, dua_envelope)
+    elif dua_envelope is not None:
+        raise ValueError("Dua descriptor requires a recording")
+    manifest = dict(format="OAUDIO01", partition="athan_audio", partition_offset=PARTITION_OFFSET,
                              partition_size=PARTITION_SIZE, used_bytes=cursor, free_bytes=PARTITION_SIZE-cursor,
                              tracks=tracks, image_sha256=hashlib.sha256(image).hexdigest())
+    if dua is not None:
+        manifest["dua"] = dict(bank_start=BANK_START, reserved_bytes=2*BANK_SIZE, bytes=len(dua),
+                               sha256=hashlib.sha256(dua).hexdigest())
+        manifest["free_bytes"] = BANK_START-cursor
+    return bytes(image), manifest
 
 
 def read_recording(path):

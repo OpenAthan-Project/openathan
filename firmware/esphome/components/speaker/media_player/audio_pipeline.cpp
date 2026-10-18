@@ -40,11 +40,13 @@ enum EventGroupBits : uint32_t {
   READER_MESSAGE_FINISHED = (1 << 7),
   // Error reading the file; cleared by process_state()
   READER_MESSAGE_ERROR = (1 << 8),
+  READER_MESSAGE_EOF = (1 << 9),
 
   // Decoder is done (either through a faiilure or the end of the stream); cleared by decoder task
   DECODER_MESSAGE_FINISHED = (1 << 12),
   // Error decoding the file; cleared by process_state() by decoder task
   DECODER_MESSAGE_ERROR = (1 << 13),
+  DECODER_MESSAGE_SUCCESS = (1 << 14),
 };
 
 AudioPipeline::AudioPipeline(speaker::Speaker *speaker, size_t buffer_size, bool task_stack_in_psram,
@@ -62,6 +64,7 @@ void AudioPipeline::start_url(const std::string &uri) {
   if (this->is_playing_) {
     xEventGroupSetBits(this->event_group_, PIPELINE_COMMAND_STOP);
   }
+  outcome_ = PipelineOutcome::NONE; completion_pending_ = false; ++session_;
   this->current_uri_ = uri;
   this->pending_url_ = true;
 }
@@ -70,11 +73,14 @@ void AudioPipeline::start_file(audio::AudioFile *audio_file) {
   if (this->is_playing_) {
     xEventGroupSetBits(this->event_group_, PIPELINE_COMMAND_STOP);
   }
+  outcome_ = PipelineOutcome::NONE; completion_pending_ = false; ++session_;
   this->current_audio_file_ = audio_file;
   this->pending_file_ = true;
 }
 
 esp_err_t AudioPipeline::stop() {
+  if (outcome_ != PipelineOutcome::FAILED) outcome_ = PipelineOutcome::CANCELLED;
+  completion_pending_ = false;
   xEventGroupSetBits(this->event_group_, EventGroupBits::PIPELINE_COMMAND_STOP);
 
   return ESP_OK;
@@ -163,6 +169,7 @@ AudioPipelineState AudioPipeline::process_state() {
         this->start_tasks_();
       }
 
+      xEventGroupClearBits(this->event_group_, EventGroupBits::READER_MESSAGE_EOF | EventGroupBits::DECODER_MESSAGE_SUCCESS);
       if (this->pending_url_) {
         xEventGroupSetBits(this->event_group_, EventGroupBits::READER_COMMAND_INIT_HTTP);
         this->playback_ms_ = 0;
@@ -180,11 +187,13 @@ AudioPipelineState AudioPipeline::process_state() {
 
   if ((event_bits & EventGroupBits::READER_MESSAGE_ERROR)) {
     xEventGroupClearBits(this->event_group_, EventGroupBits::READER_MESSAGE_ERROR);
+    outcome_ = PipelineOutcome::FAILED; completion_pending_ = false;
     return AudioPipelineState::ERROR_READING;
   }
 
   if ((event_bits & EventGroupBits::DECODER_MESSAGE_ERROR)) {
     xEventGroupClearBits(this->event_group_, EventGroupBits::DECODER_MESSAGE_ERROR);
+    outcome_ = PipelineOutcome::FAILED; completion_pending_ = false;
     return AudioPipelineState::ERROR_DECODING;
   }
 
@@ -197,7 +206,13 @@ AudioPipelineState AudioPipeline::process_state() {
       // Stop command is fully processed, so clear the command bit
       xEventGroupClearBits(this->event_group_, EventGroupBits::PIPELINE_COMMAND_STOP);
       this->hard_stop_ = true;
+      completion_pending_ = false;
+      if (outcome_ != PipelineOutcome::FAILED) outcome_ = PipelineOutcome::CANCELLED;
     }
+
+    if ((event_bits & EventGroupBits::READER_MESSAGE_EOF) && (event_bits & EventGroupBits::DECODER_MESSAGE_SUCCESS) &&
+        !(event_bits & EventGroupBits::PIPELINE_COMMAND_STOP) && outcome_ == PipelineOutcome::NONE)
+      completion_pending_ = true;
 
     if (!this->is_playing_) {
       // The tasks have been stopped for two ``process_state`` calls in a row, so delete the tasks
@@ -223,6 +238,7 @@ AudioPipelineState AudioPipeline::process_state() {
     }
     this->is_playing_ = false;
     if (!this->speaker_->is_running()) {
+      if (completion_pending_ && outcome_ == PipelineOutcome::NONE) outcome_ = PipelineOutcome::COMPLETED;
       return AudioPipelineState::STOPPED;
     } else {
       this->is_finishing_ = true;
@@ -236,6 +252,7 @@ AudioPipelineState AudioPipeline::process_state() {
   if (this->is_finishing_) {
     if (!this->speaker_->is_running()) {
       this->is_finishing_ = false;
+      if (completion_pending_ && outcome_ == PipelineOutcome::NONE) outcome_ = PipelineOutcome::COMPLETED;
     } else {
       return AudioPipelineState::PLAYING;
     }
@@ -361,6 +378,7 @@ void AudioPipeline::read_task(void *params) {
         audio::AudioReaderState reader_state = reader->read();
 
         if (reader_state == audio::AudioReaderState::FINISHED) {
+          xEventGroupSetBits(this_pipeline->event_group_, EventGroupBits::READER_MESSAGE_EOF);
           break;
         } else if (reader_state == audio::AudioReaderState::FAILED) {
           xEventGroupSetBits(this_pipeline->event_group_,
@@ -449,6 +467,7 @@ void AudioPipeline::decode_task(void *params) {
         }
 
         if (decoder_state == audio::AudioDecoderState::FINISHED) {
+          xEventGroupSetBits(this_pipeline->event_group_, EventGroupBits::DECODER_MESSAGE_SUCCESS);
           break;
         } else if (decoder_state == audio::AudioDecoderState::FAILED) {
           if (!has_stream_info) {

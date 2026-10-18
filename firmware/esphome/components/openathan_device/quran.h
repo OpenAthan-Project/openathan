@@ -10,7 +10,7 @@ class Quran : public QuranApi {
   void begin(openathan_component::OpenAthan *athan, const std::string &boot_id) { athan_ = athan; boot_id_ = boot_id; }
   void loop(bool connected, bool blocked);
   void shutdown();
-  bool playback_pending() const;
+  bool playback_pending() const override;
   void snapshot(JsonObject root) override;
   void catalog_snapshot(JsonObject root) override;
   int action(const std::string &action, JsonObjectConst input, std::string &error) override;

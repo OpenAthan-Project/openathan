@@ -218,3 +218,14 @@ runtime limitations. The [maintenance validation report](../../docs/development/
 records the subsequent controller organization, scenario-specific test waits and
 matched capacity measurements.
 Browser fixtures are simulated; they do not establish physical-device behavior.
+
+
+## Dua after Athan
+
+The independent optional preference queues a recording download when enabled;
+readiness and download feedback remain distinct from the saved toggle. Readback
+reconciles uncertain writes without repeating them. The shared `playback_busy`
+observation keeps Stop reachable through the silent two-second pause and orders
+playback status independently of preference revisions. Older firmware without a
+`dua` observation keeps the section hidden. See the [dua contract](../../docs/development/dua.md)
+for APIs, failure/recovery behavior and pending physical qualification.

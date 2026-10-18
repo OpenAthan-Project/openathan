@@ -89,12 +89,27 @@ int main(int argc, char **argv) {
   player.drain_commands(); valid.loop();
   check(player.commands == std::vector<std::string>({"stop media", "stop announcement", "play"}));
   auto epoch = valid.playback_epoch();
+#ifndef OPENATHAN_QURAN
+  check(!valid.start_stream("https://cdn.mp3quran.net/test/001.mp3"));
+  check(valid.dua_supported());
+  valid.stop(); player.pipeline_state = esphome::speaker::AudioPipelineState::STOPPED;
+  player.state = esphome::media_player::MEDIA_PLAYER_STATE_IDLE; player.drain_commands();
+  check(valid.start(Track::NORMAL)); player.drain_commands(); valid.loop(); player.drain_commands();
+  player.pipeline_state = esphome::speaker::AudioPipelineState::PLAYING;
+  player.state = esphome::media_player::MEDIA_PLAYER_STATE_ANNOUNCING; valid.loop();
+  player.outcome = esphome::speaker::PipelineOutcome::COMPLETED;
+  player.pipeline_state = esphome::speaker::AudioPipelineState::STOPPED;
+  player.state = esphome::media_player::MEDIA_PLAYER_STATE_IDLE; valid.loop();
+  check(valid.completion().outcome == openathan::PlaybackOutcome::COMPLETED);
+  std::cout << "Stored completion works without Quran streaming\n"; return 0;
+#endif
   check(!valid.start_stream("http://cdn.mp3quran.net/test/001.mp3"));
   check(valid.playback_epoch() == epoch);
   check(valid.start_stream("https://cdn.mp3quran.net/audio/test/001.mp3"));
   check(valid.source() == openathan::PlaybackSource::QURAN);
   check(valid.playback_epoch() != epoch);
   player.drain_commands(); valid.loop();
+  player.drain_commands();
   player.pipeline_state = esphome::speaker::AudioPipelineState::ERROR_DECODING;
   valid.loop();
   check(valid.stream_state() == openathan::StreamState::ERROR);
@@ -140,6 +155,7 @@ int main(int argc, char **argv) {
   handoff.state = State::MEDIA_PLAYER_STATE_ANNOUNCING; audio.loop();
   check(audio.source() == Source::ATHAN && audio.playback_epoch() == epoch);
   handoff.pipeline_state = Pipeline::STOPPED; handoff.state = State::MEDIA_PLAYER_STATE_IDLE;
+  handoff.outcome = esphome::speaker::PipelineOutcome::COMPLETED;
   audio.loop(); check(audio.source() == Source::NONE);
 
   // Direct play() and rapid stored/stream replacements use the same boundary;
@@ -195,12 +211,12 @@ int main(int argc, char **argv) {
     check(audio.stream_state() == Stream::LOADING && audio.source() == Source::QURAN);
     handoff.drain_commands(); audio.loop(); check(audio.stream_state() == Stream::LOADING);
     handoff.pipeline_state = Pipeline::STOPPED; audio.loop();
-    handoff.pipeline_state = failure; audio.loop();
+    handoff.drain_commands(); handoff.pipeline_state = failure; audio.loop();
     check(audio.stream_state() == Stream::ERROR && audio.source() == Source::NONE);
     handoff.commands.clear(); handoff.drain_commands(); handoff.pipeline_state = Pipeline::STOPPED;
     audio.loop(); check(handoff.commands.empty());
     check(audio.start(Track::NORMAL)); handoff.drain_commands(); audio.loop();
-    handoff.pipeline_state = failure; audio.loop(); check(audio.source() == Source::NONE);
+    handoff.drain_commands(); handoff.pipeline_state = failure; audio.loop(); check(audio.source() == Source::NONE);
     handoff.pipeline_state = Pipeline::STOPPED; handoff.drain_commands();
   }
 }

@@ -15,10 +15,15 @@ enum class AudioFileType { MP3 };
 struct AudioFile { const uint8_t *data; size_t length; AudioFileType file_type; };
 }
 namespace speaker {
+enum class PipelineOutcome { NONE, COMPLETED, CANCELLED, FAILED };
 enum class AudioPipelineState { STOPPED, PLAYING, ERROR_READING, ERROR_DECODING };
 struct SpeakerMediaPlayer {
   AudioPipelineState pipeline_state{AudioPipelineState::STOPPED};
   AudioPipelineState media_pipeline_state{AudioPipelineState::STOPPED};
+  PipelineOutcome outcome{PipelineOutcome::NONE};
+  uint32_t session{};
+  uint32_t announcement_session() const { return session; }
+  PipelineOutcome announcement_outcome() const { return outcome; }
   AudioPipelineState announcement_state() const { return pipeline_state; }
   bool playback_stopped() const {
     return initialized && pending_commands.empty() && pipeline_state == AudioPipelineState::STOPPED &&
@@ -33,8 +38,13 @@ struct SpeakerMediaPlayer {
   std::vector<std::string> commands;
   std::deque<std::string> pending_commands;
   // Consuming a Stop command does not synchronously stop a worker pipeline.
-  void drain_command() { if (!pending_commands.empty()) pending_commands.pop_front(); }
-  void drain_commands() { pending_commands.clear(); }
+  void drain_command() {
+    if (!pending_commands.empty()) {
+      const auto command = pending_commands.front(); pending_commands.pop_front();
+      if (command == "play" || command.rfind("https:", 0) == 0) { ++session; outcome = PipelineOutcome::NONE; }
+    }
+  }
+  void drain_commands() { while (!pending_commands.empty()) drain_command(); }
   void queue(const std::string &command) { commands.push_back(command); pending_commands.push_back(command); }
   struct Call {
     SpeakerMediaPlayer *player;

@@ -4,7 +4,12 @@
 #include <string>
 
 namespace openathan {
-enum class PlaybackSource { NONE, ATHAN, QURAN };
+enum class PlaybackSource { NONE, ATHAN, QURAN, DUA };
+enum class PlaybackOutcome { NONE, COMPLETED, CANCELLED, FAILED };
+struct PlaybackCompletion {
+  uint32_t epoch{};
+  PlaybackOutcome outcome{PlaybackOutcome::NONE};
+};
 enum class StreamState { IDLE, LOADING, PLAYING, ERROR };
 class Playback {
  public:
@@ -13,6 +18,12 @@ class Playback {
   // Active playback health may remain true while new starts are temporarily gated.
   virtual bool healthy() const { return ready(); }
   virtual bool playing() const = 0;
+  virtual bool busy() const { return playing() || source() != PlaybackSource::NONE || stream_state() == StreamState::LOADING; }
+  virtual PlaybackCompletion completion() const { return {}; }
+  virtual bool dua_supported() const { return false; }
+  virtual bool dua_ready() const { return false; }
+  // Optional product media binding. Caller retains immutable bytes until idle.
+  virtual bool set_dua_data(const uint8_t *, size_t) { return false; }
   // Replace current audio; true means the request was accepted, not audibly played.
   virtual bool start(Track track) = 0;
   virtual void stop() = 0;

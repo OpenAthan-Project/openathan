@@ -155,3 +155,11 @@ MP3 fixtures verify decoded PCM, chunked input, graceful partial EOF, sink
 backpressure and decoder reuse. Empty, text-only, ID3-only and incomplete first
 frames must fail in Quran-enabled builds; the non-Quran path retains upstream
 EOF behavior. No hardware playback or audible acceptance is established.
+
+
+The reference host checks also run the production pipeline completion state
+machine and optional dua downloader with deterministic I/O. The downloader checks
+interrupted erase/write recovery without changing the normal/Fajr data, signature
+and size rejection, and cancellation. These synthetic checks do not establish
+hardware flash latency, listening quality or runtime memory headroom; see the
+[dua contract](../../docs/development/dua.md).

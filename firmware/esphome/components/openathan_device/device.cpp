@@ -75,6 +75,8 @@ void Device::setup() {
   api_->set_upgrade(&upgrade_);
   quran_.begin(athan_, random_nonce());
   api_->set_quran(&quran_);
+  dua_.begin(athan_);
+  api_->set_dua(&dua_);
   hostname_ = std::string(App.get_name().c_str()) + ".local";
   const std::string mac = get_mac_address();
   realm_ = "OpenAthan-" + mac;
@@ -154,7 +156,7 @@ bool Device::connected() const {
 }
 bool Device::playback_busy() const {
   const auto *playback = athan_ ? athan_->playback() : nullptr;
-  return quran_.playback_pending() || (playback && (playback->playing() ||
+  return (athan_ && athan_->playback_busy()) || quran_.playback_pending() || (playback && (playback->playing() ||
       playback->source() != ::openathan::PlaybackSource::NONE ||
       playback->stream_state() == ::openathan::StreamState::LOADING));
 }
@@ -222,6 +224,7 @@ void Device::serial_request(const Frame& request) {
       send_(true, 2, {255}); return;
     }
     std::vector<std::string> reply;
+    if (dua_.active() || quran_.playback_pending()) { dua_.shutdown(); send_(true, 2, {255}); return; }
     const auto error = upgrade_.usb_command(command, fields, reply);
     if (error) send_(true, 2, {error}); else result_(true, command, reply);
     return;
@@ -326,8 +329,15 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
   scanning_ = false;
 }
 void Device::loop() {
+  upgrade_.set_audio_busy(dua_.active() || quran_.playback_pending());
   upgrade_.loop(wifi::global_wifi_component->is_connected());
-  quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || upgrade_.streaming_blocked());
+  const auto dua_clock = athan_->read();
+  const auto dua_status = athan_->status();
+  const bool dua_window = upgrade_window(playback_busy(), dua_clock.valid, athan_->activated(),
+      dua_status.automatic_ready, dua_clock.utc, dua_status.next ? std::optional<int64_t>(dua_status.next->utc) : std::nullopt);
+  dua_.loop(connected(), dua_window && athan_->activated() && upgrade_.confirmed() && !maintenance_ && !phone_setup_active() &&
+      !wifi_attempt_.active() && !scanning_ && !upgrade_.streaming_blocked());
+  quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || dua_.active() || upgrade_.streaming_blocked());
   const auto now = now_ms();
   phone_loop_(now);
   if (wifi_attempt_.active()) {

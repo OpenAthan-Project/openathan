@@ -32,8 +32,18 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   ::openathan::LightSaveResult change_lights(::openathan::LightSettings value, uint32_t revision);
   const char *light_application_status() const;
   ::openathan::LightMode current_light_mode() const { return light_mode_; }
-  void set_playback(::openathan::Playback *playback) { playback_ = playback; }
-  ::openathan::Playback *playback() const { return playback_; }
+  const ::openathan::DuaPreferences &dua_preferences() const { return dua_preferences_; }
+  const ::openathan::DuaSequence &dua_sequence() const { return sequence_; }
+  ::openathan::DuaSaveResult change_dua(bool enabled, uint32_t revision) {
+    if (maintenance_) return ::openathan::DuaSaveResult::STORAGE;
+    const auto result = dua_preferences_.update(enabled, revision);
+    sequence_.set_enabled(dua_preferences_.enabled());
+    return result;
+  }
+  bool playback_busy() const { return sequence_.busy(); }
+  void set_playback(::openathan::Playback *playback) { playback_ = playback; sequence_.set_backend(playback); }
+  ::openathan::Playback *playback() { return &sequence_; }
+  const ::openathan::Playback *playback() const { return &sequence_; }
   // Internal injection points, wired before setup by the developer test harness.
   void set_calculator(::openathan::DayCalculator *calculator) { calculator_source_ = calculator; }
   void set_state_store(::openathan::StateStore *store) { state_store_ = store; }
@@ -99,6 +109,9 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   bool display_output_ok_{};
   uint64_t display_next_check_{};
   void apply_display_();
+  NvsDuaStore dua_store_;
+  ::openathan::DuaPreferences dua_preferences_{dua_store_};
+  ::openathan::DuaSequence sequence_;
   NvsTimeFormatStore time_format_store_;
   ::openathan::TimeFormatPreferences time_format_preferences_{time_format_store_};
   NvsLightStore light_store_;

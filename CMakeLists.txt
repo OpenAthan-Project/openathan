@@ -9,7 +9,7 @@ add_test(NAME upgrade_safe_window COMMAND upgrade_policy_tests)
 file(GLOB ADHAN_SOURCES CONFIGURE_DEPENDS third_party/adhan-cpp/src/*.cpp)
 add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp
-  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp ${ADHAN_SOURCES})
+  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp lib/openathan-core/src/dua.cpp ${ADHAN_SOURCES})
 target_include_directories(openathan_core PUBLIC lib/openathan-core/include third_party/adhan-cpp/include)
 add_executable(prayer_tests tests/prayer_tests.cpp)
 target_link_libraries(prayer_tests PRIVATE openathan_core)
@@ -158,3 +158,16 @@ foreach(mode IN ITEMS production isolated)
   endif()
   add_test(NAME time_format_${mode} COMMAND time_format_${mode}_tests)
 endforeach()
+
+add_executable(dua_tests tests/dua_tests.cpp)
+target_link_libraries(dua_tests PRIVATE openathan_core)
+add_test(NAME dua_sequence_and_preferences COMMAND dua_tests)
+
+add_executable(audio_adapter_no_quran_tests tests/audio_adapter_tests.cpp
+  firmware/esphome/components/openathan_audio/partition_audio.cpp)
+target_compile_definitions(audio_adapter_no_quran_tests PRIVATE OPENATHAN_DUA_PIPELINE)
+target_include_directories(audio_adapter_no_quran_tests PRIVATE tests/stubs lib/openathan-core/include
+  firmware/esphome/components/openathan_audio)
+if(NOT APPLE)
+  target_link_libraries(audio_adapter_no_quran_tests PRIVATE OpenSSL::Crypto)
+endif()
