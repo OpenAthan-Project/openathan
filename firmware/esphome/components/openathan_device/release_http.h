@@ -3,10 +3,15 @@
 #include <esp_crt_bundle.h>
 #include <string>
 #include <strings.h>
+#ifdef OPENATHAN_DUA_QUALIFICATION
+#include "esphome/components/openathan_dua_qualification/qualification.h"
+#endif
 namespace esphome::openathan_device::release_http {
 inline bool allowed_url(const std::string &url) {
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
   return openathan_upgrade_qualification::allowed_url(url);
+#elif defined(OPENATHAN_DUA_QUALIFICATION)
+  return openathan_dua_qualification::allowed_url(url);
 #else
   // Redirects are necessary for GitHub release storage. Never send device
   // credentials, and never follow an insecure or arbitrary-host redirect.
@@ -34,6 +39,8 @@ struct Response {
       config.url = url.c_str();
 #ifdef OPENATHAN_UPGRADE_QUALIFICATION
       openathan_upgrade_qualification::configure_tls(config);
+#elif defined(OPENATHAN_DUA_QUALIFICATION)
+      openathan_dua_qualification::configure_tls(config);
 #else
       config.crt_bundle_attach = esp_crt_bundle_attach;
 #endif

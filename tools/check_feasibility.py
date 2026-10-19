@@ -19,16 +19,19 @@ def inspect_build_profile(build_dir, app):
     defines = (build_dir / "src/esphome/core/defines.h").read_text()
     upgrade = "#define OPENATHAN_UPGRADE_QUALIFICATION\n" in defines
     quran = "#define OPENATHAN_QURAN_QUALIFICATION\n" in defines
-    qualification = upgrade or quran
+    dua = "#define OPENATHAN_DUA_QUALIFICATION\n" in defines
+    qualification = upgrade or quran or dua
     isolated = "#define OPENATHAN_PROVISIONING_TEST_STORAGE\n" in defines
-    if upgrade and quran:
+    if sum((upgrade, quran, dua)) > 1:
         raise ValueError("Qualification profiles are mutually exclusive")
     if ((not upgrade and b"OPENATHAN_QUALIFICATION_V1" in app) or
-            (not quran and b"OPENATHAN_QURAN_QUALIFICATION_V1" in app)):
+            (not quran and b"OPENATHAN_QURAN_QUALIFICATION_V1" in app) or
+            (not dua and b"OPENATHAN_DUA_QUALIFICATION_V1" in app)):
         raise ValueError("Qualification identity must match the build profile")
     commands = (build_dir / "build/compile_commands.json").read_text()
     for kind, enabled, family in (("upgrade", upgrade, "OPENATHAN_QUALIFICATION_"),
-                                  ("quran", quran, "OPENATHAN_QURAN_QUALIFICATION_")):
+                                  ("quran", quran, "OPENATHAN_QURAN_QUALIFICATION_"),
+                                  ("dua", dua, "OPENATHAN_DUA_QUALIFICATION_")):
         component = build_dir / f"src/esphome/components/openathan_{kind}_qualification"
         compiled = f"/openathan_{kind}_qualification/qualification.cpp" in commands
         if enabled:
@@ -42,6 +45,9 @@ def inspect_build_profile(build_dir, app):
     if quran and ('#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines or
                   b"OPENATHAN_QURAN_QUALIFICATION_V1" not in app):
         raise ValueError("Quran qualification requires disabled updates and its identity marker")
+    if dua and ('#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines or
+                b"OPENATHAN_DUA_QUALIFICATION_V1" not in app):
+        raise ValueError("Dua qualification requires disabled updates and its identity marker")
     reject_test_material(app, allow_qualification=qualification, allow_isolated=isolated)
     return qualification, isolated
 

@@ -1,6 +1,9 @@
 #include "dua.h"
 #include "upgrade.h"
 #include "release_http.h"
+#ifdef OPENATHAN_DUA_QUALIFICATION
+#include "esphome/components/openathan_dua_qualification/qualification.h"
+#endif
 #include "esphome/core/application.h"
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
@@ -53,7 +56,11 @@ bool DuaMedia::verify_(const char *envelope, size_t size, uint32_t bytes, const 
       !unhex(signature, sig.data(), signature.size() / 2) ||
       mbedtls_sha256(reinterpret_cast<const uint8_t *>(payload.data()), payload.size(), hash, 0)) return false;
   mbedtls_pk_context key; mbedtls_pk_init(&key);
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  const char *pem = OPENATHAN_DUA_QUALIFICATION_PUBLIC_KEY;
+#else
   const char *pem = OPENATHAN_UPGRADE_PUBLIC_KEY;
+#endif
   const bool verified = !mbedtls_pk_parse_public_key(&key, reinterpret_cast<const uint8_t *>(pem), std::strlen(pem) + 1) &&
       !mbedtls_pk_verify(&key, MBEDTLS_MD_SHA256, hash, 32, sig.data(), signature.size() / 2);
   mbedtls_pk_free(&key);
@@ -138,13 +145,15 @@ void DuaMedia::loop(bool connected, bool permitted) {
   if (!safe_) { state_ = "waiting"; return; }
   // Only the explicitly isolated private-trust qualification component may
   // override the production transport. Ordinary isolated builds stay offline.
-#ifdef OPENATHAN_UPGRADE_QUALIFICATION
-  constexpr bool private_qualification = true;
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  constexpr bool download_allowed = true;
+#elif defined(OPENATHAN_UPGRADE_QUALIFICATION)
+  constexpr bool download_allowed = OPENATHAN_UPDATES_ENABLED;
 #else
-  constexpr bool private_qualification = false;
+  const bool download_allowed = !openathan_storage::TEST_MODE &&
+      std::strcmp(OPENATHAN_BUILD_COMMIT, "development") != 0 && OPENATHAN_UPDATES_ENABLED;
 #endif
-  if ((!private_qualification && (openathan_storage::TEST_MODE || std::strcmp(OPENATHAN_BUILD_COMMIT, "development") == 0)) ||
-      !OPENATHAN_UPDATES_ENABLED) {
+  if (!download_allowed) {
     state_ = "unavailable"; error_ = "Dua downloads require production firmware"; return;
   }
   target_ = staging_ ? staging_ - 1 : 0;
@@ -161,12 +170,17 @@ void DuaMedia::loop(bool connected, bool permitted) {
 void DuaMedia::worker_(void *argument) {
   auto *self = static_cast<DuaMedia *>(argument);
   self->run_();
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  openathan_dua_qualification::worker_finished(uxTaskGetStackHighWaterMark(nullptr));
+#endif
   self->active_ = false;
   vTaskDelete(nullptr);
 }
 void DuaMedia::run_() {
   using namespace ::openathan;
-#ifdef OPENATHAN_UPGRADE_QUALIFICATION
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  const auto base = std::string(openathan_dua_qualification::RELEASE_BASE) + "download/" + OPENATHAN_FIRMWARE_VERSION + "/";
+#elif defined(OPENATHAN_UPGRADE_QUALIFICATION)
   const auto base = std::string(openathan_upgrade_qualification::RELEASE_BASE) + "download/" + OPENATHAN_FIRMWARE_VERSION + "/";
 #else
   const auto base = std::string("https://github.com/OpenAthan-Project/openathan/releases/download/") + OPENATHAN_FIRMWARE_VERSION + "/";
@@ -261,5 +275,8 @@ void DuaMedia::snapshot(JsonObject root) {
   root["state"] = state_; root["error"] = error_; root["received_bytes"] = received_; root["total_bytes"] = total_;
   root["phase"] = ::openathan::dua_phase_name(athan_->dua_sequence().phase());
   root["playback_error"] = athan_->dua_sequence().failed();
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  openathan_dua_qualification::snapshot(root);
+#endif
 }
 }  // namespace esphome::openathan_device

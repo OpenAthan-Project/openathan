@@ -33,11 +33,19 @@ def check(include):
                 raise ValueError('Missing qualification transport: ' + signature)
             methods.append(match[0])
         (work / 'dua_qualification_transport.inc').write_text('\n'.join(methods))
-        for flags in ([], ['-DOPENATHAN_PROVISIONING_TEST_STORAGE'], [
+        for flags in ([], ['-DOPENATHAN_UPDATES_ENABLED=0'], ['-DOPENATHAN_PROVISIONING_TEST_STORAGE'], [
                 '-DOPENATHAN_UPGRADE_QUALIFICATION', '-DOPENATHAN_PROVISIONING_TEST_STORAGE',
                 '-DOPENATHAN_QUALIFICATION_ORIGIN="https://192.168.1.2:8443"',
-                '-DOPENATHAN_QUALIFICATION_CA="host private CA"', '-DOPENATHAN_QUALIFICATION_STARTUP_FAILURE=false']):
-            subprocess.run(command + ['-I' + str(work), *flags], check=True)
+                '-DOPENATHAN_QUALIFICATION_CA="host private CA"', '-DOPENATHAN_QUALIFICATION_STARTUP_FAILURE=false'], [
+                '-DOPENATHAN_DUA_QUALIFICATION', '-DOPENATHAN_PROVISIONING_TEST_STORAGE',
+                '-DOPENATHAN_UPDATES_ENABLED=0',
+                '-DOPENATHAN_DUA_QUALIFICATION_ORIGIN="https://192.168.1.2:8443"',
+                '-DOPENATHAN_DUA_QUALIFICATION_CA="host private CA"',
+                '-DOPENATHAN_DUA_QUALIFICATION_PUBLIC_KEY="host dua key"']):
+            sources = []
+            if '-DOPENATHAN_DUA_QUALIFICATION' in flags:
+                sources.append(str(ROOT / 'firmware/esphome/components/openathan_dua_qualification/qualification.cpp'))
+            subprocess.run(command + ['-I' + str(work), *flags, *sources], check=True)
             subprocess.run([str(output), str(fixture)], check=True)
 
 if __name__ == '__main__':

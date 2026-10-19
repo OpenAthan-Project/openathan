@@ -1,0 +1,20 @@
+# Private media qualification only; no firmware update transport is enabled.
+substitutions:
+  dua_qualification_version: v0.0.1
+packages:
+  isolated: !include ../provisioning/validation.yaml
+esphome:
+  project:
+    version: ${dua_qualification_version}
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [openathan_dua_qualification]
+openathan_device:
+  updates_enabled: false
+openathan_dua_qualification:
+  origin: !secret dua_qualification_origin
+  ca_file: !secret dua_qualification_ca_file
+  public_key_file: !secret dua_qualification_public_key_file
+  version: ${dua_qualification_version}
