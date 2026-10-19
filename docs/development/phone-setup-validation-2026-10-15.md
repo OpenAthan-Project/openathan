@@ -1,5 +1,9 @@
 # Phone setup validation — 2026-10-15
 
+October 19 follow-up: [attended setup, cold restart, webpage discovery and
+production update observations](phone-setup-validation-2026-10-19.md) add later
+evidence. The implementation-time results and limits below remain dated.
+
 This report covers the unreleased first-run phone setup change relative to merged
 main `5ac1802d9251596375caece5186f5637a0c4c3fa`. It records automated checks and
 compile-only firmware measurements. No hardware installation, physical phone

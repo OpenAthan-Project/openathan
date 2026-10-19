@@ -1,5 +1,9 @@
 # Speaker-page discovery — development validation, 2026-10-14
 
+October 19 follow-up: [attended setup, cold restart, webpage discovery and
+production update observations](phone-setup-validation-2026-10-19.md) add later
+physical evidence. The implementation-time results and limits below remain dated.
+
 This unreleased addition lets an owner find the device-local page without a
 bookmark. A short idle press cycles Atom through QR, address information and
 normal status. Waveshare shows one combined connection view inside its existing
