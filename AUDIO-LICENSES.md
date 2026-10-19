@@ -1,10 +1,12 @@
 # Release recording rights and attribution
 
 The project maintainer approved Fajr on **2026-09-28** and the current replacement
-normal recording on **2026-10-01**,
-following review of AlAdhan / Islamic Network's written permission for offline
+normal recording on **2026-10-01**, following review of AlAdhan / Islamic Network's
+written permission for offline
 bundling and redistribution in a free application without ads or in-app purchases.
-The [recording registry](release/recordings.json) binds that decision to the exact
+On **2026-10-18**, the maintainer approved the supplied dua recording and confirmed
+the same source and permission basis. The
+[recording registry](release/recordings.json) binds these decisions to the exact
 MP3 bytes. Public release also requires physical qualification.
 
 ## Permission basis
@@ -25,7 +27,7 @@ approval. Review materially different distribution terms separately.
 
 ## Approved recordings
 
-Both files were supplied by the maintainer as compressed MP3s, with
+All three files were supplied by the maintainer as compressed MP3s, with
 [AlAdhan's download page](https://aladhan.com/download-adhans) identified as their
 source. Exact upstream variants and the original compression settings were not
 recorded. Packaging preserves the supplied bytes without further transcoding,
@@ -35,6 +37,7 @@ normalization or trimming. Files remain outside Git.
 | --- | --- | ---: | --- |
 | Normal | `Adhan-Mishary_compressed.mp3` | 1,115,496 | `7db84d037f1643c17834bd5052da504f10c0781da334426123f71cf7ba4ea2cb` |
 | Fajr | `Adhan-Fajr-Mishary_compressed.mp3` | 1,768,332 | `2005993def65a985d6c68fa8a327e2d504f328261cba9f893b2912038fe980e6` |
+| Dua | `Adhan-Dua_compressed.mp3` | 97,700 | `e012c265ed388b72c28216528c583035643401737de6fbfc69aad486268b5c49` |
 
 The replacement normal recording was selected by the maintainer, who confirmed
 the same AlAdhan source and existing permission basis. It is approximately
@@ -42,12 +45,23 @@ the same AlAdhan source and existing permission basis. It is approximately
 approved on 2026-09-29. Fajr is unchanged. Previously published release assets
 retain their original recording selection.
 
+The dua recording was approved as supplied, without further compression. It is
+approximately 21.45 seconds long, 44.1 kHz stereo MP3 and fits the existing 252 KiB
+optional-media limit. The maintainer confirmed the same AlAdhan / Islamic Network
+source and permission basis as the Athan recordings. Its reciter and exact
+upstream variant were not independently identified; do not infer them from the
+Athan credits. Text verification and on-device qualification remain separate
+from this approval of the supplied recording and permission basis.
+
 Although the provider does not require attribution, retain this credit with the
 recordings:
 
 > Adhan and Fajr Adhan recited by Mishary Rashid Alafasy. Audio source:
 > AlAdhan.com / Islamic Network. Supplied as compressed MP3s; copyright remains
 > with the respective rights holders.
+
+> Dua after Athan. Audio source: AlAdhan.com / Islamic Network. Supplied as a
+> compressed MP3; copyright remains with the respective rights holders.
 
 ## Changes and release validation
 

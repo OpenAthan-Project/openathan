@@ -16,6 +16,14 @@
       "license": "https://community.islamic.network/d/255-permission-to-bundle-an-adhan-audio-file-in-our-android-app-nurafiq",
       "attribution": "Fajr Adhan recited by Mishary Rashid Alafasy. Audio source: AlAdhan.com / Islamic Network. Supplied as a compressed MP3; copyright remains with the respective rights holders.",
       "approved": true
+    },
+    {
+      "role": "dua",
+      "sha256": "e012c265ed388b72c28216528c583035643401737de6fbfc69aad486268b5c49",
+      "source": "https://aladhan.com/download-adhans",
+      "license": "https://community.islamic.network/d/255-permission-to-bundle-an-adhan-audio-file-in-our-android-app-nurafiq",
+      "attribution": "Dua after Athan. Audio source: AlAdhan.com / Islamic Network. Supplied as a compressed MP3; copyright remains with the respective rights holders.",
+      "approved": true
     }
   ]
 }

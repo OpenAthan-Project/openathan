@@ -141,7 +141,10 @@ def validate_firmware_images(factory, app=None, *, allow_qualification=False, al
 def approved_tracks(registry, license_bytes, payloads):
     require(isinstance(registry, dict) and registry.get("schema") == 1, "Unsupported recording registry")
     entries = registry.get("tracks")
-    require(isinstance(entries, list) and len(entries) == len(payloads) and len(entries) in (2, 3), "All bundled recordings require approval")
+    require(isinstance(entries, list) and len(entries) in (2, 3) and
+            len(payloads) in (2, 3) and len(entries) >= len(payloads), "All bundled recordings require approval")
+    # Approval permits optional dua packaging without requiring its inclusion.
+    entries = entries[:len(payloads)]
     require(license_bytes.strip(), "Committed audio attribution is missing")
     for role, entry, payload in zip(("normal", "fajr", "dua"), entries, payloads):
         require(isinstance(entry, dict) and entry.get("role") == role and entry.get("approved") is True,

@@ -3,9 +3,12 @@
 Development feature: one optional offline recording after scheduled Athan. The
 [dated validation report](dua-validation-2026-10-18.md) records matched builds,
 automated coverage and the remaining hardware/media gates. The
-preference defaults to off. No dua recording is approved or bundled yet; supplying
-and reviewing the text, recording, redistribution permission and sound quality
-is required before preparing a release with dua media.
+preference defaults to off. The maintainer approved the supplied recording and
+permission basis on 2026-10-18; its exact hash and unchanged bytes are documented
+in [recording rights and attribution](../../AUDIO-LICENSES.md). The recording stays
+outside Git. Text verification and the hardware qualification below remain
+required before a release with dua media; recording approval does not publish
+or install it.
 
 ## Owner behavior
 
@@ -107,9 +110,10 @@ audio partition.
 
 ## Packaging and validation
 
-After media review, add the exact dua hash, source, permission URL and attribution
-as the third approved entry in `release/recordings.json`, with matching attribution
-in `AUDIO-LICENSES.md`. Keep the actual recording and signing key outside Git.
+The third approved entry in `release/recordings.json` binds the supplied dua to
+its exact hash, source, permission URL and attribution in `AUDIO-LICENSES.md`.
+Review replacement media before changing that approval. Keep the actual recording
+and signing key outside Git.
 Pass `--dua /private/path/dua.mp3` to the ordinary release packaging command.
 Packaging requires the same source-bound approval and production signing key as
 other recordings, emits signed `dua.json` and `dua.mp3`, and includes the same

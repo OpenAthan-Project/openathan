@@ -2,9 +2,10 @@
 
 This PR adds optional stored dua after scheduled Athan, independent preference
 persistence, signed media installation and playback ownership through the pause.
-No dua recording has been supplied or approved. These are compile-only development
-results, not release or hardware qualification. No device was accessed, flashed
-or played, and no release was published.
+At the time of these checks, no dua recording had been supplied or approved.
+The subsequent [recording approval](../../AUDIO-LICENSES.md) does not add hardware
+qualification to these compile-only development results. No device was accessed,
+flashed or played, and no release was published.
 
 ## Automated checks
 
