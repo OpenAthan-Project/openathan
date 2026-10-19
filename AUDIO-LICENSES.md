@@ -50,8 +50,10 @@ approximately 21.45 seconds long, 44.1 kHz stereo MP3 and fits the existing 252 
 optional-media limit. The maintainer confirmed the same AlAdhan / Islamic Network
 source and permission basis as the Athan recordings. Its reciter and exact
 upstream variant were not independently identified; do not infer them from the
-Athan credits. Text verification and on-device qualification remain separate
-from this approval of the supplied recording and permission basis.
+Athan credits. A subsequent [automated text check](docs/development/dua-qualification-validation-2026-10-19.md)
+matched the reference wording. On-device listening and qualification remain
+separate from that check and this approval of the supplied recording and permission
+basis.
 
 Although the provider does not require attribution, retain this credit with the
 recordings:

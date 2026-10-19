@@ -6,9 +6,9 @@ automated coverage and the remaining hardware/media gates. The
 preference defaults to off. The maintainer approved the supplied recording and
 permission basis on 2026-10-18; its exact hash and unchanged bytes are documented
 in [recording rights and attribution](../../AUDIO-LICENSES.md). The recording stays
-outside Git. Text verification and the hardware qualification below remain
-required before a release with dua media; recording approval does not publish
-or install it.
+outside Git. An [automated text check](dua-qualification-validation-2026-10-19.md)
+matched the reference dua wording. Hardware qualification below remains required
+before a release with dua media; recording approval does not publish or install it.
 
 ## Owner behavior
 

@@ -15,7 +15,10 @@ settings/history and fresh compatible application recovery before installation.
 
 ## Private trust and approved media
 
-Start from reviewed, merged source and the [pinned toolchain](../../.github/workflows/README.md).
+Stage media against a reviewed, merged recording-approval commit and use the
+[pinned toolchain](../../.github/workflows/README.md). Build review candidates from
+an exact source commit; require the qualification changes to be reviewed and
+merged before a separately authorized installation.
 Create a new private directory outside Git using the build host's reachable
 RFC1918 address. The generated HTTPS certificate lasts seven days; an address or
 trust change requires rebuilding the candidates. Only public trust enters them.
