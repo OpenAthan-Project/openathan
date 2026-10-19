@@ -20,6 +20,9 @@ namespace esphome::openathan_upgrade_qualification {
 #include "dua_qualification_transport.inc"
 }
 static const std::string RELEASE = std::string(OPENATHAN_QUALIFICATION_ORIGIN) + "/releases/download/v0.8.0/";
+#elif defined(OPENATHAN_DUA_QUALIFICATION)
+#include "esphome/components/openathan_dua_qualification/qualification.h"
+static const std::string RELEASE = std::string(OPENATHAN_DUA_QUALIFICATION_ORIGIN) + "/releases/download/v0.8.0/";
 #else
 static const std::string RELEASE = "https://github.com/OpenAthan-Project/openathan/releases/download/v0.8.0/";
 #endif
@@ -137,7 +140,7 @@ void descriptor_failures() {
 }
 int main(int argc,char **argv) {
   assert(argc==2);std::ifstream in(argv[1],std::ios::binary);original={std::istreambuf_iterator<char>(in),{}};assert(original.size()==AUDIO_PARTITION_SIZE);
-#if defined(OPENATHAN_PROVISIONING_TEST_STORAGE) && !defined(OPENATHAN_UPGRADE_QUALIFICATION)
+#if (defined(OPENATHAN_PROVISIONING_TEST_STORAGE) && !defined(OPENATHAN_UPGRADE_QUALIFICATION) && !defined(OPENATHAN_DUA_QUALIFICATION)) || (!OPENATHAN_UPDATES_ENABLED && !defined(OPENATHAN_DUA_QUALIFICATION))
   reset();Audio a;esphome::openathan_component::OpenAthan speaker;enable(speaker,a);DuaMedia blocked;blocked.begin(&speaker);
   blocked.loop(true,true);assert(!pending_worker && !operation && http_requests.empty());
   std::cout<<"Ordinary isolated firmware refuses production dua downloads\n";return 0;
@@ -176,5 +179,13 @@ int main(int argc,char **argv) {
     assert(std::equal(original.begin(),original.begin()+DUA_BANK_START,flash.begin()));
   }
   reset();flash[DUA_BANK_START+100]=0;Audio audio;esphome::openathan_component::OpenAthan athan;enable(athan,audio);DuaMedia media;media.begin(&athan);media.loop(true,true);assert(!pending_worker && state(media)=="unavailable" && operation==0);
+#ifdef OPENATHAN_DUA_QUALIFICATION
+  JsonDocument observation; media.snapshot(observation.to<JsonObject>());
+  assert(observation["qualification"]["identity"].as<std::string>() == "OPENATHAN_DUA_QUALIFICATION_V1");
+  assert(observation["qualification"]["worker_stack_min_free"].as<unsigned>() == 4096);
+  assert(observation["qualification"]["largest_internal"].as<unsigned>() == 32768);
+  assert(!esphome::openathan_dua_qualification::allowed_url("https://github.com/file"));
+  assert(!esphome::openathan_dua_qualification::allowed_url("https://192.168.1.2:8443.attacker/file"));
+#endif
   std::cout<<"Production dua downloader: "<<writes<<" interrupted write/erase points, recovery, trust, cancellation and bounds passed\n";
 }

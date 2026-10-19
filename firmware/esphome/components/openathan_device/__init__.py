@@ -75,6 +75,8 @@ async def to_code(config):
     if qualification := CORE.config.get("openathan_upgrade_qualification"):
         from esphome.components.openathan_upgrade_qualification import firmware_identity
         version, public_key = firmware_identity(qualification)
+    elif qualification := CORE.config.get("openathan_dua_qualification"):
+        version = qualification["version"]
     if CORE.config["esphome"].get("project", {}).get("version") != version:
         raise cv.Invalid("Official project version must match release/firmware.json")
     cg.add_define("OPENATHAN_FIRMWARE_VERSION", version)

@@ -164,7 +164,7 @@ def handler(directory):
     return Feed
 
 
-def tls_server(address, directory, context):
+def tls_server(address, directory, context, handler_factory=handler):
     class TLSFeed(ThreadingHTTPServer):
         daemon_threads = True
 
@@ -183,7 +183,7 @@ def tls_server(address, directory, context):
                 return
             super().process_request_thread(connection, address)
 
-    return TLSFeed(address, handler(directory))
+    return TLSFeed(address, handler_factory(directory))
 
 
 def server(directory):

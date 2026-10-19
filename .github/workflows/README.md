@@ -163,3 +163,11 @@ interrupted erase/write recovery without changing the normal/Fajr data, signatur
 and size rejection, and cancellation. These synthetic checks do not establish
 hardware flash latency, listening quality or runtime memory headroom; see the
 [dua contract](../../docs/development/dua.md).
+
+Two additional builds compile `dua/qualification.yaml` and
+`waveshare/dua-qualification.yaml`. These use private media trust with firmware
+updates disabled, isolated storage and a separate dua qualification component.
+Host tests check generated profiles, release exclusion and a loopback-only TLS
+feed with exact-version routes and media faults. The device job executes the
+production downloader under this profile too. See
+[private dua qualification](../../docs/development/dua-qualification.md).

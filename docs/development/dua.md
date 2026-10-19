@@ -6,9 +6,9 @@ automated coverage and the remaining hardware/media gates. The
 preference defaults to off. The maintainer approved the supplied recording and
 permission basis on 2026-10-18; its exact hash and unchanged bytes are documented
 in [recording rights and attribution](../../AUDIO-LICENSES.md). The recording stays
-outside Git. Text verification and the hardware qualification below remain
-required before a release with dua media; recording approval does not publish
-or install it.
+outside Git. An [automated text check](dua-qualification-validation-2026-10-19.md)
+matched the reference dua wording. Hardware qualification below remains required
+before a release with dua media; recording approval does not publish or install it.
 
 ## Owner behavior
 
@@ -99,8 +99,11 @@ operations. Cancellation stops staging; network failures, including errors while
 reading the signed descriptor, retry after five minutes.
 Verification, layout and persistent HTTP failures require explicit Retry.
 Internal-RAM buffers are used for flash operations. Ordinary isolated builds and
-development identities cannot fetch production media. The explicitly selected
-upgrade-qualification component instead uses its existing private release origin,
+development identities cannot fetch production media. The
+[dua-only qualification profiles](dua-qualification.md) use private media trust
+on either board while keeping firmware updates disabled. They expose runtime
+heap/PSRAM and completed media-worker stack observations only in the test build.
+The explicitly selected upgrade-qualification component also uses its existing private release origin,
 CA and signing key for dua assets; its isolation/release-exclusion guards remain
 mandatory. A qualification feed supplies `dua.json` and `dua.mp3` under the running
 qualification version's `releases/download/<version>/` route. Preserve the entire

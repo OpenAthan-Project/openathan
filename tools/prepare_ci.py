@@ -16,7 +16,7 @@ def prepare(output_dir):
     if output_dir.is_relative_to(ROOT):
         raise ValueError("Fixture output must be outside the repository")
     targets = [ROOT / "firmware/esphome" / name / "secrets.yaml"
-               for name in ("feasibility", "scheduler", "upgrades", "waveshare")]
+               for name in ("feasibility", "scheduler", "upgrades", "waveshare", "dua")]
     for path in [output_dir, *targets]:
         if path.exists() or path.is_symlink():
             raise ValueError(f"Refusing to replace existing path: {path}")
@@ -36,6 +36,11 @@ def prepare(output_dir):
     with targets[3].open("ab") as handle:
         for key, value in quran.items():
             handle.write(f"quran_qualification_{key}: {value!r}\n".encode())
+    dua = initialize(output_dir / "dua-qualification", "192.168.1.2")
+    for target in (targets[3], targets[4]):
+        with target.open("ab") as handle:
+            for key, value in dua.items():
+                handle.write(f"dua_qualification_{key}: {value!r}\n".encode())
     payloads = [b"".join(hashlib.sha256(f"{name}-{i}".encode()).digest()
                         for i in range(256)) for name in ("normal", "fajr")]
     image, _ = build_image(*payloads)
