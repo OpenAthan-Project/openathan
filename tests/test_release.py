@@ -182,6 +182,30 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'not been approved'):
             artifacts.approved_tracks(unapproved, release.source_file(self.commit, artifacts.LICENSE_PATH), self.payloads)
 
+    def test_optional_dua_approval_preserves_legacy_selection(self):
+        dua = b'ID3-synthetic-dua'
+        entry = dict(self.registry['tracks'][0], role='dua', sha256=artifacts.digest(dua))
+        self.registry['tracks'].append(entry)
+        license_bytes = '\n'.join(t['sha256'] for t in self.registry['tracks']).encode()
+        selected = artifacts.approved_tracks(self.registry, license_bytes, self.payloads)
+        self.assertEqual(selected, self.registry['tracks'][:2])
+        self.assertEqual(artifacts.approved_tracks(self.registry, license_bytes, (*self.payloads, dua)),
+                         self.registry['tracks'])
+
+    def test_bundled_dua_requires_approval_and_matching_hash(self):
+        dua = b'ID3-synthetic-dua'
+        payloads = (*self.payloads, dua)
+        license_bytes = '\n'.join(artifacts.digest(p) for p in payloads).encode()
+        with self.assertRaisesRegex(ValueError, 'require approval'):
+            artifacts.approved_tracks(self.registry, license_bytes, payloads)
+        self.registry['tracks'].append(dict(self.registry['tracks'][0], role='dua',
+                                            sha256=artifacts.digest(dua), approved=False))
+        with self.assertRaisesRegex(ValueError, 'dua recording has not been approved'):
+            artifacts.approved_tracks(self.registry, license_bytes, payloads)
+        self.registry['tracks'][-1]['approved'] = True
+        with self.assertRaisesRegex(ValueError, 'dua recording does not match its approved hash'):
+            artifacts.approved_tracks(self.registry, license_bytes, (*self.payloads, b'changed'))
+
     def test_media_approval_is_from_commit_not_working_tree(self):
         (self.repo / artifacts.MEDIA_REGISTRY).write_text('{"schema":1,"tracks":[]}')
         self.package()  # Working-tree edits do not replace the reviewed commit.
