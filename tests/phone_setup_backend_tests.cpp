@@ -66,6 +66,16 @@ namespace openathan_component {
 struct SettingsProbe { bool ok{true}; bool healthy() const { return ok; } };
 struct OpenAthan {
   bool incomplete{true},busy{}; SettingsProbe settings;
+  struct AudioProbe {
+    bool playing() const { return false; }
+    bool ready() const { return false; }
+    bool healthy() const { return false; }
+    unsigned source() const { return 0; }
+    unsigned stream_state() const { return 0; }
+    unsigned phase() const { return 0; }
+  } audio;
+  const AudioProbe *playback() const { return &audio; }
+  const AudioProbe &dua_sequence() const { return audio; }
   const char *setup_state() const { return incomplete ? "incomplete" : "active"; }
   SettingsProbe *settings_service() { return &settings; }
   bool playback_busy() const { return busy; }
@@ -240,6 +250,18 @@ void busy_admission() {
   assert(queued.device.wifi_attempt_.active());queued.device.loop();
   assert(queued.device.upgrade_.background_busy && esphome::wifi::wifi_probe.joins==1);queued.preserved();
 }
+void busy_diagnostics() {
+  Fixture f(false);f.athan.busy=true;f.device.dua_.running=true;f.device.upgrade_.working=true;
+  const auto writes=nvs_test::writes;
+  f.device.serial_request({true,3,rpc(0x72,{})});
+#ifdef OPENATHAN_PROVISIONING_TEST_STORAGE
+  const std::vector<std::string> fields{"busy-v1",f.device.hostname_,"1","1","1","0","0","0","0","1","0","0","0","0","0","0"};
+  assert(f.sent==std::vector<std::vector<uint8_t>>{frame(true,4,rpc(0x72,fields))});
+#else
+  assert(f.sent.back()==frame(true,2,std::vector<uint8_t>{2}));
+#endif
+  assert(nvs_test::writes==writes && f.athan.busy && f.device.dua_.running && f.device.upgrade_.working);
+}
 bool usb_before_first_loop() {
   bool passed=true;
   for (bool succeeds : {false,true}) {
@@ -332,6 +354,6 @@ void interruptions_and_storage_faults() {
 }
 int main() {
   if (!usb_before_first_loop()) return 1;
-  closed_startup();busy_admission();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
+  closed_startup();busy_admission();busy_diagnostics();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
   std::cout << "Production phone HTTP, AP admission, password protection, deferred join, storage faults and USB exclusion passed\n";
 }

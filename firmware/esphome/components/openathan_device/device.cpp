@@ -190,6 +190,18 @@ void Device::serial_request(const Frame& request) {
     return;
   }
 #ifdef OPENATHAN_PROVISIONING_TEST_STORAGE
+  if (request.extension && command == 0x72 && fields.empty()) {
+    const auto *playback = athan_->playback();
+    result_(true, command, {"busy-v1", hostname_, std::to_string(playback_busy()),
+        std::to_string(dua_.active()), std::to_string(upgrade_.active()), std::to_string(upgrade_.usb_busy()),
+        std::to_string(bool(phone_response_)), std::to_string(phone_attempt_), std::to_string(maintenance_),
+        std::to_string(athan_->playback_busy()), std::to_string(unsigned(athan_->dua_sequence().phase())),
+        std::to_string(playback && playback->playing()), std::to_string(playback && playback->ready()),
+        std::to_string(playback && playback->healthy()),
+        std::to_string(playback ? unsigned(playback->source()) : 0),
+        std::to_string(playback ? unsigned(playback->stream_state()) : 0)});
+    return;  // Observation only, including while ordinary commands are busy.
+  }
   if (request.extension && command == 0x70 && fields.empty()) {
     result_(true, command, {"test-v1", hostname_, maintenance_ ? "restart_required" : "ready"});
     return;

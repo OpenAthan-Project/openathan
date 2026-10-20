@@ -13,6 +13,16 @@ separately authorized, attended session. Isolated preferences do **not** isolate
 the physical audio banks. Preserve the complete current shared-audio partition,
 settings/history and fresh compatible application recovery before installation.
 
+Isolated builds also accept read-only USB extension command `0x72`, with no
+fields, during busy/maintenance states. Its `busy-v1` result contains hostname,
+device playback busy, dua worker, updater worker, USB update, pending phone
+response, phone attempt, maintenance, core playback busy, sequence phase,
+playing, ready, healthy, playback source and stream state, in that order.
+Boolean values are `0`/`1`; enums use their core numeric values. This diagnostic
+does not clear an owner, change storage or grant admission. Production builds
+reject the command. Preserve raw observations privately when investigating a
+startup or recovery conflict.
+
 ## Private trust and approved media
 
 Stage media against a reviewed, merged recording-approval commit and use the
