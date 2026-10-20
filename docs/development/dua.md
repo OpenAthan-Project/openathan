@@ -48,6 +48,14 @@ ownership rather than audible playback alone. `playback_source` additionally
 supports `dua`. Optional device displays show “Dua / Starting” during the pause
 and “Dua / Playing” during playback; the calculated prayer ring is unchanged.
 
+Manual firmware checks and installation requests return busy during playback,
+dua installation or provisioning. An automatic check remains due until this
+work ends. USB Wi-Fi changes, scans and password changes also return busy during
+playback, dua installation or an active firmware worker, while read-only status remains
+available. A queued update still permits USB network repair before its worker starts.
+First-run phone setup waits for shared playback and dua ownership to
+clear before opening; Stop remains available through the device page.
+
 The `supported` observation describes media installation availability, independently
 of preference storage. An owner can save enabled intent or turn it off while media
 is unavailable, provided the preference store is healthy. Saving the preference

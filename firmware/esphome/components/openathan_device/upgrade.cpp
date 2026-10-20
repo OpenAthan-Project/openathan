@@ -190,6 +190,9 @@ int Upgrade::action(const std::string &action, JsonObjectConst input, std::strin
     return 200;
   }
   if (active_ || !queued_.envelope.empty()) { error = "An update is already in progress"; return 409; }
+  if ((action == "check" || action == "install") && (background_busy_ || athan_->playback_busy())) {
+    error = "Wait for playback, dua installation or provisioning to finish"; return 409;
+  }
   if (action == "check" && input.size() == 0) {
     if (!start_(false)) { error = "Unable to start checking for updates"; return 503; }
     return 200;
@@ -343,7 +346,7 @@ void Upgrade::loop(bool connected) {
 #else
   const bool health = services_healthy;
 #endif
-  safe_ = !audio_busy_ && upgrade_window(athan_->playback_busy(), clock.valid, athan_->activated(),
+  safe_ = !background_busy_ && upgrade_window(athan_->playback_busy(), clock.valid, athan_->activated(),
       health && status.automatic_ready, clock.utc, status.next ? std::optional<int64_t>(status.next->utc) : std::nullopt);
   std::lock_guard<std::mutex> lock(mutex_);
   if (!confirmed_) {
@@ -465,7 +468,7 @@ void Upgrade::loop(bool connected) {
     if (safe_ && connected && now >= retry_ms_) start_(true);
     return;
   }
-  if (connected && clock.valid && now >= next_check_ms_) {
+  if (connected && clock.valid && now >= next_check_ms_ && !background_busy_ && !athan_->playback_busy()) {
     next_check_ms_ = now + 86400000 + esp_random() % 3600000;
     start_(false);
   }

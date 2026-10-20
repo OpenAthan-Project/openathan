@@ -41,9 +41,10 @@ class Upgrade : public UpgradeApi {
   std::vector<std::string> usb_info();
   uint8_t usb_command(uint8_t command, const std::vector<std::string> &fields, std::vector<std::string> &reply);
   bool usb_chunk(const ::openathan::usb_upgrade::Chunk &chunk);
-  void set_audio_busy(bool busy) { audio_busy_ = busy; }
+  void set_background_busy(bool busy) { background_busy_ = busy; }
   bool confirmed() const { return confirmed_; }
   bool usb_busy() const { return usb_token_ || usb_request_; }
+  bool active() const { return active_; }
   bool streaming_blocked() const { return usb_busy() || active_ || state_ == "queued" || state_ == "installing"; }
  private:
   static void worker_(void *argument);
@@ -58,7 +59,7 @@ class Upgrade : public UpgradeApi {
   bool usb_abort_();
   openathan_component::OpenAthan *athan_{};
   std::mutex mutex_;
-  bool audio_busy_{};
+  bool background_busy_{};
   UpgradeRelease offered_, queued_;
   std::string state_{"idle"}, error_, expected_, result_;
   const esp_partition_t *staged_{};
