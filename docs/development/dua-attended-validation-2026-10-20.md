@@ -79,3 +79,8 @@ runtime measurements, scheduler responsiveness during flash work and applicable
 update/provisioning exclusion remain separate follow-up checks. Use the
 [qualification guide](dua-qualification.md) and relevant hardware runbooks, with
 fresh live state and preservation before any further installation.
+
+The later [bounded runtime report](dua-runtime-validation-2026-10-20.md) adds
+source-bound memory, timing and admission observations on both boards, and
+records a USB recovery fix discovered during that session. It retains separate
+limits for final signed release images, production TLS and Waveshare OTA work.

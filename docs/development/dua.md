@@ -11,7 +11,9 @@ matched the reference dua wording. Hardware qualification below remains required
 before a release with dua media; recording approval does not publish or install it.
 The [attended results](dua-attended-validation-2026-10-20.md) record subsequent
 normal/Fajr listening, Stop, offline shared events, installation recovery and
-preservation, with remaining runtime and update-exclusion limits.
+preservation. The later [bounded runtime report](dua-runtime-validation-2026-10-20.md)
+adds memory, timing and admission observations with separate source and profile
+limits.
 
 ## Owner behavior
 
