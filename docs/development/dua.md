@@ -9,6 +9,9 @@ in [recording rights and attribution](../../AUDIO-LICENSES.md). The recording st
 outside Git. An [automated text check](dua-qualification-validation-2026-10-19.md)
 matched the reference dua wording. Hardware qualification below remains required
 before a release with dua media; recording approval does not publish or install it.
+The [attended results](dua-attended-validation-2026-10-20.md) record subsequent
+normal/Fajr listening, Stop, offline shared events, installation recovery and
+preservation, with remaining runtime and update-exclusion limits.
 
 ## Owner behavior
 
