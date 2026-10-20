@@ -78,8 +78,9 @@ bool Upgrade::descriptor_(const std::string &envelope, UpgradeRelease &release) 
 bool Upgrade::persist_(const std::string &queue, const std::string &expected) {
   if (!storage_ok_) return false;
   JsonDocument doc;
-  doc["schema"] = usb_request_ ? 2 : 1; doc["queue"] = queue; doc["expected"] = expected;
-  if (usb_request_) doc["source"] = "usb";
+  const bool usb = usb_request_ && (!queue.empty() || !expected.empty());
+  doc["schema"] = usb ? 2 : 1; doc["queue"] = queue; doc["expected"] = expected;
+  if (usb) doc["source"] = "usb";
   std::string record;
   serializeJson(doc, record);
   if (nvs_set_blob(nvs_, "request", record.data(), record.size()) != ESP_OK || nvs_commit(nvs_) != ESP_OK) {
@@ -128,6 +129,9 @@ void Upgrade::begin(openathan_component::OpenAthan *athan, bool server_ready) {
   expected_ = doc["expected"].as<std::string>();
   if (!expected_.empty() && !release_version(expected_)) { storage_ok_ = false; return; }
   const auto queue = doc["queue"].as<std::string>();
+  // Older successful clears retained schema 2 with an empty queue and handoff.
+  // This is no owner: USB provisioning must work before audio startup health.
+  if (queue.empty() && expected_.empty()) usb_request_ = false;
   if (!queue.empty()) {
     if (!descriptor_(queue, queued_) || (!expected_.empty() && queued_.version != expected_)) {
       storage_ok_ = false; return;
