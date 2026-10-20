@@ -190,6 +190,18 @@ void Device::serial_request(const Frame& request) {
     return;
   }
 #ifdef OPENATHAN_PROVISIONING_TEST_STORAGE
+  if (request.extension && command == 0x72 && fields.empty()) {
+    const auto *playback = athan_->playback();
+    result_(true, command, {"busy-v1", hostname_, std::to_string(playback_busy()),
+        std::to_string(dua_.active()), std::to_string(upgrade_.active()), std::to_string(upgrade_.usb_busy()),
+        std::to_string(bool(phone_response_)), std::to_string(phone_attempt_), std::to_string(maintenance_),
+        std::to_string(athan_->playback_busy()), std::to_string(unsigned(athan_->dua_sequence().phase())),
+        std::to_string(playback && playback->playing()), std::to_string(playback && playback->ready()),
+        std::to_string(playback && playback->healthy()),
+        std::to_string(playback ? unsigned(playback->source()) : 0),
+        std::to_string(playback ? unsigned(playback->stream_state()) : 0)});
+    return;  // Observation only, including while ordinary commands are busy.
+  }
   if (request.extension && command == 0x70 && fields.empty()) {
     result_(true, command, {"test-v1", hostname_, maintenance_ ? "restart_required" : "ready"});
     return;
@@ -232,6 +244,11 @@ void Device::serial_request(const Frame& request) {
   if (maintenance_ || (upgrade_.usb_busy() && !((request.extension && command == 1) || (!request.extension && (command == 2 || command == 3))))) {
     send_(request.extension, 2, {255});
     return;
+  }
+  const bool provisioning = (!request.extension && (command == 1 || command == 4)) ||
+      (request.extension && command == 2);
+  if (provisioning && (playback_busy() || dua_.active() || upgrade_.active())) {
+    send_(request.extension, 2, {255}); return;
   }
   send_(request.extension, 2, {0});
   if (request.extension) {
@@ -329,7 +346,8 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
   scanning_ = false;
 }
 void Device::loop() {
-  upgrade_.set_audio_busy(dua_.active() || quran_.playback_pending());
+  upgrade_.set_background_busy(dua_.active() || quran_.playback_pending() || maintenance_ ||
+      wifi_attempt_.active() || scanning_ || phone_response_ || phone_attempt_);
   upgrade_.loop(wifi::global_wifi_component->is_connected());
   const auto dua_clock = athan_->read();
   const auto dua_status = athan_->status();
@@ -396,6 +414,9 @@ void Device::loop() {
   if (request) {
     std::lock_guard<std::mutex> lock(request->mutex);
     if (!request->cancelled) {
+      // Dua/network work may have started earlier in this same iteration.
+      upgrade_.set_background_busy(dua_.active() || quran_.playback_pending() || maintenance_ ||
+          wifi_attempt_.active() || scanning_ || phone_response_ || phone_attempt_);
       handle_http_(*request);
       if (request->phone_connect) phone_response_ = request;
     }

@@ -65,10 +65,20 @@ auto *global_wifi_component=&wifi_probe;
 namespace openathan_component {
 struct SettingsProbe { bool ok{true}; bool healthy() const { return ok; } };
 struct OpenAthan {
-  bool incomplete{true}; SettingsProbe settings;
+  bool incomplete{true},busy{}; SettingsProbe settings;
+  struct AudioProbe {
+    bool playing() const { return false; }
+    bool ready() const { return false; }
+    bool healthy() const { return false; }
+    unsigned source() const { return 0; }
+    unsigned stream_state() const { return 0; }
+    unsigned phase() const { return 0; }
+  } audio;
+  const AudioProbe *playback() const { return &audio; }
+  const AudioProbe &dua_sequence() const { return audio; }
   const char *setup_state() const { return incomplete ? "incomplete" : "active"; }
   SettingsProbe *settings_service() { return &settings; }
-  bool playback_busy() const { return false; }
+  bool playback_busy() const { return busy; }
   bool activated() const { return !incomplete; }
   struct Sample { bool automatic_ready{true}; std::optional<::openathan::Event> next; };
   Sample status() const { return {}; }
@@ -87,17 +97,23 @@ struct HttpExchange {
   std::mutex mutex;
 };
 struct UpgradeProbe {
-  bool busy{},blocked{}; unsigned commands{};
+  bool busy{},blocked{},working{},background_busy{}; unsigned commands{};
   bool usb_busy() const { return busy; }
-  bool streaming_blocked() const { return busy || blocked; }
-  void set_audio_busy(bool) {}
+  bool streaming_blocked() const { return busy || blocked || working; }
+  bool active() const { return working; }
+  void set_background_busy(bool value) { background_busy=value; }
   bool confirmed() const { return true; }
   void loop(bool) {}
   std::vector<std::string> usb_info() { return {"info"}; }
   uint8_t usb_command(uint8_t,const std::vector<std::string>&,std::vector<std::string>&) { ++commands; return 0; }
   bool usb_chunk(const ::openathan::usb_upgrade::Chunk &) { return false; }
 };
-struct DuaProbe { bool active() const { return false; } void shutdown() {} void loop(bool, bool) {} };
+struct DuaProbe {
+  bool running{},start_next{};
+  bool active() const { return running; }
+  void shutdown() {}
+  void loop(bool, bool permitted) { if(start_next && permitted) { running=true;start_next=false; } }
+};
 struct QuranProbe { bool playback_pending() const { return false; } void loop(bool,bool) {} };
 struct ApiProbe {
   unsigned calls{};
@@ -134,7 +150,7 @@ struct Device {
   struct Asset { const uint8_t *data{};size_t size{};const char *type{}; } assets_[6];
   std::shared_ptr<HttpExchange> phone_response_;
   DuaProbe dua_;
-  bool playback_busy() const { return false; }
+  bool playback_busy() const { return athan_->playback_busy(); }
   UpgradeProbe upgrade_; QuranProbe quran_; ApiProbe api_storage; ApiProbe *api_{&api_storage};
   std::mutex queue_mutex_; std::deque<std::shared_ptr<HttpExchange>> requests_;
 };
@@ -206,6 +222,45 @@ void closed_startup() {
   { Fixture f(false);f.device.wifi_record_=LoadResult::ERROR;f.device.loop();assert(!f.device.phone_setup_active()); }
   { Fixture f(false);f.device.password_record_=LoadResult::ERROR;f.device.loop();assert(!f.device.phone_setup_active()); }
   { Fixture f(false);f.athan.settings.ok=false;f.device.loop();assert(!f.device.phone_setup_active()); }
+}
+void busy_admission() {
+  for (unsigned kind=0;kind<3;++kind) {
+    Fixture f(false);
+    if(kind==0)f.athan.busy=true; // Includes the silent pause.
+    if(kind==1)f.device.dua_.running=true;
+    if(kind==2)f.device.upgrade_.working=true;
+    f.device.loop();assert(!f.device.phone_initialized_ && !f.device.phone_setup_active());
+    const auto writes=nvs_test::writes;
+    for(const auto &request:std::vector<Frame>{{false,3,rpc(1,{"Other","other password"})},
+        {false,3,rpc(4,{})},{true,3,rpc(2,{"replacement password"})}}) {
+      f.sent.clear();f.device.serial_request(request);
+      assert(f.sent.size()==1 && f.sent[0]==frame(request.extension,2,std::vector<uint8_t>{255}));
+      assert(nvs_test::writes==writes && !f.device.wifi_attempt_.active() && !f.device.scanning_);
+    }
+    f.athan.busy=false;f.device.dua_.running=false;f.device.upgrade_.working=false;
+    f.device.loop();assert(f.device.phone_initialized_ && f.device.phone_setup_active());f.preserved();
+  }
+  // The HTTP request must see a dua worker started in this same iteration.
+  Fixture f(false);f.athan.incomplete=false;f.device.dua_.start_next=true;
+  f.call("GET","/api/status");
+  assert(f.device.dua_.running && f.device.upgrade_.background_busy);
+  // A queued update must not trap an owner who needs USB to repair Wi-Fi.
+  Fixture queued(false);queued.athan.incomplete=false;queued.device.upgrade_.blocked=true;
+  queued.device.serial_request({false,3,rpc(1,{"Home","wifi password"})});
+  assert(queued.device.wifi_attempt_.active());queued.device.loop();
+  assert(queued.device.upgrade_.background_busy && esphome::wifi::wifi_probe.joins==1);queued.preserved();
+}
+void busy_diagnostics() {
+  Fixture f(false);f.athan.busy=true;f.device.dua_.running=true;f.device.upgrade_.working=true;
+  const auto writes=nvs_test::writes;
+  f.device.serial_request({true,3,rpc(0x72,{})});
+#ifdef OPENATHAN_PROVISIONING_TEST_STORAGE
+  const std::vector<std::string> fields{"busy-v1",f.device.hostname_,"1","1","1","0","0","0","0","1","0","0","0","0","0","0"};
+  assert(f.sent==std::vector<std::vector<uint8_t>>{frame(true,4,rpc(0x72,fields))});
+#else
+  assert(f.sent.back()==frame(true,2,std::vector<uint8_t>{2}));
+#endif
+  assert(nvs_test::writes==writes && f.athan.busy && f.device.dua_.running && f.device.upgrade_.working);
 }
 bool usb_before_first_loop() {
   bool passed=true;
@@ -299,6 +354,6 @@ void interruptions_and_storage_faults() {
 }
 int main() {
   if (!usb_before_first_loop()) return 1;
-  closed_startup();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
+  closed_startup();busy_admission();busy_diagnostics();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
   std::cout << "Production phone HTTP, AP admission, password protection, deferred join, storage faults and USB exclusion passed\n";
 }

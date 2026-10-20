@@ -1,5 +1,10 @@
 # Dua private qualification preparation — 2026-10-19
 
+The later [attended validation](dua-attended-validation-2026-10-20.md) records
+completed listening, Stop, offline shared-event and Wi-Fi recovery checks. The
+remaining-attended list below describes this preparation checkpoint, before
+those sessions; retain the later report's source and runtime/update limits.
+
 This is host-only preparation for an attended dua session on either reference
 board. Recording approval is merged at
 `3c6ec7456d2d17ab57e261805c6f6c4a68427385`; the measured qualification source is

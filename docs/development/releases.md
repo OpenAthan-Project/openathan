@@ -1,9 +1,10 @@
 # Firmware release preparation
 
-[v0.6.0](../releases/v0.6.0.md) is the published stable release for Atom and
-Waveshare Box V2. The [v0.7.0 preparation](v0.7.0-preparation-2026-10-17.md)
-records the next review candidate, source-bound phone checks and remaining
-publication requirements. The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md)
+[v0.7.0](../releases/v0.7.0.md) is the published stable release for Atom and
+Waveshare Box V2. The [v0.8.0 preparation](v0.8.0-preparation-2026-10-20.md)
+records the dua review candidate and its validation gates. The
+[v0.7.0 preparation](v0.7.0-preparation-2026-10-17.md) retains source-bound phone
+checks and limitations. The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md)
 retains its earlier review/build evidence. The previous
 [release qualification report](release-validation-2026-10-10.md) records v0.5.0
 production images, attended installation/update results and remaining limits.
@@ -101,6 +102,13 @@ Pass `--waveshare-build-dir /tmp/openathan-waveshare-build` when packaging the A
 build to produce the combined bundle. The two builds must share an exact commit.
 Each board has its own manifest, factory, OTA, signed descriptor, checksums and
 build report; Atom filenames and signed schema 1 remain compatible.
+
+For an approved dua release, also pass `--dua /path/to/approved-dua.mp3`.
+The combined bundle then has fifteen assets: `dua.json` and `dua.mp3` join the
+thirteen existing names. The shared audio image contains one committed dua bank,
+while the signed descriptor binds Wi-Fi installation to this exact release.
+The original two-track header and Athan bytes are unchanged. Legacy bundles
+without the optional bank remain supported. See the [dua contract](dua.md).
 
 The Atom assets are:
 

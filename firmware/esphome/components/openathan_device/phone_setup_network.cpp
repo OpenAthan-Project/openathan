@@ -11,7 +11,8 @@ namespace esphome::openathan_device {
 bool Device::phone_eligible_() const {
   const auto *settings = athan_ ? athan_->settings_service() : nullptr;
   return phone_setup::eligible(athan_ && std::strcmp(athan_->setup_state(), "incomplete") == 0,
-      store_.healthy() && settings && settings->healthy() && !maintenance_ && !upgrade_.streaming_blocked(),
+      store_.healthy() && settings && settings->healthy() && !maintenance_ && !upgrade_.streaming_blocked() &&
+          !playback_busy() && !dua_.active(),
       wifi_record_ == ::openathan::LoadResult::EMPTY, password_record_ == ::openathan::LoadResult::ERROR);
 }
 bool Device::phone_setup_active() const {
@@ -52,7 +53,7 @@ void Device::phone_dns_() {
 }
 void Device::phone_loop_(uint64_t now) {
   if (!phone_initialized_ && App.is_setup_complete() && !wifi_attempt_.active() && !scanning_ &&
-      !upgrade_.usb_busy()) {
+      !upgrade_.streaming_blocked() && !playback_busy() && !dua_.active()) {
     phone_initialized_ = true;
     if (phone_eligible_()) {
       phone_session_ = true;

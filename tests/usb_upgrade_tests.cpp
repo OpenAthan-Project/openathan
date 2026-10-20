@@ -111,7 +111,26 @@ void check_selection_reads() {
   pending.begin(&a,true);const auto record=saved_record;std::vector<std::string> reply;
   assert(pending.usb_command(ABORT,{"interrupted"},reply)==255 && saved_record==record);
 }
+void check_empty_usb_journal() {
+  // Older clears retained source=usb even with no queue or handoff. Such a
+  // tombstone must not block network repair before startup health is available.
+  for (unsigned schema : {1u,2u}) for (const char *expected : {"","v0.3.0"}) {
+    reset();JsonDocument journal;journal["schema"]=schema;journal["queue"]="";journal["expected"]=expected;
+    if(schema==2)journal["source"]="usb";
+    serializeJson(journal,saved_record);const auto record=saved_record;
+    Upgrade u;esphome::openathan_component::OpenAthan a;a.health=false;u.begin(&a,true);
+    const bool handoff=schema==2 && std::string(expected)!="";
+    assert(u.usb_busy()==handoff && !u.confirmed());
+    now_us=30000000;u.loop(false);assert(u.usb_busy()==handoff && !u.confirmed());
+    std::vector<std::string> reply;assert(u.usb_command(BEGIN,{"200"},reply)==255);
+    assert(saved_record==record && nvs_commits==0 && erases==0 && writes==0 && boot_selections==0);
+  }
+  reset();save_usb_request("");Upgrade active;esphome::openathan_component::OpenAthan a;a.health=false;
+  active.begin(&a,true);assert(active.usb_busy() && !active.confirmed());
+  assert(nvs_commits==0 && erases==0 && writes==0 && boot_selections==0);
+}
 int main() {
+  check_empty_usb_journal();
   if(std::string(OPENATHAN_FIRMWARE_VERSION)=="v0.4.0") {
     // A maintainer-installed newer app can supersede a USB request, but an
     // older candidate may still be selected. Supersession must not erase proof.
@@ -154,7 +173,10 @@ int main() {
     auto data=std::span(reinterpret_cast<const uint8_t *>(application_response.data()),size_t{CHUNK});
     assert(!u.usb_chunk({token_value(token),1,1,data}));assert(!u.usb_chunk({token_value(token)+1,1,0,data}));
     assert(u.usb_chunk({token_value(token),1,0,data}));assert(!u.usb_chunk({token_value(token),1,0,data}));
-    assert(u.usb_command(ABORT,{token},reply)==0&&live_ota_handles==0&&boot_selections==0);}
+    assert(u.usb_command(ABORT,{token},reply)==0&&live_ota_handles==0&&boot_selections==0);
+    JsonDocument cleared;assert(!deserializeJson(cleared,saved_record));
+    assert(cleared["schema"].as<unsigned>()==1 && cleared.size()==3);
+    a.health=false;Upgrade restarted;restarted.begin(&a,true);assert(!restarted.usb_busy() && !restarted.confirmed());}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);a.clock.valid=false;
     const auto token=start_usb(u);std::vector<std::string> reply;assert(u.usb_command(VERIFY,{token},reply)==0);
     send_app(u,token);assert(u.usb_command(FINISH,{token},reply)==0);assert(reply[0]=="verified");assert(state(u)=="awaiting_power"&&boot_selections==1);

@@ -70,6 +70,42 @@ void expect_http_config() {
   }
   assert(last_bundle && last_ca.empty());expect_http_cleanup();
 }
+struct PausePlayback : ::openathan::Playback {
+  bool owned{true};
+  bool ready() const override { return true; }
+  bool playing() const override { return false; }
+  bool start(::openathan::Track) override { return false; }
+  void stop() override { owned=false; }
+  ::openathan::PlaybackSource source() const override {
+    return owned ? ::openathan::PlaybackSource::DUA : ::openathan::PlaybackSource::NONE;
+  }
+};
+void check_busy_admission() {
+  for (unsigned kind=0;kind<3;++kind) {
+    reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    PausePlayback pause;
+    if(kind==0)a.sample.playing=true;
+    if(kind==1)a.audio=&pause;
+    if(kind==2)u.set_background_busy(true); // Active dua download, no audible playback.
+    const auto attempts=task_attempts,commits=nvs_commits;
+    assert(action(u,"check")==409);
+    assert(!pending_worker && task_attempts==attempts && nvs_commits==commits);
+    now_us+=100000000;u.loop(true);
+    assert(!pending_worker && task_attempts==attempts && http_requests.empty());
+    a.sample.playing=false;pause.owned=false;u.set_background_busy(false);
+    u.loop(true);assert(pending_worker);run_worker();
+    assert(state(u)==(newer_release("v0.3.0",OPENATHAN_FIRMWARE_VERSION)?"available":"current"));
+    if(newer_release("v0.3.0",OPENATHAN_FIRMWARE_VERSION)) {
+      if(kind==0)a.sample.playing=true;
+      if(kind==1)pause.owned=true;
+      if(kind==2)u.set_background_busy(true);
+      assert(action(u,"install","v0.3.0")==409 && saved_record.empty());
+      a.sample.playing=false;pause.owned=false;u.set_background_busy(false);
+      assert(action(u,"install","v0.3.0")==200);
+    }
+    assert(erases==0 && writes==0 && boot_selections==0);
+  }
+}
 void check_redirects() {
   for(const auto bytes:{size_t{150},size_t{905},size_t{4096}}) {
     reset();const auto asset=asset_url(bytes);
@@ -147,6 +183,7 @@ void check_redirects() {
   }
 }
 int main(){
+  check_busy_admission();
   check_redirects();
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
     JsonDocument doc;u.snapshot(doc.to<JsonObject>());assert(doc["qualification"].isUnbound());
