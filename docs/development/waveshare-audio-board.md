@@ -13,14 +13,15 @@ are the sources for these mappings. The inspected archive SHA-256 is
 `e63823469cec26ac782b9e8a9f8af22d8c55015362fa8a4fb4e7212a17af149e`;
 `I2C_Driver.h`, `I2S_Driver.h`, `Audio_ES8311.cpp`, `Button_Driver.cpp` and
 `TCA9555PWR.h` agree with the schematic for the bus, audio, amplifier and keys. Confirm the actual PCB before hardware writes;
-these are documented mappings, not an observation of the new physical unit.
+these are the documented mappings. The [tested-unit report](waveshare-audio-board-hardware-2026-10-21.md)
+records observed compatibility while retaining the unknown PCB revision.
 
 | Function | Wiring |
 | --- | --- |
 | I2C | SDA GPIO11, SCL GPIO10 |
 | ES8311 | 0x18; 44.1 kHz, 16-bit mono; MCLK 12, BCLK 13, LRCLK 14, DOUT 16 |
 | TCA9555 | 0x20; amplifier P10 (zero-based bit 8), keys P11/P12/P13 (bits 9/10/11), active low |
-| RGB | Seven WS2812 LEDs, GPIO38, RGB; colour order awaits physical confirmation |
+| RGB | Seven WS2812 LEDs, GPIO38, RGB; see the tested-unit colour observations |
 | RTC | PCF85063, 0x51 on the same I2C bus |
 | BOOT | GPIO0, active low with internal pull-up |
 | Memory | 16 MiB flash, 8 MiB octal PSRAM |
@@ -73,7 +74,9 @@ Older single-board and two-board bundles remain valid.
 
 ## Hardware qualification
 
-No installation, playback or recovery result is established by this change.
+The [attended hardware report](waveshare-audio-board-hardware-2026-10-21.md)
+records one unit's installation, playback and control results, runtime
+measurements and remaining release gates.
 Use the [provisioning runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
 with a new AUDIO-Board-specific preflight: identify USB port/MAC/security/flash,
 verify PCB revision/mappings, retain matching private original-flash reads, and

@@ -10,8 +10,9 @@ manufacturer's V1.1 schematic; identify and verify the physical revision before
 installation. A model sticker alone does not establish the PCB revision.
 
 **Availability:** firmware and installer integration are under development.
-No AUDIO-Board hardware acceptance is recorded yet. Public installation requires
-a separately qualified, published release; compiling this profile is not that qualification.
+[Attended checks on one USB-powered unit](../../../docs/development/waveshare-audio-board-hardware-2026-10-21.md)
+are recorded, with release gates still open. Public installation requires a
+separately qualified, published release; compiling this profile is not that qualification.
 
 ## Required parts
 
@@ -32,6 +33,10 @@ brightness and an off switch. KEY1 lowers volume, KEY2 stops audio and KEY3 rais
 volume. Each volume press changes the saved setting by five percentage points.
 BOOT stops audio on a short press, skips the next Athan on a 2–5 second press,
 and cancels a skip on a 6–10 second press. RESET restarts the device.
+
+With the USB-C socket at the top, the five buttons down the right edge are
+**RESET → BOOT → KEY3 → KEY2 → KEY1**. KEY2 is the fourth button down; BOOT is
+immediately below RESET. Use KEY2 or a short BOOT press to stop playback.
 
 ## Setup
 
@@ -62,6 +67,7 @@ Use command-only USB recovery for Wi-Fi/password repair.
 
 Microphones, speech recognition, camera, SD storage, external displays and
 battery management are not implemented. Initial hardware qualification uses
-USB power. PCB revision, audible playback, RTC retention, runtime memory and
-physical installation/update/recovery remain unverified; see the
-[implementation and validation report](../../../docs/development/waveshare-audio-board.md).
+USB power. The exact PCB revision, real scheduled playback, complete power-loss
+clock retention and signed update/rollback qualification remain open. See the
+[hardware results and limits](../../../docs/development/waveshare-audio-board-hardware-2026-10-21.md)
+and [implementation guide](../../../docs/development/waveshare-audio-board.md).

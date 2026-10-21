@@ -1,8 +1,9 @@
 # AUDIO-Board software validation — October 21, 2026
 
-This report records software/build evidence, not physical hardware acceptance.
-The AUDIO-Board PCB revision is unverified. No flash writes, installation,
-playback, RTC test or update/recovery session was performed for this report.
+This initial checkpoint records software/build evidence. It preceded the later
+[attended hardware checks](waveshare-audio-board-hardware-2026-10-21.md), which
+record installation, listening, controls, runtime measurements and their limits
+separately. The AUDIO-Board PCB revision marking remains unverified.
 
 ## Pinned builds and capacity
 
@@ -44,5 +45,6 @@ were reviewed. The embedded device UI separately passes 564 Chromium/WebKit
 cases without skips. A screenshot-test path was corrected to use Playwright
 output paths after Linux CI exposed a Mac-specific temporary path. The initial reused-preview-server USB-uncertainty failures did
 not reproduce on fresh isolated servers; original failed logs were retained. No simulator opens Web Serial.
-Physical phone/USB installation and recovery remain pending; see the
+Physical results and remaining release gates are recorded in the
+[later hardware report](waveshare-audio-board-hardware-2026-10-21.md); see the
 [qualification procedure](waveshare-audio-board.md#hardware-qualification).
