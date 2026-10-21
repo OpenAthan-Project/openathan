@@ -1,5 +1,11 @@
 # Firmware checks
 
+AUDIO-Board production and isolated development jobs compile the screenless
+profile and enforce the same dependency, storage and capacity contracts. Host
+tests cover checked amplifier sequencing, expander read failures, key debounce,
+RGB output and persistent physical volume changes. These do not establish
+audible playback or hardware acceptance.
+
 `firmware.yml` runs on pull requests and pushes to `main`, with read-only
 repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation

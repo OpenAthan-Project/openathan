@@ -202,6 +202,14 @@ The public website and browser installer live in the separate [`OpenAthan-Projec
 
 The device UI remains in this repository and must function without the public website or cloud infrastructure. The deployed website can suggest a location and adopt approved stable releases after verification; neither is required for local controls or daily operation. Automatic website adoption does not request a speaker update: owners queue signed application updates through the device's Firmware section.
 
+## Screenless AUDIO-Board
+
+The [AUDIO-Board profile](waveshare-audio-board.md) composes the same product
+services without a display. Its adapter owns checked TCA9555 amplifier control,
+three debounced keys and the optional RGB output. ES8311 playback sequencing is
+shared with Box V2; the framework-independent core has no new board dependency.
+Physical volume controls save through the existing settings service.
+
 ## Future migration
 
 If ESPHome later limits audio, storage, UI, or performance requirements, the OpenAthan core and device-facing APIs should be reusable from native ESP-IDF firmware.

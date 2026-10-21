@@ -178,7 +178,7 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertNotIn("if", build)
         self.assertEqual(build["strategy"]["matrix"]["configuration"], [
             "device", "validation", "reference", "provisioning-validation",
-            "upgrade-qualification", "upgrade-startup-failure", "waveshare-production", "waveshare-audio", "waveshare-display", "waveshare-diagnostics", "quran-qualification", "dua-qualification", "waveshare-dua-qualification"])
+            "upgrade-qualification", "upgrade-startup-failure", "audio-board-production", "audio-board-development", "waveshare-production", "waveshare-audio", "waveshare-display", "waveshare-diagnostics", "quran-qualification", "dua-qualification", "waveshare-dua-qualification"])
         steps = build["steps"]
         self.assertEqual(steps[0]["with"]["fetch-depth"], 2)
         detector = next(step for step in steps if step.get("id") == "build_policy")

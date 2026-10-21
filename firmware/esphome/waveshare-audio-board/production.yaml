@@ -1,0 +1,15 @@
+# Screenless AUDIO-Board; unrelated Waveshare boards require their own profile.
+esphome:
+  name: openathan
+  name_add_mac_suffix: true
+  min_version: 2026.9.0
+  project:
+    name: OpenAthan.waveshare_audio_board
+    version: v0.8.0
+packages:
+  openathan: !include ../packages/openathan.yaml
+  product: !include ../packages/product.yaml
+  hardware: !include ../packages/hardware/waveshare-audio-board.yaml
+openathan_device:
+  hardware: waveshare-esp32-s3-audio-board
+  updates_enabled: true

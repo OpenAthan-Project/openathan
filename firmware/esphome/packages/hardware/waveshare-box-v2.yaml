@@ -9,7 +9,7 @@ external_components:
   - source:
       type: local
       path: ../../components
-    components: [waveshare_box_audio]
+    components: [waveshare_box_audio, es8311_playback]
   - source:
       type: local
       path: ../../components

@@ -3,6 +3,7 @@ from esphome.components import openathan_audio
 from esphome.components.es8311.audio_dac import ES8311
 from esphome.const import CONF_ID
 
+AUTO_LOAD = ["es8311_playback"]
 DEPENDENCIES = ["audio_dac", "openathan_audio"]
 ns = cg.esphome_ns.namespace("waveshare_box_audio")
 Audio = ns.class_("Audio", cg.Component, cg.global_ns.namespace("openathan").class_("Playback"))

@@ -12,7 +12,7 @@ You do not need to solder, write code or run Home Assistant.
 | Waveshare **ESP32-S3-Touch-LCD-1.85C-BOX V2** | Pre-assembled | Round display with prayer ring, BOOT button | [Parts and setup](reference-builds/waveshare-box-v2/README.md) |
 
 **Compatibility:** the Atom profile supports the GC9107 display; newer ST7735
-revisions remain unqualified. Waveshare **V1 is unsupported**. A167 is also
+revisions remain unqualified. Waveshare **Box V1 is unsupported**. A167 is also
 called Echo Pyramid. Check the exact revision before buying.
 
 Choose the pre-assembled Box V2 if you prefer not to connect modules. Choose the
@@ -49,6 +49,13 @@ speakers should use [preserving updates or credential recovery](../docs/developm
 - **Unused peripherals:** touch input, microphones and SD/removable storage are
   not supported by OpenAthan. Their presence in vendor specifications does not
   make them available in OpenAthan firmware.
+
+## AUDIO-Board development
+
+The screenless Waveshare ESP32-S3-AUDIO-Board has a new firmware adapter and
+installer integration. Hardware qualification and a published compatible release
+are pending; it is not yet an additional publicly supported build. See its
+[parts and setup guide](reference-builds/waveshare-audio-board/README.md).
 
 ## Other hardware and expansions
 

@@ -182,6 +182,26 @@ class HardwareReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'different source'):
                 artifacts.validate_bundle(directory)
 
+    def test_three_board_bundle_and_incomplete_assets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for hardware in artifacts.PROFILES:
+                files, _ = self.bundle(hardware)
+                for name, data in files.items(): (directory / name).write_bytes(data)
+            _, _, files, _ = artifacts.validate_bundle(directory)
+            self.assertEqual(len(files), 13)
+            (directory / artifacts.asset_name(artifacts.AUDIO_BOARD, 'firmware.factory.bin')).unlink()
+            with self.assertRaises(ValueError): artifacts.validate_bundle(directory)
+
+    def test_audio_board_signature_is_not_box_v2_despite_same_flash_size(self):
+        _, app = self.bundle(artifacts.AUDIO_BOARD)
+        key = ec.generate_private_key(ec.SECP256R1())
+        private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        public = key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        envelope = upgrade.sign('v0.5.0', 'a'*40, app, private, public, artifacts.AUDIO_BOARD)
+        self.assertEqual(upgrade.validate(envelope, app, public, 'v0.5.0', 'a'*40, artifacts.AUDIO_BOARD)['hardware'], artifacts.AUDIO_BOARD)
+        with self.assertRaises(ValueError): upgrade.validate(envelope, app, public, 'v0.5.0', 'a'*40, artifacts.WAVESHARE)
+
     def test_waveshare_signature_cannot_be_used_for_atom(self):
         _, app = self.bundle(artifacts.WAVESHARE)
         key = ec.generate_private_key(ec.SECP256R1())

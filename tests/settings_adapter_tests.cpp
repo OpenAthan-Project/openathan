@@ -202,6 +202,21 @@ static void light_time_and_setup() {
   CHECK(f.device.change_lights({false,20},1)==LightSaveResult::SAVED);
   CHECK(f.device.current_light_mode()==LightMode::OFF);
 }
+static void physical_volume() {
+  Fixture f; f.begin();
+  const auto before=f.value();
+  CHECK(f.device.adjust_volume(-5)==SettingsResult::SAVED);
+  CHECK(f.value().volume==before.volume-5);
+  auto expected=before; expected.volume-=5; CHECK(f.value()==expected);
+  Fixture reboot(false); reboot.begin(); CHECK(reboot.value()==expected);
+  CHECK(reboot.device.adjust_volume(-1000)==SettingsResult::SAVED && reboot.value().volume==0);
+  CHECK(reboot.device.adjust_volume(-5)==SettingsResult::UNCHANGED);
+  CHECK(reboot.device.adjust_volume(1000)==SettingsResult::SAVED && reboot.value().volume==100);
+  nvs_test::fail_commit=true;
+  CHECK(reboot.device.adjust_volume(-5)==SettingsResult::STORAGE);
+  CHECK(reboot.value().volume==100);
+  nvs_test::fail_commit=false;
+}
 static void updates_and_replay() {
   Fixture f; f.begin();
   CHECK(f.device.status().automatic_ready);
@@ -1196,7 +1211,7 @@ int main() {
   round_display_adapter();
   round_playback_ring_adapter();
   display_button_guidance();
-  display_integration(); light_time_and_setup(); light_integration(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
+  display_integration(); light_time_and_setup(); light_integration(); physical_volume(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
   dua_api(); display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
 #endif
