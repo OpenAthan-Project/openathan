@@ -1,8 +1,8 @@
 # Firmware release preparation
 
-[v0.7.0](../releases/v0.7.0.md) is the published stable release for Atom and
+[v0.8.0](../releases/v0.8.0.md) is the current published stable release for Atom and
 Waveshare Box V2. The [v0.8.0 preparation](v0.8.0-preparation-2026-10-20.md)
-records the dua review candidate and its validation gates. The
+records the source, candidate validation and remaining qualification limits. The
 [v0.7.0 preparation](v0.7.0-preparation-2026-10-17.md) retains source-bound phone
 checks and limitations. The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md)
 retains its earlier review/build evidence. The previous

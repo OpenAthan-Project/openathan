@@ -11,17 +11,17 @@ The Atom layout, button guidance and 8-bit buffer remain unchanged.
 It defaults to `true`, preserving reference behavior; hardware without a stop
 button should set it to `false` to show “Use phone.”
 
-The reference candidate includes a dim, always-on 128×128 status screen through
+The reference firmware includes a dim, always-on 128×128 status screen through
 [the GC9107 board profile](../../boards/atom-s3r-gc9107-display.yaml).
-This is development work after v0.2.1, not a capability in the published v0.2.1
-bundle. The dated report records isolated hardware acceptance; successor
-release qualification remains separate.
+Published since [v0.3.0](../../../../docs/releases/v0.3.0.md), this display is not
+available in v0.2.1. Dated reports retain their source-bound hardware results;
+publication does not establish every later release image or retail revision.
 
 The board profile keeps the screen on with a saved brightness preference
 (1–100%, default 50%) and rotation 0. The local settings page provides a separate
 **Screen brightness** slider that applies when saved and survives restart.
-This preference is unreleased; see the
-[API contract](../../provisioning/README.md#screen-brightness-unreleased).
+This preference is available since v0.4.0; see the
+[API contract](../../provisioning/README.md#screen-brightness).
 The intended viewing side is opposite the Pyramid's power/expansion ports, with the cord at the back.
 The earlier isolated run used rotation 180 and confirmed dimness and readability
 from the operator's viewing side; it did not establish this front/back convention.

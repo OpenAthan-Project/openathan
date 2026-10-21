@@ -1,6 +1,7 @@
 # Dua after Athan
 
-Development feature: one optional offline recording after scheduled Athan. The
+Available since [v0.8.0](../releases/v0.8.0.md): one optional offline recording
+after scheduled Athan. The
 [dated validation report](dua-validation-2026-10-18.md) records matched builds,
 automated coverage and the remaining hardware/media gates. The
 preference defaults to off. The maintainer approved the supplied recording and
@@ -8,7 +9,8 @@ permission basis on 2026-10-18; its exact hash and unchanged bytes are documente
 in [recording rights and attribution](../../AUDIO-LICENSES.md). The recording stays
 outside Git. An [automated text check](dua-qualification-validation-2026-10-19.md)
 matched the reference dua wording. Hardware qualification below remains required
-before a release with dua media; recording approval does not publish or install it.
+for new release candidates with dua media; recording approval alone does not
+publish or install it.
 The [attended results](dua-attended-validation-2026-10-20.md) record subsequent
 normal/Fajr listening, Stop, offline shared events, installation recovery and
 preservation. The later [bounded runtime report](dua-runtime-validation-2026-10-20.md)

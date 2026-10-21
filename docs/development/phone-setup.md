@@ -1,8 +1,9 @@
 # First-run phone setup
 
-This unreleased feature lets a newly installed speaker complete setup from a
-phone. The public installer continues its existing USB flow until a supported
-firmware release is published and adopted by the separate website repository.
+Available since [v0.7.0](../releases/v0.7.0.md), this feature lets a newly installed
+speaker complete setup from a phone. The public installer offers phone setup or
+continued computer setup on compatible releases; older firmware retains its USB
+flow. See the [user setup guide](https://openathan.com/docs/getting-started/).
 
 ## Journey
 
@@ -85,8 +86,12 @@ Firmware acceptance includes matched pinned builds, capacity checks and preserve
 partition/update contracts. Static RAM and compilation do not prove runtime heap
 or PSRAM headroom.
 
-The [dated validation report](phone-setup-validation-2026-10-15.md) records the
+The [initial validation report](phone-setup-validation-2026-10-15.md) records the
 matched firmware measurements, automated results and simulated UI previews.
+The [October 19 follow-up](phone-setup-validation-2026-10-19.md) records attended
+iPhone wizard completion, cold restart and page rediscovery on both boards,
+plus separately scoped production-update observations. These results do not
+establish every phone, network or exact published-image installation/recovery.
 
 Before hardware claims, follow the [provisioning hardware runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
 in a separately coordinated session with isolated records and compatible

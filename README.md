@@ -1,127 +1,132 @@
 # OpenAthan
 
-OpenAthan is an open-source, low-cost DIY Athan and Quran smart speaker project. It supports an ordinary-user reference build and a reusable ESPHome integration for people who already have compatible hardware. The reference experience is intended to work without soldering, PCB design, Home Assistant, or embedded-development experience.
+Turn a supported speaker into an Athan and Quran speaker for your home. OpenAthan
+calculates prayer times and plays the Athan automatically, with settings you can
+control from your phone. It is open source and works without Home Assistant,
+soldering, or programming.
 
-> **Project status:** [v0.5.0](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.5.0) is available for AtomS3R C126 + Voice Pyramid A167 and Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2. Both support standalone scheduled Athan, a display, phone-friendly setup and settings, USB Wi-Fi/password recovery and owner-requested signed updates. See the [release notes](docs/releases/v0.5.0.md) and [qualification results](docs/development/release-validation-2026-10-10.md). Waveshare V1 is not supported; newer Atom ST7735 display revisions remain unqualified.
+**Current release: [v0.8.0](docs/releases/v0.8.0.md).**
+[Latest release and downloads](https://github.com/OpenAthan-Project/openathan/releases/latest)
+· [Choose hardware](#supported-speakers) · [Set up your speaker](#get-started)
 
-Use the [public setup guide](https://openathan.com/docs/getting-started/) for a
-new speaker and the [firmware update guide](docs/development/firmware-upgrades.md)
-for an existing one. Fresh installation erases existing settings, credentials
-and prayer history. Compatible application updates and USB credential recovery
-preserve them and the stored recordings.
+<a id="available-functionality-and-next-milestones"></a>
 
-The reference firmware includes [local setup and settings](firmware/esphome/provisioning/README.md).
-The encrypted [developer settings console](firmware/esphome/scheduler/SETTINGS.md)
-is an optional development tool. [Release tooling](docs/development/releases.md)
-builds exact source commits and packages the [approved normal and Fajr recordings](AUDIO-LICENSES.md).
+## What you can do
 
-## Supported paths
+- **Hear the Athan automatically** for the prayers you enable, with a separate
+  Fajr recording stored on the speaker.
+- **Adjust prayer times** for your location, timezone, calculation and Asr
+  methods, with individual prayer adjustments and a timetable to review.
+- **Control playback from your phone:** change volume, stop audio, or skip and
+  restore the next announcement. Saved playback history prevents unwanted repeats
+  across restarts.
+- **Listen to Quran:** choose a reciter, recording edition and surah from
+  MP3Quran. Scheduled Athan takes priority; interrupted Quran does not resume
+  automatically.
+- **Enable dua after Athan:** an optional recording plays after a completed
+  scheduled Athan. It is off by default. Existing speakers download it when
+  enabled; once installed, it plays offline.
+- **Set up over phone or USB.** On supported screens, a button shows QR codes and
+  the speaker's address so you can find its page again.
+- **Customize the supported screen and lights**, including screen brightness and
+  12/24-hour time. Available controls depend on the hardware.
+- **Update over Wi-Fi** from the speaker's settings while keeping saved settings
+  and recordings. USB recovery can change Wi-Fi or reset a forgotten speaker
+  password without erasing prayer settings or playback history.
 
-### Ordinary users
+<img src="docs/development/device-ui-redesign/today-phone.png" alt="Example phone interface showing the next prayer, volume, Skip control and daily timetable" width="320">
 
-1. Buy the documented reference hardware.
-2. Assemble the Atom + Pyramid modules, or use the pre-assembled Waveshare Box V2.
-3. Connect the device over USB.
-4. Visit [openathan.com/install](https://openathan.com/install).
-5. Install OpenAthan and enter Wi-Fi credentials.
-6. Complete the phone-friendly local setup wizard.
-7. Use the device standalone.
+*Simulated phone preview with example times and a test hostname. Appearance and
+available controls depend on firmware and hardware.*
 
-Precompiled releases are available through [openathan.com/install](https://openathan.com/install). This path requires neither YAML nor ESPHome knowledge. For Atom, use only its USB-C data connection during setup, then disconnect it and use only Pyramid bottom power for normal playback. Waveshare Box V2 uses its rear USB-C data port. First setup requires internet time synchronization. Atom also needs internet time after a cold boot; Waveshare can restore initialized RTC time after a powered restart. RTC battery-backed retention while unplugged has not yet been verified.
+<a id="supported-reference-hardware"></a>
 
-### ESPHome users
+## Supported speakers
 
-ESPHome contributors can compose the reusable OpenAthan package from a local checkout and connect it to compatible audio and optional interface components. Their configuration remains responsible for its board, networking, credentials, and any hardware entities it exposes. Remote package consumption and additional hardware require validation; see the [integration guide](firmware/esphome/README.md).
+Both options run the same core Athan and Quran features and use the browser
+installer. Buy the exact supported model and revision.
 
-The reusable package treats hardware as capabilities. An audio playback endpoint is fundamental to Athan playback; RGB LEDs, a display, physical or touch controls, a microphone, RTC, removable storage, and Home Assistant integration are optional. See the [ESPHome firmware documentation](firmware/esphome/README.md) and [custom-hardware example](firmware/esphome/examples/custom-hardware.yaml).
+| Speaker | Assembly and interface | Setup guide |
+| --- | --- | --- |
+| **M5Stack AtomS3R C126 + Voice Pyramid A167** | Two modules to connect; small screen, front button and prayer-status lights | [Parts and setup](hardware/reference-builds/voice-pyramid/assembly.md) |
+| **Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2** | Pre-assembled speaker; round screen and BOOT button | [Parts and setup](hardware/reference-builds/waveshare-box-v2/README.md) |
 
-Home Assistant may eventually be supported as an optional integration on either path, but it will not be required for core operation.
+**Check before buying:** Waveshare **V1 is unsupported**. The Atom profile targets
+the **GC9107 display**; newer ST7735 revisions are not qualified. A167 is also
+sold/documented as **Echo Pyramid**. Touch input, microphones and SD storage are
+not supported by OpenAthan, even where the hardware includes them.
 
-## Supported reference hardware
+See the [hardware comparison and compatibility guide](hardware/README.md) for
+accessories, clock behavior and model-specific limits. Audio playback is required;
+screens, lights and other peripherals are optional to OpenAthan's reusable core.
 
-The original precompiled reference build uses:
+<a id="supported-paths"></a>
+<a id="ordinary-users"></a>
 
-- **M5Stack AtomS3R C126** — ESP32-S3, 8 MB flash, 8 MB PSRAM, and a 0.85-inch display.
-- **M5Stack Voice Pyramid A167** — speaker and audio hardware, microphone, RGB LEDs, capacitive touch controls, and enclosure.
+## Get started
 
-SKU A167 has also been called **Echo Pyramid**; verify the SKU when purchasing. See the [AtomS3R documentation](https://docs.m5stack.com/en/core/AtomS3R), [Voice Pyramid documentation](https://docs.m5stack.com/en/atom/Voice_Pyramid), and [reference bill of materials](hardware/reference-builds/voice-pyramid/bom.md).
+You need supported hardware, a computer with **desktop Chrome or Edge**, a
+**USB data cable**, USB power, and a **2.4 GHz WPA2/WPA3 personal Wi-Fi network**.
+A charging-only cable will not work for installation. Networks requiring a web
+sign-in or enterprise authentication are unsupported.
 
-The second supported build is **Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2**: a pre-assembled ESP32-S3 speaker with a round display, 16 MiB flash, 8 MiB PSRAM and onboard RTC. See the [Waveshare profile and hardware mappings](docs/development/waveshare-box-v2.md). V1 has different audio hardware and is not supported. Touch input, microphones and SD storage are not yet supported by OpenAthan.
+1. Follow your speaker's hardware guide above to connect the correct USB port.
+2. Open [USB setup](https://openathan.com/install/) on your computer to install
+   OpenAthan. **A new installation erases existing firmware and saved data.**
+3. Choose phone setup now or later, or continue on the computer. No coding is
+   required. Follow the [complete setup guide](https://openathan.com/docs/getting-started/).
+4. Open the speaker's local page, choose your location and prayer settings, and
+   review the timetable. Select **Finish setup** to enable automatic Athan.
 
-This C126 + A167 combination is the designated reference target, not a requirement of the reusable OpenAthan package. RTC, removable storage, larger external speakers, and other modules are optional capabilities rather than core requirements.
+Keep your phone and speaker on the same home Wi-Fi for everyday controls. Phone
+enrollment uses a temporary open setup network; perform initial setup in a trusted
+place. You can join that network manually without scanning a QR code.
 
-## Architecture
+**Already installed?** Open the speaker's settings to check for updates, or use
+USB setup for Wi-Fi/password recovery. Do not choose a fresh installation to
+update an existing speaker. See the [preserving update guide](docs/development/firmware-upgrades.md)
+for older firmware or bootloader compatibility.
 
-```text
-OpenAthan
-├── openathan-core
-│   ├── prayer calculations
-│   ├── scheduling
-│   ├── settings
-│   └── playback abstractions
-├── reusable ESPHome integration
-│   ├── hardware-independent OpenAthan component
-│   └── required and optional capability interfaces
-├── hardware integrations
-│   ├── Voice Pyramid A167 adapter
-│   ├── Waveshare Box V2 audio, display and RTC adapters
-│   └── user-supplied ESPHome components
-├── official reference firmware
-│   ├── validated AtomS3R C126 board configuration
-│   ├── C126 + A167 capability mapping
-│   ├── Waveshare Box V2 production configuration
-│   └── provisioning, networking, OTA, and release configuration
-└── local OpenAthan device UI
-```
+## Internet, compatibility and help
 
-OpenAthan-specific behavior belongs in modular C++ components rather than one large YAML configuration. `openathan-core` and the prayer scheduler must depend on capability interfaces, never on Voice Pyramid entities or GPIOs. They should remain independent from ESPHome, Home Assistant, and the reference hardware wherever practical so they can later move to native ESP-IDF or another framework if necessary.
+- **Stored Athan and installed dua work offline once the clock is valid.**
+  First setup needs internet time. Atom needs internet time again after a cold
+  boot. Waveshare Box V2 can restore initialized clock time across powered
+  restarts; unplugged retention and backup-battery behavior remain unqualified.
+- **Quran streaming needs internet access to MP3Quran.** It does not provide an
+  offline Quran library, ayah controls or playback bookmarks.
+- Settings and scheduling run locally without the public website or Home
+  Assistant. Home Assistant integration, touch controls and additional storage
+  remain future work in the [roadmap](docs/development/roadmap.md).
+- If a `.local` address will not open, use the speaker's displayed current IP
+  address. See [troubleshooting](https://openathan.com/docs/troubleshooting/) or
+  [report an issue](https://github.com/OpenAthan-Project/openathan/issues/new/choose)
+  with your model, firmware version and what happened.
 
-See [the development architecture](docs/development/architecture.md) for responsibility boundaries.
+These are pre-1.0 releases. Read the [release notes and validation limits](docs/releases/v0.8.0.md)
+before installing. Publication and automated checks do not establish physical
+qualification of every release image, hardware revision or network condition.
 
-## Repository responsibilities
+<a id="esphome-users"></a>
 
-- This repository contains firmware, `openathan-core`, the device-local UI, hardware reference information, and development documentation.
-- [`OpenAthan-Project/website`](https://github.com/OpenAthan-Project/website) contains the public website, public-facing documentation, and browser installer.
-- Firmware release artifacts are built and published from this repository. The website installer verifies and consumes published artifacts; it never compiles firmware. Its approved-release adoption is separate from a speaker owner's request to install an update.
-- The device UI remains here because its local API and firmware behavior evolve together. It must work without the public website or cloud infrastructure.
+## For contributors and ESPHome users
 
-```text
-lib/openathan-core/       Framework-independent product logic
-firmware/esphome/         Reusable ESPHome package, integrations, examples, and reference entry point
-web/device-ui/            Device-local OpenAthan interface
-hardware/                 Reference builds and optional expansions
-docs/development/         Architecture and engineering documentation
-```
+Start with [contributing](CONTRIBUTING.md), [build and test instructions](.github/workflows/README.md),
+the [architecture guide](docs/development/architecture.md), and the
+[device UI guide](web/device-ui/README.md). Report security vulnerabilities through
+[private reporting](SECURITY.md).
 
-## Available functionality and next milestones
+ESPHome users can compose the [reusable integration](firmware/esphome/README.md)
+from a local checkout with compatible audio and optional peripherals. Custom
+hardware needs development and validation; it is not automatically supported by
+the public installer. Remote package consumption remains unvalidated.
 
-Reference firmware implements local prayer-time calculation, calculation and Asr
-methods, prayer offsets, scheduled normal/Fajr playback, durable skip and replay
-protection, saved volume and settings, time synchronization, and application OTA.
-Settings can be changed through the authenticated local interface.
-
-The reference build includes phone-friendly setup, local configuration,
-USB Wi-Fi/password recovery, explicit first-run activation, prayer-status LEDs
-and signed application updates. The [roadmap](docs/development/roadmap.md)
-separates shipped features from remaining work and validation limits. Displays
-and their saved brightness/time-format controls are optional capabilities;
-touch controls remain future work. None is required by the reusable scheduler.
-
-Development firmware adds [MP3Quran streaming](docs/development/quran-streaming.md)
-with reciter, recording edition and surah selection in the local UI. One surah
-plays directly on the device; Athan interrupts it without automatic resume.
-Physical playback and runtime memory qualification remain release gates.
-Resume positions, ayah selection, adhkar, offline Quran storage, RTC expansion
-for other hardware and optional Home Assistant integration remain later work.
-
-## Development safety
-
-- Do not add hardware pin mappings until they have been verified against the manufacturer's documentation or source and physical hardware.
-- Do not present scaffold files as installable firmware.
-- Do not commit Wi-Fi credentials or signing secrets.
-- Do not bundle third-party Athan or Quran recordings without explicit, compatible redistribution rights.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing substantial changes.
+This repository owns firmware, the framework-independent product core, the local
+device UI, hardware guides and release artifacts. The separate
+[website repository](https://github.com/OpenAthan-Project/website) owns public
+setup documentation and the installer; it consumes published artifacts and does
+not compile firmware. See [release tooling](docs/development/releases.md) for
+maintainer instructions.
 
 ## Licensing
 
@@ -130,6 +135,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing substantial changes.
   (GPLv3 runtime and MIT Python).
 - OpenAthan-authored documentation: [CC BY 4.0](docs/LICENSE.md).
 - Future original hardware design sources: [CERN-OHL-P-2.0](hardware/LICENSE.md), unless stated otherwise.
-- Third-party dependencies, hardware, and media remain under their respective terms.
+- Third-party dependencies, hardware, and media retain their own terms. See
+  [recording attribution and permissions](AUDIO-LICENSES.md).
 
 OpenAthan is an independent community project and is not affiliated with the third-party hardware, software, or content providers referenced in its documentation.

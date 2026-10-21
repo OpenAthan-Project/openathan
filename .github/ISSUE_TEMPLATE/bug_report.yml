@@ -10,8 +10,8 @@ body:
     id: hardware
     attributes:
       label: Hardware
-      description: List the Atom/controller and speaker/base models.
-      placeholder: AtomS3R C126 + Voice Pyramid A167
+      description: List the exact speaker model/revision, or controller and speaker-base models.
+      placeholder: Waveshare Box V2, or AtomS3R C126 (GC9107) + Voice Pyramid A167
     validations:
       required: true
   - type: input
