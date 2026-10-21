@@ -4,7 +4,9 @@ The ESP32-S3-Touch-LCD-1.85C-BOX **V2** production and development profiles reus
 standalone prayer calculations, scheduling, stored recordings, USB provisioning and the
 authenticated device-local phone controls. V1 uses different audio hardware and
 is not supported by this profile. Touch, microphones and SD storage are
-deferred. Production is available in [v0.5.0](../releases/v0.5.0.md).
+deferred. Production is available since [v0.5.0](../releases/v0.5.0.md).
+Start with the [parts and setup guide](../../hardware/reference-builds/waveshare-box-v2/README.md)
+for installation; [current release notes](../releases/v0.8.0.md) cover later features and limits.
 See the [release qualification report](release-validation-2026-10-10.md) and
 [earlier development validation](waveshare-validation-2026-10-09.md) for physical
 results and their limits.
@@ -233,7 +235,8 @@ a full-flash restore also restores historical settings and prayer consumption.
 
 ## Production release
 
-`firmware/esphome/waveshare/production.yaml` is the published v0.5.0 production profile.
+`firmware/esphome/waveshare/production.yaml` is the production entry point, first
+published in v0.5.0 and retained for later releases.
 It uses `openathan` with a MAC suffix, production settings/setup/network/upgrade
 storage, round display, BOOT controls and signed updates. It omits diagnostic and
 isolated-storage components. Existing isolated development records are not migrated.

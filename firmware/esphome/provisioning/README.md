@@ -4,7 +4,9 @@
 AtomS3R C126 + Voice Pyramid A167. It includes phone and USB provisioning, local
 setup/settings, first-run activation, optional lights and signed firmware updates.
 The public [browser installer](https://openathan.com/install/) consumes published
-artifacts from this repository. See the [current release evidence and limits](../../../docs/development/release-validation-2026-10-03.md)
+artifacts from this repository. Waveshare uses its own
+[`production.yaml`](../waveshare/production.yaml); compare [supported models](../../../hardware/README.md).
+See the [current release notes and limits](../../../docs/releases/v0.8.0.md)
 and [earlier provisioning results](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
 Serial close/reopen has caused temporary Wi-Fi loss on the tested unit; that
 observation remains relevant to recovery guidance.
@@ -13,7 +15,11 @@ For existing-device acceptance, use the [isolated test build and hardware runboo
 It keeps test prayer, activation and credential records separate and includes a
 USB-only maintenance helper. Production builds reject those maintenance commands.
 
-## Phone setup (unreleased)
+<a id="phone-setup-unreleased"></a>
+
+## Phone setup
+
+Available since v0.7.0.
 
 Fresh devices offer an open `OpenAthan-Setup-<suffix>` Wi-Fi network. Join it from
 the phone's Wi-Fi settings or scan the screen's Wi-Fi QR code. If setup does not
@@ -39,8 +45,9 @@ The setup network is open and its HTTP traffic is unencrypted. Set up the speake
 in a trusted place. Only the limited bootstrap interface is available through
 this network; the normal settings API retains its device-password protection.
 See the [phone setup contract](../../../docs/development/phone-setup.md) for
-interfaces, storage boundaries and physical acceptance requirements. This feature
-does not change the published installer until supported firmware is released.
+interfaces, storage boundaries and physical acceptance requirements. Older
+firmware retains USB enrollment. The [October 19 follow-up](../../../docs/development/phone-setup-validation-2026-10-19.md)
+records later wizard and rediscovery results within their tested scope.
 
 ## Build and developer access
 
@@ -79,14 +86,14 @@ network client isolation may prevent access.
 Enter latitude/longitude, an IANA timezone, and the calculation method. Review
 the preview, then choose **Finish setup**. Default choices for a fresh device
 are Standard Asr, automatic high-latitude handling, zero offsets, all five prayers
-enabled, and 70% volume. The reference hardware's existing 60% output ceiling
-remains. With no valid clock, configuration can be finished but announcements
-wait for time synchronization. A cold boot without a usable time source cannot
+enabled, and 70% volume. Actual output depends on the board's calibrated volume
+mapping; start low and adjust gradually. With no valid clock, configuration can
+be finished but announcements wait for time synchronization. A cold boot without a usable time source cannot
 establish the current time from saved settings alone.
 
 ### Finding the speaker page again
 
-The connection-screen feature is an unreleased addition after v0.6.0. Press the
+Connection screens are available since v0.7.0. Press the
 Atom front button or Waveshare BOOT button briefly while audio is idle. Atom cycles through a QR
 code, the hostname/IP information, and the normal screen. Waveshare shows the QR
 code and both addresses together; press again to return. The information closes
@@ -297,13 +304,20 @@ OPENATHAN_TEST_BROWSERS=chromium,webkit npm test
 
 The [dated device report](../../../docs/development/feasibility-report.md) records
 first-run, USB recovery, phone controls and interruption results by tested source.
-The [current release summary](../../../docs/development/release-validation-2026-10-03.md)
-adds production migration, approved media, listening and public-delivery evidence.
+The [earlier release report](../../../docs/development/release-validation-2026-10-03.md)
+records production migration, approved media, listening and public-delivery evidence.
+Current [release notes](../../../docs/releases/v0.8.0.md) and the
+[phone-setup follow-up](../../../docs/development/phone-setup-validation-2026-10-19.md)
+link later results without extending those earlier passes.
 Host/browser simulations do not establish hidden-network radio behavior, broader
 phone/browser coverage or physical acceptance of every later revision. Preserve
 those source and coverage limits when selecting new acceptance work.
 
-## Time format (unreleased)
+<a id="time-format-unreleased"></a>
+
+## Time format
+
+Available since v0.4.0.
 
 `GET /api/time-format` and the `time_format` object in `/api/status` return
 `{schema: 1, revision, hours, application}`. `hours` is 12 or 24; existing devices
@@ -323,7 +337,11 @@ to 24-hour time and saves are blocked. A failed save keeps the last confirmed
 format active and blocks further preference writes until restart. These failures
 never block scheduling or playback. Isolated builds use `oa_test`.
 
-## Screen brightness (unreleased)
+<a id="screen-brightness-unreleased"></a>
+
+## Screen brightness
+
+Available since v0.4.0.
 
 `GET /api/display` and the `display` object in `/api/status` return
 `{schema: 1, supported, revision, brightness_percent, application}`. Supported

@@ -1,15 +1,18 @@
 # Roadmap
 
-This roadmap tracks implemented capabilities and future product work. Checked
-items may be available in development firmware before a public release. Release
-availability is documented separately.
+This roadmap tracks available capabilities and future product work. The current
+published release is [v0.8.0](../releases/v0.8.0.md). Checked items describe
+implementation, not blanket physical qualification; release notes and dated
+validation reports retain their evidence limits.
 
 ## Current milestone
 
 Standalone Athan is available on AtomS3R C126 + Voice Pyramid A167 and Waveshare
 Box V2, with local setup, prayer scheduling, stored normal/Fajr audio, device
-controls and signed firmware updates. MP3Quran streaming is implemented in
-development firmware.
+controls and signed firmware updates. Releases include MP3Quran streaming
+(v0.6.0), first-run phone setup and connection QR screens (v0.7.0), and optional
+offline dua after scheduled Athan (v0.8.0). Compare the exact supported models in
+the [hardware guide](../../hardware/README.md).
 
 Atom needs internet time synchronization after a cold boot; Waveshare supports
 onboard RTC restoration after a powered reset. Once the clock is valid, prayer
@@ -43,6 +46,8 @@ Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 
 - [x] Browser installer at `openathan.com/install` consuming approved release artifacts.
 - [x] Device-local setup, settings and playback controls.
+- [x] First-run phone Wi-Fi setup, with manual entry or optional screen QR.
+- [x] Button-accessible speaker webpage QR and hostname/IP information.
 - [x] USB device-password setup and settings/history-preserving credential recovery.
 - [x] Optional HTTPS location suggestions, reviewed and saved on the device.
 - [x] Signed application-only update discovery, owner queue/cancel controls and safe-window installation.
@@ -51,10 +56,11 @@ Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 - [x] Automatic website adoption of approved stable releases.
 - [ ] Browser USB firmware updates that preserve saved data.
 
-## Phase 3 — Quran and adhkar
+## Phase 3 — Quran, dua and adhkar
 
 - [x] MP3Quran streaming with reciter, edition and surah selection.
 - [x] Athan priority over Quran playback.
+- [x] Optional offline dua after scheduled Athan, with recording installation for existing speakers.
 - [ ] Additional streaming providers.
 - [ ] Ayah playback controls.
 - [ ] Resume/bookmark behavior.

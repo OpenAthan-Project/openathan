@@ -1,6 +1,8 @@
 # Quran streaming
 
-The product development firmware can play one MP3Quran surah on the speaker.
+Published since [v0.6.0](../releases/v0.6.0.md), the reference firmware can play
+one MP3Quran surah on the speaker. Availability does not extend the recorded
+hardware/runtime validation beyond its tested source and conditions.
 The local Quran page loads the live reciter catalog, searches across it, pages
 through matching reciters, and offers each selected recording edition's available
 surahs. Automated checks are recorded in the

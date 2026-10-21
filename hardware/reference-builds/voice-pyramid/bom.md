@@ -1,13 +1,16 @@
 # Voice Pyramid Reference Build — Bill of Materials
 
+[Compare supported speakers](../../README.md) · [Assembly and setup](assembly.md)
+
 ## Required hardware
 
 | Component | Model / SKU | Purpose |
 |---|---|---|
-| M5Stack AtomS3R | **C126** | ESP32-S3 controller; 8 MB flash, 8 MB PSRAM, display |
-| M5Stack Voice Pyramid | **A167** | Speaker/audio hardware, microphone, RGB LEDs, touch controls, enclosure |
+| M5Stack AtomS3R | **C126, GC9107 display revision** | Controller, display and front button; newer ST7735 revisions unqualified |
+| M5Stack Voice Pyramid | **A167** | Speaker, RGB lights and enclosure; microphones and touch controls unused by OpenAthan |
 | USB-C data cable and computer | Desktop Chrome or Edge for browser setup | USB installation and credential recovery |
 | USB power source | Suitable for the Pyramid's documented bottom USB-C power input | Normal operation; the data cable may be reused for power |
+| Home Wi-Fi | 2.4 GHz WPA2/WPA3 personal network | Initial setup and internet time; no enterprise or web sign-in networks |
 
 The reference build uses pre-assembled modules and requires no soldering. See the
 [assembly and single-cable power instructions](assembly.md).
@@ -22,15 +25,9 @@ Official references:
 
 ## Optional expansions
 
-Not required by the current reference build:
-
-- battery-backed RTC;
-- microSD or USB storage;
-- external powered speaker/audio output;
-- additional controls;
-- Home Assistant.
-
-These should only become part of the required BOM if testing proves they are necessary for reliable core operation.
+No additional modules are required. Clocks, removable storage and external audio
+outputs are [possible future expansions](../../expansions/README.md), not currently
+supported accessories. Home Assistant integration also remains future work.
 
 ## Development-only hardware
 
