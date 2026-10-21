@@ -1,5 +1,9 @@
 # OpenAthan
 
+[![Latest release](https://img.shields.io/github/v/release/OpenAthan-Project/openathan?label=release)](https://github.com/OpenAthan-Project/openathan/releases/latest)
+[![Firmware CI on main](https://github.com/OpenAthan-Project/openathan/actions/workflows/firmware.yml/badge.svg?branch=main&event=push)](https://github.com/OpenAthan-Project/openathan/actions/workflows/firmware.yml?query=branch%3Amain+event%3Apush)
+[![Software license: Apache-2.0](https://img.shields.io/badge/software%20license-Apache--2.0-blue)](#licensing)
+
 Turn a supported speaker into an Athan and Quran speaker for your home. OpenAthan
 calculates prayer times and plays the Athan automatically, with settings you can
 control from your phone. It is open source and works without Home Assistant,
