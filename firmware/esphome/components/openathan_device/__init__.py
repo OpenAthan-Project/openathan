@@ -21,14 +21,15 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Device),
     cv.Required("openathan_id"): cv.use_id(openathan.OpenAthan),
     cv.Optional("hardware", default="atoms3r-c126-pyramid-a167"): cv.one_of(
-        "atoms3r-c126-pyramid-a167", "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"),
+        "atoms3r-c126-pyramid-a167", "waveshare-esp32-s3-touch-lcd-1_85c-box-v2",
+        "waveshare-esp32-s3-audio-board"),
     cv.Optional("updates_enabled", default=True): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
 def validate(config):
     full = fv.full_config.get()
-    if config["hardware"] == "waveshare-esp32-s3-touch-lcd-1_85c-box-v2":
+    if config["hardware"] in ("waveshare-esp32-s3-touch-lcd-1_85c-box-v2", "waveshare-esp32-s3-audio-board"):
         if "openathan_provisioning_validation" in full and config["updates_enabled"]:
             raise cv.Invalid("Isolated Waveshare development requires updates_enabled false")
     if "improv_serial" not in full or "device_id" not in full["improv_serial"]:
@@ -81,7 +82,9 @@ async def to_code(config):
         raise cv.Invalid("Official project version must match release/firmware.json")
     cg.add_define("OPENATHAN_FIRMWARE_VERSION", version)
     cg.add_define("OPENATHAN_HARDWARE", config["hardware"])
-    prefix = "waveshare-box-v2." if config["hardware"].startswith("waveshare-") else ""
+    prefix = {"atoms3r-c126-pyramid-a167": "",
+              "waveshare-esp32-s3-touch-lcd-1_85c-box-v2": "waveshare-box-v2.",
+              "waveshare-esp32-s3-audio-board": "waveshare-audio-board."}[config["hardware"]]
     cg.add_define("OPENATHAN_UPGRADE_DESCRIPTOR", prefix + "upgrade.json")
     cg.add_define("OPENATHAN_UPGRADE_APPLICATION", prefix + "firmware.ota.bin")
     cg.add_define("OPENATHAN_UPDATES_ENABLED", int(config["updates_enabled"]))

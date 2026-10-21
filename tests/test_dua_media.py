@@ -85,8 +85,8 @@ class DuaMediaTests(unittest.TestCase):
                     capacity=dict(application_bytes=len(app),application_sha256=artifacts.digest(app),application_slot_bytes=0x200000,
                         slot_free_bytes=0x200000-len(app),application_budget_remaining_bytes=0x180000-len(app),growth_target_passed=True)))})
         for hardware, profile in artifacts.PROFILES.items():
-            chosen={k:v for k,v in files.items() if k in ('dua.json','dua.mp3','athan-audio.bin') or
-                (k.startswith(profile['prefix']) if hardware==artifacts.WAVESHARE else not k.startswith(artifacts.profile(artifacts.WAVESHARE)['prefix']))}
+            names={artifacts.asset_name(hardware,name) for name in artifacts.ASSETS}
+            chosen={k:v for k,v in files.items() if k in names or k in ('dua.json','dua.mp3')}
             files[artifacts.asset_name(hardware, 'SHA256SUMS')]=artifacts.checksums(chosen)
         with tempfile.TemporaryDirectory() as temporary, patch.object(release, 'source_file', return_value=self.public):
             root=Path(temporary)

@@ -171,3 +171,8 @@ target_include_directories(audio_adapter_no_quran_tests PRIVATE tests/stubs lib/
 if(NOT APPLE)
   target_link_libraries(audio_adapter_no_quran_tests PRIVATE OpenSSL::Crypto)
 endif()
+
+add_executable(audio_board_adapter_tests tests/audio_board_adapter_tests.cpp)
+target_include_directories(audio_board_adapter_tests PRIVATE tests/audio_board_stubs tests/waveshare_stubs
+  tests/stubs firmware lib/openathan-core/include)
+add_test(NAME audio_board_controls_power_and_ring COMMAND audio_board_adapter_tests)
