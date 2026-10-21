@@ -40,7 +40,9 @@ legacy and phone-setup producer fixtures through the exact pinned website
 consumer. The website separately passes 207 unit tests and 513 Chromium/WebKit/
 mobile browser cases, with three intentional skips. Its check, formatting,
 build and static-output checks pass. Desktop and narrow-screen handoff captures
-were reviewed. The initial reused-preview-server USB-uncertainty failures did
+were reviewed. The embedded device UI separately passes 564 Chromium/WebKit
+cases without skips. A screenshot-test path was corrected to use Playwright
+output paths after Linux CI exposed a Mac-specific temporary path. The initial reused-preview-server USB-uncertainty failures did
 not reproduce on fresh isolated servers; original failed logs were retained. No simulator opens Web Serial.
 Physical phone/USB installation and recovery remain pending; see the
 [qualification procedure](waveshare-audio-board.md#hardware-qualification).

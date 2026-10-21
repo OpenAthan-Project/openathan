@@ -5,6 +5,7 @@
 #include "esphome/components/es8311_playback/audio.h"
 #include <array>
 #include <functional>
+#include <utility>
 
 namespace esphome::waveshare_audio_board {
 // Sole owner of the TCA9555. V1.1: P10=PA, P11/P12/P13=KEY1/2/3.
