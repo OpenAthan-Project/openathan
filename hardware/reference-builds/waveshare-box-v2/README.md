@@ -13,6 +13,14 @@ See the [manufacturer's model documentation](https://www.waveshare.com/wiki/ESP3
 and OpenAthan's [verified profile and hardware notes](../../../docs/development/waveshare-box-v2.md).
 Vendor descriptions also cover capabilities that OpenAthan does not use.
 
+## Where to buy
+
+[Buy from Waveshare's official store](https://www.waveshare.com/product/esp32-s3-touch-lcd-1.85c.htm).
+The listing includes multiple options: select the **speaker-box** version and
+confirm **V2** with the seller. Do not choose the bare board or V1 for this build.
+You may also use a regional distributor supplying the exact supported model and
+revision. Prices, shipping and availability depend on the seller.
+
 ## Required parts
 
 | Item | What to check |

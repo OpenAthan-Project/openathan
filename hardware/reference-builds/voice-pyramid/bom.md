@@ -35,4 +35,13 @@ A second Atom/audio base may be useful to contributors for firmware experimentat
 
 ## Procurement notes
 
-Prices, vendors, and availability change frequently. Project documentation should distinguish reference SKUs from vendor-specific purchase links so users can buy from appropriate distributors in their region.
+Official-store purchase links (both modules are required):
+
+- [AtomS3R C126](https://shop.m5stack.com/products/atoms3r-dev-kit) — confirm the
+  **GC9107 display revision** with the seller; C126 alone does not guarantee it.
+- [Voice Pyramid A167](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom) —
+  the base is sold without the Atom controller.
+
+These purchase links are separate from the technical references above. You may
+also use a regional distributor supplying the exact supported model and revision.
+Prices, shipping and availability depend on the seller.
