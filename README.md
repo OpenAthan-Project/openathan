@@ -64,6 +64,21 @@ See the [hardware comparison and compatibility guide](hardware/README.md) for
 accessories, clock behavior and model-specific limits. Audio playback is required;
 screens, lights and other peripherals are optional to OpenAthan's reusable core.
 
+### Buy the hardware
+
+Choose one build. These links go to the manufacturers' stores; confirm the exact
+model and revision with the seller before ordering.
+
+- **M5Stack build — buy both modules:** [AtomS3R C126](https://shop.m5stack.com/products/atoms3r-dev-kit)
+  and [Voice Pyramid A167](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom).
+  Confirm the Atom's **GC9107 display**; the C126 SKU alone does not guarantee it.
+- **Waveshare build:** [ESP32-S3-Touch-LCD-1.85C store listing](https://www.waveshare.com/product/esp32-s3-touch-lcd-1.85c.htm).
+  Select the **speaker-box** option and confirm **V2**. The bare board and V1 are
+  not the supported speaker build.
+
+You can also buy the exact supported hardware from a distributor in your region.
+Prices, shipping and availability depend on the seller.
+
 <a id="supported-paths"></a>
 <a id="ordinary-users"></a>
 
@@ -142,4 +157,6 @@ maintainer instructions.
 - Third-party dependencies, hardware, and media retain their own terms. See
   [recording attribution and permissions](AUDIO-LICENSES.md).
 
-OpenAthan is an independent community project and is not affiliated with the third-party hardware, software, or content providers referenced in its documentation.
+OpenAthan is an independent community project. References and purchase links do not
+imply endorsement by third-party hardware, software, or content providers. Any
+affiliate purchase links are explicitly marked and disclosed beside the links.
