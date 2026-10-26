@@ -6,6 +6,11 @@ tests cover checked amplifier sequencing, expander read failures, key debounce,
 RGB output and persistent physical volume changes. These do not establish
 audible playback or hardware acceptance.
 
+Two further AUDIO-Board jobs compile healthy and failed-startup private upgrade
+qualification. The feed and scoped USB planner bind the registered hardware
+identity, asset prefix and flash capacity. Qualification retains isolated records
+and private signing trust; ordinary development builds still disable updates.
+
 `firmware.yml` runs on pull requests and pushes to `main`, with read-only
 repository permissions and exact stable action revisions. It runs the C++ suite
 with UndefinedBehaviorSanitizer, the complete Python suite, and schema validation

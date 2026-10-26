@@ -49,6 +49,45 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "qualification application"):
             qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
 
+    def test_legacy_feed_without_hardware_retains_atom_paths(self):
+        path = self.directory / "feed.json"
+        config = json.loads(path.read_text())
+        del config["hardware"]
+        path.write_text(json.dumps(config))
+        address = self.tls_feed()
+        headers, _ = self.fetch(address, "/releases/latest/download/upgrade.json")
+        self.assertIn(b"200", headers)
+
+    def test_waveshare_feed_binds_hardware_flash_size_and_asset_paths(self):
+        original_app = self.app
+        base = Path(self.temporary.name)
+        from upgrade_artifacts import validate
+        for hardware in (release_artifacts.AUDIO_BOARD, release_artifacts.WAVESHARE):
+            with self.subTest(hardware=hardware):
+                self.directory = base / hardware
+                qualification.initialize(self.directory, "192.168.1.2", hardware=hardware)
+                self.application.write_bytes(esp_image(original_app[32:288] + hardware.encode() + b'\0'))
+                with self.assertRaisesRegex(ValueError, "16 MiB"):
+                    qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
+                self.application.write_bytes(esp_image(original_app[32:288] + b'wrong-board\0', flash_bytes=0x1000000))
+                with self.assertRaisesRegex(ValueError, "hardware differs"):
+                    qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
+                self.app = esp_image(original_app[32:288] + hardware.encode() + b'\0', flash_bytes=0x1000000)
+                self.application.write_bytes(self.app)
+                address = self.tls_feed()
+                descriptor = release_artifacts.asset_name(hardware, "upgrade.json")
+                application = release_artifacts.asset_name(hardware, "firmware.ota.bin")
+                headers, envelope = self.fetch(address, f"/releases/latest/download/{descriptor}")
+                self.assertIn(b"200", headers)
+                validate(envelope, self.app, (self.directory / "public-key.pem").read_bytes(),
+                         "v0.0.2", "a"*40, hardware)
+                headers, app = self.fetch(address, f"/releases/download/v0.0.2/{application}")
+                self.assertIn(b"200", headers)
+                self.assertEqual(app, self.app)
+                for wrong in ("upgrade.json", "firmware.ota.bin", "waveshare-other.upgrade.json"):
+                    headers, _ = self.fetch(address, f"/releases/latest/download/{wrong}")
+                    self.assertIn(b"404", headers)
+
     def test_qualification_images_cannot_enter_release_bundles(self):
         factory, _ = firmware()
         with self.assertRaisesRegex(ValueError, "Qualification firmware"):

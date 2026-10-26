@@ -16,7 +16,7 @@ def prepare(output_dir):
     if output_dir.is_relative_to(ROOT):
         raise ValueError("Fixture output must be outside the repository")
     targets = [ROOT / "firmware/esphome" / name / "secrets.yaml"
-               for name in ("feasibility", "scheduler", "upgrades", "waveshare", "dua")]
+               for name in ("feasibility", "scheduler", "upgrades", "waveshare", "dua", "waveshare-audio-board")]
     for path in [output_dir, *targets]:
         if path.exists() or path.is_symlink():
             raise ValueError(f"Refusing to replace existing path: {path}")
@@ -28,9 +28,10 @@ def prepare(output_dir):
             handle.write(settings)
     from upgrade_qualification import initialize
     qualification = initialize(output_dir / "qualification", "192.168.1.2")
-    with targets[2].open("ab") as handle:
-        for key, value in qualification.items():
-            handle.write(f"qualification_{key}: {value!r}\n".encode())
+    for target in (targets[2], targets[5]):
+        with target.open("ab") as handle:
+            for key, value in qualification.items():
+                handle.write(f"qualification_{key}: {value!r}\n".encode())
     from quran_qualification import initialize as initialize_quran
     quran = initialize_quran(output_dir / "quran-qualification", "192.168.1.2")
     with targets[3].open("ab") as handle:

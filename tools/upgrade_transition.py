@@ -16,7 +16,8 @@ import sys
 import zlib
 
 from audio_image import ROOT
-from release_artifacts import digest, esp_image, json_bytes, read_file, read_json, reject_test_material, require
+from release_artifacts import (HARDWARE, PROFILES, digest, esp_image, json_bytes, profile,
+                               read_file, read_json, reject_test_material, require)
 from upgrade_qualification import MARKER, private_directory, write_private
 from upgrade_artifacts import image_version
 
@@ -111,7 +112,7 @@ def records(nvs, parser):
     return result
 
 
-def analyze(images, idf):
+def analyze(images, idf, hardware=HARDWARE):
     partitions, parser = idf_modules(idf)
     control = images["control"]
     actual = partitions.PartitionTable.from_binary(control[:0x1000])
@@ -120,7 +121,7 @@ def analyze(images, idf):
     require(fields(actual) == fields(expected), "Device partition table differs from the supported layout")
     selected = selection(control[0x6000:])
     app = images[f"app{selected['slot']}"]
-    length = esp_image(app)
+    length = esp_image(app, flash_bytes=profile(hardware)["flash_bytes"])
     require(length <= 1572864, "Selected application exceeds its budget")
     return dict(selection=selected, application_bytes=length, application_sha256=digest(app[:length]),
                 regions={name: digest(data) for name, data in images.items()},
@@ -128,8 +129,9 @@ def analyze(images, idf):
 
 
 class Device:
-    def __init__(self, port, expected_mac):
+    def __init__(self, port, expected_mac, hardware=HARDWARE):
         import esptool
+        flash_bytes = profile(hardware)["flash_bytes"]
         self.esp = esptool.get_default_connected_device([port], port, 7, 115200, chip="esp32s3")
         try:
             mac = ":".join(f"{byte:02x}" for byte in self.esp.read_mac())
@@ -145,7 +147,8 @@ class Device:
             # before identification or reads. Bare ROM flash_id is not reliable.
             from esptool.cmds import attach_flash
             attach_flash(self.esp)
-            require((self.esp.flash_id() >> 16) & 0xff == 0x17, "Expected exactly 8 MiB of flash")
+            require(1 << ((self.esp.flash_id() >> 16) & 0xff) == flash_bytes,
+                    f"Expected exactly {flash_bytes // 0x100000} MiB of flash")
         except BaseException:
             self.close(); raise
 
@@ -163,7 +166,7 @@ class Device:
         require(self.read(address, len(data)) == data, "Independent flash readback differs")
 
 
-def capture(device, directory, idf, expected_mac):
+def capture(device, directory, idf, expected_mac, hardware=HARDWARE):
     directory = private_directory(directory, fresh=True)
     images = {}
     for name, (address, size) in REGIONS.items():
@@ -173,8 +176,9 @@ def capture(device, directory, idf, expected_mac):
         write_private(directory / f"{name}.bin", first)
         images[name] = first
         print(f"Paired {name} read complete", flush=True)
-    report = analyze(images, idf)
-    report.update(mac=expected_mac.lower(), utc=datetime.now(timezone.utc).isoformat(), full_flash_backup=False)
+    report = analyze(images, idf, hardware)
+    report.update(mac=expected_mac.lower(), hardware=hardware,
+                  utc=datetime.now(timezone.utc).isoformat(), full_flash_backup=False)
     app = images[f"app{report['selection']['slot']}"][:report["application_bytes"]]
     write_private(directory / "recovery.ota.bin", app)
     write_private(directory / "snapshot.json", json_bytes(report))
@@ -184,26 +188,32 @@ def capture(device, directory, idf, expected_mac):
 def make_plan(snapshot, application, bootloader=None):
     directory = private_directory(snapshot)
     report = read_json(read_file(directory / "snapshot.json", 65536))
+    hardware = report.get("hardware", HARDWARE)
     require(report["selection"]["state"] in ("valid", "undefined", "erased"), "Current slot must be bootable and not pending")
     app = read_file(application, 1572864)
-    esp_image(app, exact=True)
+    esp_image(app, exact=True, flash_bytes=profile(hardware)["flash_bytes"])
+    if hardware != HARDWARE:
+        require(hardware.encode() + b"\0" in app, "Application hardware identity differs from the snapshot")
     if bootloader:
-        require(MARKER in app and image_version(app) == "v0.0.1", "Bootloader transitions require the healthy v0.0.1 baseline")
+        require(MARKER in app and image_version(app, hardware) == "v0.0.1", "Bootloader transitions require the healthy v0.0.1 baseline")
         boot = read_file(bootloader, 0x8000)
         allowlist = read_json((ROOT / "release/rollback-bootloaders.json").read_bytes())
         require(len(boot) == 0x8000 and digest(boot) in allowlist["sha256"], "Bootloader is not in the reviewed allowlist")
-        esp_image(boot)
+        esp_image(boot, flash_bytes=profile(hardware)["flash_bytes"])
     else:
         reject_test_material(app)
-        require(image_version(app) == read_json((ROOT / "release/firmware.json").read_bytes())["version"],
+        require(image_version(app, hardware) == read_json((ROOT / "release/firmware.json").read_bytes())["version"],
                 "Production restoration requires the current committed firmware version")
         require(report["regions"]["bootloader"] in read_json((ROOT / "release/rollback-bootloaders.json").read_bytes())["sha256"],
                 "Production restoration requires the transitioned bootloader")
-    return dict(schema=1, snapshot=str(directory), snapshot_sha256=digest((directory / "snapshot.json").read_bytes()),
+    result = dict(schema=1, snapshot=str(directory), snapshot_sha256=digest((directory / "snapshot.json").read_bytes()),
                 mac=report["mac"], application=str(application.resolve()), application_sha256=digest(app),
                 application_bytes=len(app), offset=report["selection"]["offset"],
                 bootloader=str(bootloader.resolve()) if bootloader else None,
                 bootloader_sha256=digest(boot) if bootloader else None)
+    if "hardware" in report:
+        result["hardware"] = hardware
+    return result
 
 
 def apply(device, plan, idf, expected_mac):
@@ -215,7 +225,7 @@ def apply(device, plan, idf, expected_mac):
     require(rebuilt == plan, "Transition inputs changed; review a new plan")
     require(not (directory / "apply-started.json").exists(), "Previous write attempt exists; reconcile it before any retry")
     current = {name: device.read(address, size) for name, (address, size) in REGIONS.items()}
-    report = analyze(current, idf)
+    report = analyze(current, idf, plan.get("hardware", HARDWARE))
     baseline = read_json(report_bytes)
     require(report["regions"] == baseline["regions"], "Device state changed since the reviewed snapshot")
     for name, (address, size) in REGIONS.items():
@@ -252,6 +262,7 @@ def main():
     inspect.add_argument("--port", required=True)
     inspect.add_argument("--expect-mac", required=True)
     inspect.add_argument("--idf", type=Path, required=True)
+    inspect.add_argument("--hardware", choices=tuple(PROFILES), default=HARDWARE)
     planning = commands.add_parser("plan")
     planning.add_argument("--snapshot", type=Path, required=True)
     planning.add_argument("--application", type=Path, required=True)
@@ -277,13 +288,15 @@ def main():
             print("Production records and complete shared audio hashes match")
         else:
             require(re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", args.expect_mac), "Invalid expected MAC")
-            device = Device(args.port, args.expect_mac)
+            plan = read_json(read_file(args.plan, 65536)) if args.command == "apply" else None
+            hardware = args.hardware if args.command == "inspect" else plan.get("hardware", HARDWARE)
+            device = Device(args.port, args.expect_mac, hardware)
             try:
                 if args.command == "inspect":
-                    result = capture(device, args.directory, args.idf, args.expect_mac)
+                    result = capture(device, args.directory, args.idf, args.expect_mac, hardware)
                     print(json.dumps({key: result[key] for key in ("selection", "application_bytes", "application_sha256")}, indent=2))
                 else:
-                    apply(device, read_json(read_file(args.plan, 65536)), args.idf, args.expect_mac)
+                    apply(device, plan, args.idf, args.expect_mac)
                     print("Scoped write independently verified; device remains stopped")
             finally:
                 device.close()

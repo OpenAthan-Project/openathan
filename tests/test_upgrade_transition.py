@@ -169,6 +169,40 @@ class TransitionTests(unittest.TestCase):
         esp._port.close.assert_called_once()
         esp.write_flash.assert_not_called()
 
+    def test_audio_board_usb_requires_explicit_16m_profile(self):
+        esp = MagicMock()
+        esp.read_mac.return_value = bytes.fromhex("aabbccddeeff")
+        esp.get_security_info.return_value = dict(flags=0, flash_crypt_cnt=0)
+        esp.run_stub.return_value = esp
+        esp.flash_id.return_value = 0x1840c8
+        with patch("esptool.get_default_connected_device", return_value=esp), patch("esptool.cmds.attach_flash"):
+            with self.assertRaisesRegex(ValueError, "8 MiB"):
+                transition.Device('/dev/cu.test', 'aa:bb:cc:dd:ee:ff')
+            device = transition.Device('/dev/cu.test', 'aa:bb:cc:dd:ee:ff', 'waveshare-esp32-s3-audio-board')
+            device.close()
+            esp.flash_id.return_value = 0x1740c8
+            with self.assertRaisesRegex(ValueError, "16 MiB"):
+                transition.Device('/dev/cu.test', 'aa:bb:cc:dd:ee:ff', 'waveshare-esp32-s3-audio-board')
+        esp.hard_reset.assert_not_called()
+        esp.write_flash.assert_not_called()
+
+    def test_audio_board_snapshot_binds_image_capacity_and_identity(self):
+        root, snapshot, application, images, report = self.fixture()
+        hardware = 'waveshare-esp32-s3-audio-board'
+        report['hardware'] = hardware
+        (snapshot / 'snapshot.json').write_bytes(json_bytes(report))
+        payload = production_app()[32:288]
+        application.write_bytes(esp_image(payload + hardware.encode() + b'\0', flash_bytes=0x1000000))
+        with patch.object(transition, 'ROOT', root):
+            plan = transition.make_plan(snapshot, application)
+            self.assertEqual(plan['hardware'], hardware)
+            application.write_bytes(esp_image(payload + hardware.encode() + b'\0'))
+            with self.assertRaisesRegex(ValueError, '16 MiB'):
+                transition.make_plan(snapshot, application)
+            application.write_bytes(esp_image(payload + b'wrong-board\0', flash_bytes=0x1000000))
+            with self.assertRaisesRegex(ValueError, 'hardware identity'):
+                transition.make_plan(snapshot, application)
+
     def test_durable_payload_crc_and_namespace_ambiguity_fail_closed(self):
         payload = bytearray(192); payload[:4] = b"OAC1"
         struct.pack_into("<I", payload, 188, zlib.crc32(payload[:188]))

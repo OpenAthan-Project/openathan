@@ -96,7 +96,8 @@ levels remain unmeasured.
 
 ## Release qualification still required
 
-- Observe real scheduled playback and consumption/no replay on this board.
+- Independently inspect scheduled-consumption records; the October 22
+  owner observation below confirms automatic playback and restart without replay.
 - Qualify hardware-specific signed Wi-Fi/USB updates, settings/history/audio
   preservation and automatic rollback/recovery with the intended release images.
 
@@ -106,3 +107,11 @@ retention, which was not tested. Battery features remain outside this milestone.
 Public availability requires the remaining hardware qualification and explicit
 release publication. Host/browser tests and the results above do not constitute
 blanket release acceptance. Follow the [board qualification procedure](waveshare-audio-board.md#hardware-qualification).
+
+## October 22 owner follow-up
+
+On the regular unpublished candidate, the owner reported hearing Fajr start by
+itself followed by dua. After the requested RESET and phone-page refresh, they
+confirmed Dhuhr was shown next and the speaker stayed quiet without Fajr or dua
+replaying. These are owner-confirmed physical observations; no device telemetry
+or independent stored-consumption read was collected in that follow-up.

@@ -101,8 +101,10 @@ def inspect_firmware(build_dir, log, root=ROOT):
     hardware = identity[1] if identity else HARDWARE
     if hardware not in PROFILES:
         raise ValueError("Unknown firmware hardware identity")
-    if hardware != HARDWARE and isolated and ('#define OPENATHAN_UPGRADE_QUALIFICATION\n' in defines or '#define OPENATHAN_UPDATES_ENABLED 0\n' not in defines):
-        raise ValueError("Waveshare capacity inspection requires isolated development with updates disabled")
+    if hardware != HARDWARE and isolated:
+        expected_updates = int('#define OPENATHAN_UPGRADE_QUALIFICATION\n' in defines)
+        if f'#define OPENATHAN_UPDATES_ENABLED {expected_updates}\n' not in defines:
+            raise ValueError("Waveshare isolated updates require an explicit upgrade qualification profile")
     validate_firmware_images(factory, app, allow_qualification=qualification, allow_isolated=isolated,
                              flash_bytes=PROFILES[hardware]["flash_bytes"], hardware=hardware)
     log_text = log.read_text().replace("\r", "\n")

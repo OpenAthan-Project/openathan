@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import audio_image
 import check_feasibility
 import prepare_ci
-from release_fixtures import firmware
+from release_fixtures import firmware, esp_image
 
 
 class CiFixtureTests(unittest.TestCase):
@@ -76,6 +76,29 @@ class CapacityChecksTests(unittest.TestCase):
         self.assertTrue(self.inspect()["growth_target_passed"])
         (self.root / "esphome/noise-c/library.json").write_text('{"version":"unexpected"}')
         with self.assertRaisesRegex(ValueError, "Diagnostic library version"):
+            self.inspect()
+
+    def test_audio_board_upgrade_capacity_requires_isolation_and_enabled_updates(self):
+        factory, _ = firmware(0x1000000)
+        app = esp_image(b'OPENATHAN_QUALIFICATION_V1' * 16, flash_bytes=0x1000000)
+        (self.build / 'build/firmware.ota.bin').write_bytes(app)
+        (self.build / 'build/firmware.factory.bin').write_bytes(factory[:0x10000] + app)
+        component = self.build / 'src/esphome/components/openathan_upgrade_qualification'
+        component.mkdir(parents=True)
+        (self.build / 'build/compile_commands.json').write_text(
+            self.pins['xtensa_esp_elf'] + '/openathan_upgrade_qualification/qualification.cpp')
+        defines = ('#define OPENATHAN_HARDWARE "waveshare-esp32-s3-audio-board"\n'
+                   '#define OPENATHAN_UPGRADE_QUALIFICATION\n'
+                   '#define OPENATHAN_PROVISIONING_TEST_STORAGE\n')
+        path = self.build / 'src/esphome/core/defines.h'
+        path.write_text(defines + '#define OPENATHAN_UPDATES_ENABLED 1\n')
+        self.assertTrue(self.inspect()['growth_target_passed'])
+        path.write_text(defines + '#define OPENATHAN_UPDATES_ENABLED 0\n')
+        with self.assertRaisesRegex(ValueError, 'explicit upgrade qualification'):
+            self.inspect()
+        path.write_text(defines.replace('#define OPENATHAN_PROVISIONING_TEST_STORAGE\n', '') +
+                        '#define OPENATHAN_UPDATES_ENABLED 1\n')
+        with self.assertRaisesRegex(ValueError, 'isolated storage'):
             self.inspect()
 
     def test_dependency_drift(self):

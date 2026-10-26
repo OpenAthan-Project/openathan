@@ -30,7 +30,8 @@ CONFIG_SCHEMA = cv.Schema({
 def validate(config):
     full = fv.full_config.get()
     if config["hardware"] in ("waveshare-esp32-s3-touch-lcd-1_85c-box-v2", "waveshare-esp32-s3-audio-board"):
-        if "openathan_provisioning_validation" in full and config["updates_enabled"]:
+        if ("openathan_provisioning_validation" in full and config["updates_enabled"] and
+                "openathan_upgrade_qualification" not in full):
             raise cv.Invalid("Isolated Waveshare development requires updates_enabled false")
     if "improv_serial" not in full or "device_id" not in full["improv_serial"]:
         raise cv.Invalid("OpenAthan requires its external improv_serial USB dispatcher")

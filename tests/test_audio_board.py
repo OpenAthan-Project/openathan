@@ -7,6 +7,39 @@ import tempfile
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
 class AudioBoardProfiles(unittest.TestCase):
+    def test_private_upgrade_profile_and_failure_identity(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from upgrade_qualification import initialize
+        import yaml
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            trust = initialize(root / 'private-feed', '192.168.1.2',
+                               hardware='waveshare-esp32-s3-audio-board')
+            (root / 'secrets.yaml').write_text(yaml.safe_dump({
+                **yaml.safe_load((ROOT / 'firmware/esphome/compile-secrets.example.yaml').read_text()),
+                **{'qualification_' + key: value for key, value in trust.items()}}))
+            config = root / 'qualification.yaml'
+            base = f'packages:\n  board: !include {ROOT / "firmware/esphome/waveshare-audio-board/upgrade-qualification.yaml"}\n'
+            config.write_text(base)
+            for version, failure in (('v0.0.1', 'false'), ('v0.0.3', 'true')):
+                result = subprocess.run([sys.executable, '-m', 'esphome',
+                    '-s', 'qualification_version', version,
+                    '-s', 'qualification_startup_failure', failure,
+                    'compile', '--only-generate', str(config)],
+                    env=dict(os.environ, ESPHOME_BUILD_PATH=str(root / version)), capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                defines = (root / version / 'openathan-test/src/esphome/core/defines.h').read_text()
+                for value in ('#define OPENATHAN_UPGRADE_QUALIFICATION\n',
+                              '#define OPENATHAN_PROVISIONING_TEST_STORAGE\n',
+                              '#define OPENATHAN_UPDATES_ENABLED 1\n',
+                              '"waveshare-esp32-s3-audio-board"',
+                              '"waveshare-audio-board.upgrade.json"'):
+                    self.assertIn(value, defines)
+                self.assertIn(f'#define OPENATHAN_QUALIFICATION_STARTUP_FAILURE {failure}\n', defines)
+            config.write_text(base + 'esphome:\n  name: openathan\n')
+            result = subprocess.run([sys.executable, '-m', 'esphome', 'config', str(config)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+
     def test_generated_profiles(self):
         for mode in ('production','development'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
