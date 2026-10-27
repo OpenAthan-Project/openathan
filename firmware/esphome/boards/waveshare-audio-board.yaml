@@ -1,0 +1,23 @@
+# Waveshare ESP32-S3-AUDIO-Board V1.1 schematic; verify the physical revision.
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    version: 5.5.5
+psram:
+  mode: octal
+  speed: 80MHz
+wifi:
+  power_save_mode: none
+i2c:
+  - id: audio_board_bus
+    sda: GPIO11
+    scl: GPIO10
+    scan: false
+i2s_audio:
+  - id: audio_board_i2s
+    i2s_mclk_pin: GPIO12
+    i2s_bclk_pin: GPIO13
+    i2s_lrclk_pin: GPIO14

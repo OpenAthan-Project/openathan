@@ -1,0 +1,92 @@
+packages:
+  board: !include ../../boards/waveshare-audio-board.yaml
+substitutions:
+  athan_speaker_id: audio_board_speaker
+  athan_playback_id: audio_board_audio
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [waveshare_audio_board, es8311_playback, waveshare_box_rtc]
+time:
+  - platform: waveshare_box_rtc
+    id: audio_board_rtc
+    network_time_id: athan_clock
+    i2c_id: audio_board_bus
+    address: 0x51
+    timezone: UTC
+    update_interval: never
+audio_dac:
+  - platform: es8311
+    id: audio_board_dac
+    i2c_id: audio_board_bus
+    address: 0x18
+    bits_per_sample: 16bit
+    sample_rate: 44100
+    use_mclk: true
+speaker:
+  - platform: i2s_audio
+    id: audio_board_speaker
+    i2s_audio_id: audio_board_i2s
+    i2s_dout_pin: GPIO16
+    dac_type: external
+    bits_per_sample: 16bit
+    sample_rate: 44100
+    channel: mono
+media_player:
+  - id: !extend athan_player
+    volume_max: 100%
+light:
+  - platform: esp32_rmt_led_strip
+    id: audio_board_leds
+    output_id: audio_board_led_driver
+    internal: true
+    pin: GPIO38
+    num_leds: 7
+    chipset: WS2812
+    # Match the vendor factory driver's executable RGB format. Its adjacent
+    # comment says GRB; confirm emitted colours on the actual board.
+    channel_colors: RGB
+    gamma_correct: 1.0
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+waveshare_audio_board:
+  id: audio_board_io
+  audio_id: audio_board_audio
+  ring_id: audio_board_ring
+  i2c_id: audio_board_bus
+  address: 0x20
+  openathan_id: athan_scheduler
+  playback_id: athan_audio
+  dac_id: audio_board_dac
+  light_id: audio_board_leds
+  led_driver_id: audio_board_led_driver
+openathan:
+  light_output_id: audio_board_ring
+binary_sensor:
+  - platform: gpio
+    id: boot_button
+    internal: true
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - openathan.button:
+              id: athan_scheduler
+              action: stop
+      - min_length: 2s
+        max_length: 5s
+        then:
+          - openathan.button:
+              id: athan_scheduler
+              action: skip_next
+      - min_length: 6s
+        max_length: 10s
+        then:
+          - openathan.button:
+              id: athan_scheduler
+              action: cancel_skip

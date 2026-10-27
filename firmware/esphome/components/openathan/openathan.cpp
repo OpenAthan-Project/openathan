@@ -110,6 +110,17 @@ std::string OpenAthan::format_local(int64_t utc, const ::openathan::Timezone &tz
   if (schedule_changed) update();
   return result;
 }
+::openathan::SettingsResult OpenAthan::adjust_volume(int step) {
+  if (!settings_service_ || !settings_service_->healthy() || !settings_service_->saved())
+    return ::openathan::SettingsResult::STORAGE;
+  const auto saved = *settings_service_->saved();
+  auto candidate = saved.value;
+  // Bound the step before addition, including callers supplying extreme ints.
+  const int bounded = step < -100 ? -100 : step > 100 ? 100 : step;
+  const int wanted = static_cast<int>(candidate.volume) + bounded;
+  candidate.volume = wanted < 0 ? 0 : wanted > 100 ? 100 : wanted;
+  return change_settings(candidate, saved.revision);
+}
 void OpenAthan::apply_volume_() {
   if (maintenance_) return;
   if (!settings_service_ || !settings_service_->healthy() || !scheduler_) return;

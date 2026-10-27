@@ -1,5 +1,6 @@
 """Qualification isolation, TLS/feed failures and release exclusion."""
 import importlib.util
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import socket
@@ -10,6 +11,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from urllib.request import build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -48,6 +50,45 @@ class QualificationTests(unittest.TestCase):
         self.application.write_bytes(firmware()[1])
         with self.assertRaisesRegex(ValueError, "qualification application"):
             qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
+
+    def test_legacy_feed_without_hardware_retains_atom_paths(self):
+        path = self.directory / "feed.json"
+        config = json.loads(path.read_text())
+        del config["hardware"]
+        path.write_text(json.dumps(config))
+        address = self.tls_feed()
+        headers, _ = self.fetch(address, "/releases/latest/download/upgrade.json")
+        self.assertIn(b"200", headers)
+
+    def test_waveshare_feed_binds_hardware_flash_size_and_asset_paths(self):
+        original_app = self.app
+        base = Path(self.temporary.name)
+        from upgrade_artifacts import validate
+        for hardware in (release_artifacts.AUDIO_BOARD, release_artifacts.WAVESHARE):
+            with self.subTest(hardware=hardware):
+                self.directory = base / hardware
+                qualification.initialize(self.directory, "192.168.1.2", hardware=hardware)
+                self.application.write_bytes(esp_image(original_app[32:288] + hardware.encode() + b'\0'))
+                with self.assertRaisesRegex(ValueError, "16 MiB"):
+                    qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
+                self.application.write_bytes(esp_image(original_app[32:288] + b'wrong-board\0', flash_bytes=0x1000000))
+                with self.assertRaisesRegex(ValueError, "hardware differs"):
+                    qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)
+                self.app = esp_image(original_app[32:288] + hardware.encode() + b'\0', flash_bytes=0x1000000)
+                self.application.write_bytes(self.app)
+                address = self.tls_feed()
+                descriptor = release_artifacts.asset_name(hardware, "upgrade.json")
+                application = release_artifacts.asset_name(hardware, "firmware.ota.bin")
+                headers, envelope = self.fetch(address, f"/releases/latest/download/{descriptor}")
+                self.assertIn(b"200", headers)
+                validate(envelope, self.app, (self.directory / "public-key.pem").read_bytes(),
+                         "v0.0.2", "a"*40, hardware)
+                headers, app = self.fetch(address, f"/releases/download/v0.0.2/{application}")
+                self.assertIn(b"200", headers)
+                self.assertEqual(app, self.app)
+                for wrong in ("upgrade.json", "firmware.ota.bin", "waveshare-other.upgrade.json"):
+                    headers, _ = self.fetch(address, f"/releases/latest/download/{wrong}")
+                    self.assertIn(b"404", headers)
 
     def test_qualification_images_cannot_enter_release_bundles(self):
         factory, _ = firmware()
@@ -122,6 +163,42 @@ class QualificationTests(unittest.TestCase):
             full.get.return_value = {"esphome": {"name": "openathan", "name_add_mac_suffix": True}}
             with self.assertRaises(module.cv.Invalid):
                 module.validate(dict(version="v0.0.1", startup_failure=False))
+
+    def test_observer_controls_send_same_origin_json(self):
+        posts = []
+        origin = ""
+
+        class Device(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                data = json.dumps({"qualification": {"identity": qualification.MARKER.decode()}}).encode()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                if (self.headers.get("Origin") != origin or
+                        self.headers.get("Content-Type") != "application/json"):
+                    self.send_error(403, "Same-origin JSON required")
+                    return
+                posts.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+                self.do_GET()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Device)
+        origin = f"http://127.0.0.1:{server.server_port}"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(lambda: thread.join(timeout=2))
+        self.addCleanup(server.shutdown)
+        with patch.object(qualification, "device_client", return_value=(origin, build_opener())), \
+                patch.object(qualification.getpass, "getpass", return_value="test-only password"):
+            qualification.observe("192.168.1.2", Path(self.temporary.name) / "observation.jsonl", 1,
+                                  command="arm", phase="before_boot_selection")
+        self.assertEqual(posts, [("/api/firmware/qualification",
+                                 {"command": "arm", "phase": "before_boot_selection"})])
 
     def tls_feed(self):
         qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)

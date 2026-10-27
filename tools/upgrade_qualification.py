@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 from audio_image import ROOT
-from release_artifacts import digest, json_bytes, read_file, read_json, require
+from release_artifacts import HARDWARE, PROFILES, asset_name, digest, json_bytes, profile, read_file, read_json, require
 from upgrade_artifacts import sign
 
 MARKER = b"OPENATHAN_QUALIFICATION_V1"
@@ -50,7 +50,8 @@ def write_private(path, data):
     path.chmod(0o600)
 
 
-def initialize(directory, address, port=8443):
+def initialize(directory, address, port=8443, hardware=HARDWARE):
+    profile(hardware)
     address = lan_address(address)
     require(1024 <= port <= 65535, "Invalid HTTPS port")
     directory = private_directory(directory, fresh=True)
@@ -86,7 +87,7 @@ def initialize(directory, address, port=8443):
         write_private(directory / name, value.public_bytes(serialization.Encoding.PEM))
     write_private(directory / "public-key.pem", signing_key.public_key().public_bytes(
                   serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
-    write_private(directory / "feed.json", json_bytes(dict(address=address, port=port)))
+    write_private(directory / "feed.json", json_bytes(dict(address=address, port=port, hardware=hardware)))
     write_private(directory / "control.json", json_bytes(dict(version=None, fault="none", chunk_delay=0, header_delay=0)))
     return dict(origin=f"https://{address}:{port}", ca_file=str(directory / "ca.pem"),
                 public_key_file=str(directory / "public-key.pem"))
@@ -94,11 +95,14 @@ def initialize(directory, address, port=8443):
 
 def stage(directory, app_path, version, commit):
     directory = private_directory(directory)
+    hardware = read_json(read_file(directory / "feed.json", 4096)).get("hardware", HARDWARE)
     require(version in VERSIONS, "Unknown qualification version")
     app = read_file(app_path, 1572864)
     require(MARKER in app, "Expected a qualification application; never serve production firmware")
+    if hardware != HARDWARE:
+        require(hardware.encode() + b"\0" in app, "Qualification application hardware differs from the feed")
     envelope = sign(version, commit, app, read_file(directory / "signing-key.pem", 4096),
-                    read_file(directory / "public-key.pem", 4096))
+                    read_file(directory / "public-key.pem", 4096), hardware)
     destination = directory / version
     destination.mkdir(mode=0o700)  # Immutable version directories; never replace a candidate.
     write_private(destination / "firmware.ota.bin", app)
@@ -118,6 +122,9 @@ def offer(directory, version, fault="none", chunk_delay=0, header_delay=0):
 
 
 def handler(directory):
+    hardware = read_json(read_file(directory / "feed.json", 4096)).get("hardware", HARDWARE)
+    descriptor_name = asset_name(hardware, "upgrade.json")
+    application_name = asset_name(hardware, "firmware.ota.bin")
     class Feed(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass  # No device credentials or request headers in logs.
@@ -126,7 +133,7 @@ def handler(directory):
             try:
                 control = read_json(read_file(directory / "control.json", 4096))
                 version = control["version"]
-                if self.path == "/releases/latest/download/upgrade.json" and version in VERSIONS:
+                if self.path == f"/releases/latest/download/{descriptor_name}" and version in VERSIONS:
                     data = read_file(directory / version / "upgrade.json", 8192)
                     if control["fault"] == "signature":
                         envelope = read_json(data)
@@ -140,7 +147,7 @@ def handler(directory):
                     self.end_headers()
                     self.wfile.write(data)
                     return
-                requested = next((v for v in VERSIONS if self.path == f"/releases/download/{v}/firmware.ota.bin"), None)
+                requested = next((v for v in VERSIONS if self.path == f"/releases/download/{v}/{application_name}"), None)
                 if requested is None:
                     self.send_error(404); return
                 data = read_file(directory / requested / "firmware.ota.bin", 1572864)
@@ -231,7 +238,7 @@ def observe(host, output, seconds, interval=2, command=None, phase=None):
                 require(phase in ("before_boot_selection", "after_boot_selection"), "Choose a hold phase")
                 payload["phase"] = phase
             exchange(Request(origin + "/api/firmware/qualification", data=json_bytes(payload),
-                             headers={"Content-Type": "application/json"}))
+                             headers={"Content-Type": "application/json", "Origin": origin}))
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             time.sleep(min(interval, max(0, deadline-time.monotonic())))
@@ -246,6 +253,7 @@ def main():
     init.add_argument("--directory", type=Path, required=True)
     init.add_argument("--address", required=True)
     init.add_argument("--port", type=int, default=8443)
+    init.add_argument("--hardware", choices=tuple(PROFILES), default=HARDWARE)
     staging = commands.add_parser("stage")
     staging.add_argument("--directory", type=Path, required=True)
     staging.add_argument("--application", type=Path, required=True)
@@ -269,7 +277,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == "init":
-            print(json.dumps(initialize(args.directory, args.address, args.port), indent=2))
+            print(json.dumps(initialize(args.directory, args.address, args.port, args.hardware), indent=2))
         elif args.command == "stage":
             print(json.dumps(stage(args.directory, args.application, args.version, args.commit), indent=2))
         elif args.command == "offer":

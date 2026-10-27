@@ -13,10 +13,13 @@ HARDWARE = "atoms3r-c126-pyramid-a167"
 LAYOUT = "dual-2m-audio-3_5m-v1"
 CONFIGURATION = "firmware/esphome/openathan.yaml"
 WAVESHARE = "waveshare-esp32-s3-touch-lcd-1_85c-box-v2"
+AUDIO_BOARD = "waveshare-esp32-s3-audio-board"
 PROFILES = {
     HARDWARE: dict(configuration=CONFIGURATION, flash_bytes=0x800000, prefix=""),
     WAVESHARE: dict(configuration="firmware/esphome/waveshare/production.yaml",
                     flash_bytes=0x1000000, prefix="waveshare-box-v2."),
+    AUDIO_BOARD: dict(configuration="firmware/esphome/waveshare-audio-board/production.yaml",
+                      flash_bytes=0x1000000, prefix="waveshare-audio-board."),
 }
 
 
@@ -112,6 +115,17 @@ def reject_test_material(app, *, allow_qualification=False, allow_isolated=False
             "Isolated test firmware cannot enter production release bundles")
 
 
+def validate_embedded_hardware(app, hardware):
+    profile(hardware)
+    identities = {board for board in PROFILES if board.encode() + b"\0" in app}
+    require(not identities or identities == {hardware},
+            "Embedded hardware identity differs from selected profile")
+    # Older Atom/Box releases may predate the identity token. AUDIO-Board is new
+    # and must never inherit that compatibility exception from another board.
+    require(hardware != AUDIO_BOARD or identities == {hardware},
+            "AUDIO-Board application is missing its embedded hardware identity")
+
+
 def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False, flash_bytes=0x800000, hardware=HARDWARE):
     require(0x10020 <= len(factory) < PARTITION_OFFSET, "Invalid factory image size")
     require(flash_bytes == profile(hardware)["flash_bytes"], "Hardware and image flash capacity differ")
@@ -130,6 +144,7 @@ def validate_firmware_images(factory, app=None, *, allow_qualification=False, al
     require(app_length <= 0x180000, "Application exceeds the 1.5 MiB growth-budget target")
     actual = factory[0x10000:0x10000 + app_length]
     reject_test_material(actual, allow_qualification=allow_qualification, allow_isolated=allow_isolated)
+    validate_embedded_hardware(actual, hardware)
     if app is not None:
         require(actual == app, "Factory and OTA application payloads differ")
         esp_image(app, exact=True, flash_bytes=flash_bytes)
@@ -218,9 +233,8 @@ def validate_bundle(directory):
     require(directory.is_dir() and not directory.is_symlink(), "Bundle must be a regular directory")
     from upgrade_artifacts import UPGRADE_ASSETS
     names = {p.name for p in directory.iterdir()}
-    combined = asset_name(WAVESHARE, "manifest.json") in names and "manifest.json" in names
-    hardware = HARDWARE if "manifest.json" in names else WAVESHARE
-    groups = (HARDWARE, WAVESHARE) if combined else (hardware,)
+    groups = tuple(board for board in PROFILES if asset_name(board, "manifest.json") in names)
+    require(bool(groups), "Bundle has no supported hardware manifest")
     dua_assets = {"dua.json", "dua.mp3"}
     has_dua = bool(names & dua_assets)
     allowed = set(dua_assets) if has_dua else set()
@@ -238,9 +252,9 @@ def validate_bundle(directory):
         files["dua.json"] = read_file(directory / "dua.json", 2048)
         files["dua.mp3"] = read_file(directory / "dua.mp3", 258048)
     results = [validate_profile_files(files, board) for board in groups]
-    if combined:
-        require(results[0][0]["commit"] == results[1][0]["commit"] and
-                results[0][0]["tag"] == results[1][0]["tag"], "Hardware bundles have different source/version")
+    require(all(result[0]["commit"] == results[0][0]["commit"] and
+                result[0]["tag"] == results[0][0]["tag"] for result in results),
+            "Hardware bundles have different source/version")
     manifest, report, payloads = results[0]
     return manifest, report, files, payloads
 
@@ -269,10 +283,9 @@ def validate_profile_files(all_files, hardware):
         audio, envelope, _ = read_bank(data("athan-audio.bin")[BANK_START:BANK_START + BANK_SIZE], public_pem)
         require(audio == all_files["dua.mp3"] and envelope == all_files["dua.json"], "Dua assets differ from installed bank")
     require(all(payload[:4096] not in app for payload in payloads), "Recording data found in application")
+    board_names = {asset_name(hardware, name) for name in (*ASSETS, "firmware.ota.bin", "upgrade.json")}
     board_files = {name: value for name, value in all_files.items()
-                   if name in ("athan-audio.bin", "dua.json", "dua.mp3") or
-                   (name.startswith(profile(hardware)["prefix"]) if hardware == WAVESHARE else
-                    not name.startswith(profile(WAVESHARE)["prefix"]))}
+                   if name in board_names or name in ("dua.json", "dua.mp3")}
     checksum_name = asset_name(hardware, "SHA256SUMS")
     checksum = "".join(f"{digest(board_files[name])}  {name}\n" for name in sorted(board_files)
                        if name != checksum_name).encode()

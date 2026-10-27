@@ -94,6 +94,7 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   bool local_date(int64_t utc, ::openathan::CivilDate &date) const;
   const ::openathan::SettingsService *settings_service() const { return settings_service_.get(); }
   ::openathan::SettingsResult change_settings(const ::openathan::DeviceSettings &candidate, uint32_t revision);
+  ::openathan::SettingsResult adjust_volume(int step);
   void write_settings_json(JsonObject root) const;
   void read_settings_json(const std::string &payload);
   bool settings_request_ok() const { return request_ok_; }

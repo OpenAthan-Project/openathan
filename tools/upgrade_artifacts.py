@@ -5,7 +5,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 from release_artifacts import (HARDWARE, LAYOUT, SHA, digest, esp_image,
-                               json_bytes, read_json, require, profile)
+                               json_bytes, read_json, require, profile, validate_embedded_hardware)
 
 UPGRADE_ASSETS = ("firmware.ota.bin", "upgrade.json")
 
@@ -27,6 +27,7 @@ def metadata(version, commit, app, hardware=HARDWARE):
     require(SHA.fullmatch(commit), "Invalid source commit")
     require(256 <= len(app) <= 1572864, "Application exceeds its budget")
     require(image_version(app, hardware) == version, "Embedded application version differs from release")
+    validate_embedded_hardware(app, hardware)
     return dict(schema=1, version=version, commit=commit, hardware=hardware, layout=LAYOUT,
                 storageFormat=1, audioFormat=1, rollback=True, bytes=len(app), sha256=digest(app))
 

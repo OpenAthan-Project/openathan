@@ -16,7 +16,7 @@ import tempfile
 
 import audio_image
 import check_feasibility
-from release_artifacts import (ASSETS, HARDWARE, WAVESHARE, PROFILES, profile, asset_name,
+from release_artifacts import (ASSETS, HARDWARE, WAVESHARE, AUDIO_BOARD, PROFILES, profile, asset_name,
                                configuration_hardware, validate_profile_files, LICENSE_PATH, MEDIA_REGISTRY, PINS_PATH,
                                REPOSITORY, SHA, TAG, approved_tracks, checksums, digest,
                                json_bytes, make_manifest, phone_setup_version, read_file, read_json, require,
@@ -192,7 +192,7 @@ def validate_dua_recording(path):
     command(["ffmpeg", "-v", "error", "-xerror", "-i", path, "-f", "null", "-"])
 
 
-def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_build_dir=None, dua=None, dua_envelope=None):
+def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_build_dir=None, dua=None, dua_envelope=None, audio_board_build_dir=None):
     require(TAG.fullmatch(tag), "Version must have the form vX.Y.Z")
     record = validate_build(build_dir)
     commit = record["commit"]
@@ -233,14 +233,17 @@ def package(build_dir, tag, normal, fajr, output, signing_key=None, waveshare_bu
             files.update({"dua.json": dua_envelope, "dua.mp3": payloads[2]})
         checksum_name = asset_name(hardware, "SHA256SUMS")
         files[checksum_name] = checksums(files)
-        if waveshare_build_dir is not None:
+        for extra_dir, expected_hardware in ((waveshare_build_dir, WAVESHARE),
+                                              (audio_board_build_dir, AUDIO_BOARD)):
+            if extra_dir is None:
+                continue
             require(hardware == HARDWARE, "Combined packaging starts with the Atom build")
-            other = validate_build(waveshare_build_dir)
-            require(other["commit"] == commit and configuration_hardware(other["configuration"]) == WAVESHARE,
-                    "Combined packaging requires the same-commit Waveshare production build")
-            with tempfile.TemporaryDirectory(prefix="openathan-waveshare-package-") as temporary:
+            other = validate_build(extra_dir)
+            require(other["commit"] == commit and configuration_hardware(other["configuration"]) == expected_hardware,
+                    "Combined packaging requires the same-commit matching production build")
+            with tempfile.TemporaryDirectory(prefix="openathan-hardware-package-") as temporary:
                 destination = Path(temporary) / "bundle"
-                package(waveshare_build_dir, tag, normal, fajr, destination, signing_key, dua=dua, dua_envelope=dua_envelope)
+                package(extra_dir, tag, normal, fajr, destination, signing_key, dua=dua, dua_envelope=dua_envelope)
                 for path in destination.iterdir():
                     if path.name in files:
                         require(files[path.name] == path.read_bytes(), "Shared release asset differs")
@@ -319,7 +322,7 @@ def upload_draft(bundle, github=None):
     manifest, report, files, payloads = validate_bundle(bundle)
     commit, tag = manifest["commit"], manifest["tag"]
     source_commit(commit)
-    groups = (HARDWARE, WAVESHARE) if asset_name(WAVESHARE, "manifest.json") in files and "manifest.json" in files else (manifest["hardware"],)
+    groups = tuple(board for board in PROFILES if asset_name(board, "manifest.json") in files)
     upgrade_capable = bool(git("ls-tree", "--name-only", commit, "release/firmware.json").strip())
     release_config = read_json(source_file(commit, "release/firmware.json")) if upgrade_capable else {}
     phone_setup = phone_setup_version(release_config)
@@ -382,6 +385,7 @@ def main():
     build_parser.add_argument("--commit", required=True)
     build_parser.add_argument("--output-dir", required=True, type=Path)
     package_parser = commands.add_parser("package", help="Package firmware with approved recordings")
+    package_parser.add_argument("--audio-board-build-dir", type=Path, help="Same-commit AUDIO-Board production build for a combined release")
     package_parser.add_argument("--waveshare-build-dir", type=Path, help="Same-commit production build for a combined release")
     package_parser.add_argument("--build-dir", required=True, type=Path)
     package_parser.add_argument("--tag", required=True)
@@ -397,7 +401,7 @@ def main():
         if args.action == "build":
             result = build(args.commit, args.output_dir, args.hardware)
         elif args.action == "package":
-            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key, args.waveshare_build_dir, args.dua)
+            result = package(args.build_dir.resolve(), args.tag, args.normal, args.fajr, args.output_dir, args.signing_key, args.waveshare_build_dir, args.dua, audio_board_build_dir=args.audio_board_build_dir)
         else:
             result = upload_draft(args.bundle)
         print(json.dumps(result, indent=2))

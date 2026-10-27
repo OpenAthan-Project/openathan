@@ -78,15 +78,15 @@ class DuaMediaTests(unittest.TestCase):
         files = {'dua.json': self.envelope, 'dua.mp3': self.audio, 'athan-audio.bin': audio}
         commit = 'a' * 40
         for hardware, profile in artifacts.PROFILES.items():
-            factory, app = firmware(profile['flash_bytes'])
+            factory, app = firmware(profile['flash_bytes'], hardware=hardware)
             files.update({artifacts.asset_name(hardware, 'firmware.factory.bin'): factory,
                 artifacts.asset_name(hardware, 'manifest.json'): artifacts.json_bytes(artifacts.make_manifest(commit, 'v0.8.0', factory, audio, hardware)),
                 artifacts.asset_name(hardware, 'build-report.json'): artifacts.json_bytes(dict(schema=1,commit=commit,configuration=profile['configuration'],
                     capacity=dict(application_bytes=len(app),application_sha256=artifacts.digest(app),application_slot_bytes=0x200000,
                         slot_free_bytes=0x200000-len(app),application_budget_remaining_bytes=0x180000-len(app),growth_target_passed=True)))})
         for hardware, profile in artifacts.PROFILES.items():
-            chosen={k:v for k,v in files.items() if k in ('dua.json','dua.mp3','athan-audio.bin') or
-                (k.startswith(profile['prefix']) if hardware==artifacts.WAVESHARE else not k.startswith(artifacts.profile(artifacts.WAVESHARE)['prefix']))}
+            names={artifacts.asset_name(hardware,name) for name in artifacts.ASSETS}
+            chosen={k:v for k,v in files.items() if k in names or k in ('dua.json','dua.mp3')}
             files[artifacts.asset_name(hardware, 'SHA256SUMS')]=artifacts.checksums(chosen)
         with tempfile.TemporaryDirectory() as temporary, patch.object(release, 'source_file', return_value=self.public):
             root=Path(temporary)

@@ -25,8 +25,11 @@ def esp_image(payload=b"non-executable test bytes" * 4, flash_bytes=0x800000):
     return bytes(result)
 
 
-def firmware(flash_bytes=0x800000):
-    app = esp_image(flash_bytes=flash_bytes)
+def firmware(flash_bytes=0x800000, *, hardware=None):
+    payload = b"non-executable test bytes" * 4
+    if hardware is not None:
+        payload += hardware.encode() + b"\0"
+    app = esp_image(payload, flash_bytes=flash_bytes)
     factory = bytearray(b"\xff" * 0x10000 + app)
     boot = esp_image(b"non-executable boot fixture", flash_bytes=flash_bytes)
     factory[:len(boot)] = boot

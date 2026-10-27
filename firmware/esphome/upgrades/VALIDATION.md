@@ -16,6 +16,24 @@ remain unchanged. Ordinary provisioning test firmware still cannot install
 production releases. Qualification firmware is rejected by release packaging.
 No public release, `latest` selection or website change is part of this procedure.
 
+### AUDIO-Board variant
+
+For the screenless AUDIO-Board, use
+`firmware/esphome/waveshare-audio-board/upgrade-qualification.yaml` in place of
+the Atom configuration below. Initialize its private feed with
+`--hardware waveshare-esp32-s3-audio-board`; this binds signatures and served
+asset names to that hardware profile. Older feeds without a hardware field keep
+the original Atom behavior. Ordinary isolated development still disables updates.
+
+Use USB power and the AUDIO-Board's own identified port/MAC. Pass the same
+`--hardware waveshare-esp32-s3-audio-board` to `upgrade_transition.py inspect`:
+it checks 16 MiB flash and binds the snapshot/plan to that profile. Scoped reads
+cover the shared partition layout, not a complete 16 MiB flash backup. Preserve
+any additional complete-flash evidence privately. Atom/Pyramid power and display
+instructions below do not apply to this board. The interruption matrix, isolated
+storage, approved real recordings, recovery review and evidence requirements do.
+An Atom or Box result does not qualify the AUDIO-Board.
+
 All instrumentation and test-specific behavior live in the separate qualification
 component. The production updater is the shared engine, connected by hooks that
 compile only into qualification builds. Production reconciliation/persistence
