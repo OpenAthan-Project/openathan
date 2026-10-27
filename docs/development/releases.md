@@ -1,7 +1,9 @@
 # Firmware release preparation
 
 [v0.8.0](../releases/v0.8.0.md) is the current published stable release for Atom and
-Waveshare Box V2. The [v0.8.0 preparation](v0.8.0-preparation-2026-10-20.md)
+Waveshare Box V2. The proposed three-board
+[v0.9.0 preparation](v0.9.0-preparation-2026-10-27.md) is separate from publication.
+The [v0.8.0 preparation](v0.8.0-preparation-2026-10-20.md)
 records the source, candidate validation and remaining qualification limits. The
 [v0.7.0 preparation](v0.7.0-preparation-2026-10-17.md) retains source-bound phone
 checks and limitations. The [v0.6.0 preparation](v0.6.0-preparation-2026-10-14.md)
@@ -24,7 +26,8 @@ schema 1.
 The firmware repository builds and packages releases. The website consumes a
 reviewed release; it never compiles firmware. The [installer contract](https://github.com/OpenAthan-Project/website/blob/main/installer/README.md)
 retains schema v1. Profiles identify AtomS3R C126 + Voice Pyramid A167
-(8 MiB flash) or Waveshare Box V2 (16 MiB flash), both ESP32-S3
+(8 MiB flash), Waveshare Box V2 or screenless Waveshare AUDIO-Board
+(both 16 MiB flash), all ESP32-S3
 and the dual-2 MiB application / 3.5 MiB shared-audio layout.
 
 The selected normal and Fajr recordings have a documented
@@ -59,7 +62,10 @@ python tools/release.py build --commit <full-40-character-commit-sha> \
 The command exports source to a fresh staging directory and compiles the registered production configuration. The default remains
 `firmware/esphome/openathan.yaml`; pass
 `--hardware waveshare-esp32-s3-touch-lcd-1_85c-box-v2` for
-`firmware/esphome/waveshare/production.yaml`. Both builds use the same source commit. It checks dependency pins, ESP32-S3 image
+`firmware/esphome/waveshare/production.yaml`, or
+`--hardware waveshare-esp32-s3-audio-board` for
+`firmware/esphome/waveshare-audio-board/production.yaml`. Every supplied build
+must use the same source commit. It checks dependency pins, ESP32-S3 image
 checksums/digests, the actual factory partition table, empty initial NVS, matching
 factory/OTA application payloads, and the 1,572,864-byte application budget.
 No audio is required. Output includes both images, the source archive, build record,
@@ -95,17 +101,22 @@ preserves MP3 bytes, checks their approved hashes, builds the
 shared partition, and executes the production C++ audio-format validator from the
 source commit. Format/hash validation does not decode MP3 or replace listening tests.
 
-Single-board upgrade-capable releases contain seven assets. Combined releases
-contain thirteen: retain the seven Atom names below and add six Waveshare files
+Single-board upgrade-capable releases contain seven assets. Combined Atom/Box
+releases contain thirteen: retain the seven Atom names below and add six Box files
 prefixed `waveshare-box-v2.`. Both manifests reference the same `athan-audio.bin`.
 Pass `--waveshare-build-dir /tmp/openathan-waveshare-build` when packaging the Atom
 build to produce the combined bundle. The two builds must share an exact commit.
-Each board has its own manifest, factory, OTA, signed descriptor, checksums and
-build report; Atom filenames and signed schema 1 remain compatible.
+Add `--audio-board-build-dir /tmp/openathan-audio-board-build` for a three-board
+bundle with nineteen assets. Its six AUDIO-Board files use `waveshare-audio-board.`;
+the same audio image is shared by all boards. Each board has its own manifest,
+factory, OTA, signed descriptor, checksums and build report; Atom filenames and
+signed schema 1 remain compatible. Image validation checks each application's
+embedded hardware identity so the two 16 MiB boards cannot be cross-labelled.
 
 For an approved dua release, also pass `--dua /path/to/approved-dua.mp3`.
-The combined bundle then has fifteen assets: `dua.json` and `dua.mp3` join the
-thirteen existing names. The shared audio image contains one committed dua bank,
+The Atom/Box bundle then has fifteen assets, or twenty-one with the AUDIO-Board:
+`dua.json` and `dua.mp3` join the existing names. The shared audio image contains
+one committed dua bank,
 while the signed descriptor binds Wi-Fi installation to this exact release.
 The original two-track header and Athan bytes are unchanged. Legacy bundles
 without the optional bank remain supported. See the [dua contract](dua.md).
@@ -138,7 +149,7 @@ speaker password, joining home Wi-Fi and continuing on the local speaker page.
 On the reference displays, it also includes the setup Wi-Fi QR and the later
 webpage QR, hostname and current IP address for finding the page again.
 Packaging copies this capability only from an explicit `phoneSetup: 1` in the
-selected commit's [release configuration](../../release/firmware.json), for both
+selected commit's [release configuration](../../release/firmware.json), for all
 production profiles. Draft upload checks it against that same committed value.
 Omitting the field preserves the legacy manifest; other values are rejected.
 The tool never infers support from a version number or a newer working tree.

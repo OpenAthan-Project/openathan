@@ -9,7 +9,7 @@ LEDs. This is a separate board from the Touch-LCD Box. Wiring follows the
 manufacturer's V1.1 schematic; identify and verify the physical revision before
 installation. A model sticker alone does not establish the PCB revision.
 
-**Availability:** firmware and installer integration are under development.
+**Availability:** included in the [proposed v0.9.0 release](../../../docs/releases/v0.9.0.md).
 [Attended checks on one USB-powered unit](../../../docs/development/waveshare-audio-board-hardware-2026-10-21.md)
 are recorded, with release gates still open. Public installation requires a
 separately qualified, published release; compiling this profile is not that qualification.
