@@ -9,9 +9,8 @@ calculates prayer times and plays the Athan automatically, with settings you can
 control from your phone. It is open source and works without Home Assistant,
 soldering, or programming.
 
-**Current release: [v0.8.0](docs/releases/v0.8.0.md).**
-[Latest release and downloads](https://github.com/OpenAthan-Project/openathan/releases/latest)
-· [Choose hardware](#supported-speakers) · [Set up your speaker](#get-started)
+**Latest published release: [notes and downloads](https://github.com/OpenAthan-Project/openathan/releases/latest).**
+[Choose hardware](#supported-speakers) · [Set up your speaker](#get-started)
 
 <a id="available-functionality-and-next-milestones"></a>
 
@@ -102,12 +101,13 @@ for older firmware or bootloader compatibility.
 - Settings and scheduling run locally without the public website or Home
   Assistant. Home Assistant integration, touch controls and additional storage
   remain future work in the [roadmap](docs/development/roadmap.md).
-- If a `.local` address will not open, use the speaker's displayed current IP
-  address. See [troubleshooting](https://openathan.com/docs/troubleshooting/) or
+- If a `.local` address will not open, use the current IP address shown on the
+  speaker's screen or read through USB setup.
+  See [troubleshooting](https://openathan.com/docs/troubleshooting/) or
   [report an issue](https://github.com/OpenAthan-Project/openathan/issues/new/choose)
   with your model, firmware version and what happened.
 
-These are pre-1.0 releases. Read the [release notes and validation limits](docs/releases/v0.8.0.md)
+These are pre-1.0 releases. Read the [latest release notes and validation limits](https://github.com/OpenAthan-Project/openathan/releases/latest)
 before installing. Publication and automated checks do not establish physical
 qualification of every release image, hardware revision or network condition.
 
