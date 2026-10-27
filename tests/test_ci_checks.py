@@ -80,7 +80,8 @@ class CapacityChecksTests(unittest.TestCase):
 
     def test_audio_board_upgrade_capacity_requires_isolation_and_enabled_updates(self):
         factory, _ = firmware(0x1000000)
-        app = esp_image(b'OPENATHAN_QUALIFICATION_V1' * 16, flash_bytes=0x1000000)
+        app = esp_image(b'OPENATHAN_QUALIFICATION_V1' * 16 + b'waveshare-esp32-s3-audio-board\0',
+                        flash_bytes=0x1000000)
         (self.build / 'build/firmware.ota.bin').write_bytes(app)
         (self.build / 'build/firmware.factory.bin').write_bytes(factory[:0x10000] + app)
         component = self.build / 'src/esphome/components/openathan_upgrade_qualification'

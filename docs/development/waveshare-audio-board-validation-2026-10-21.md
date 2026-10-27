@@ -4,6 +4,8 @@ This initial checkpoint records software/build evidence. It preceded the later
 [attended hardware checks](waveshare-audio-board-hardware-2026-10-21.md), which
 record installation, listening, controls, runtime measurements and their limits
 separately. The AUDIO-Board PCB revision marking remains unverified.
+See the [October 26 update report](waveshare-audio-board-upgrades-2026-10-26.md)
+for later matched builds, producer checks and private hardware qualification.
 
 ## Pinned builds and capacity
 

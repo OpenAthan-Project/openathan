@@ -78,7 +78,7 @@ class DuaMediaTests(unittest.TestCase):
         files = {'dua.json': self.envelope, 'dua.mp3': self.audio, 'athan-audio.bin': audio}
         commit = 'a' * 40
         for hardware, profile in artifacts.PROFILES.items():
-            factory, app = firmware(profile['flash_bytes'])
+            factory, app = firmware(profile['flash_bytes'], hardware=hardware)
             files.update({artifacts.asset_name(hardware, 'firmware.factory.bin'): factory,
                 artifacts.asset_name(hardware, 'manifest.json'): artifacts.json_bytes(artifacts.make_manifest(commit, 'v0.8.0', factory, audio, hardware)),
                 artifacts.asset_name(hardware, 'build-report.json'): artifacts.json_bytes(dict(schema=1,commit=commit,configuration=profile['configuration'],

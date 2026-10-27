@@ -1,5 +1,9 @@
 # AUDIO-Board attended hardware checks — October 21, 2026
 
+Later signed-update and recovery evidence is recorded in the
+[October 26 report](waveshare-audio-board-upgrades-2026-10-26.md). The observations
+below retain their original source and date.
+
 These results apply to one USB-powered ESP32-S3-AUDIO-Board using source
 `341c05c5c69dbafdcf8535a0b063ec4f21404563`. Its model, 16 MiB flash, 8 MiB
 PSRAM and directly observed I/O match the AUDIO-Board profile. The exact PCB

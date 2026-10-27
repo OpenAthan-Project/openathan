@@ -1,5 +1,6 @@
 """Qualification isolation, TLS/feed failures and release exclusion."""
 import importlib.util
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import socket
@@ -10,6 +11,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from urllib.request import build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -161,6 +163,42 @@ class QualificationTests(unittest.TestCase):
             full.get.return_value = {"esphome": {"name": "openathan", "name_add_mac_suffix": True}}
             with self.assertRaises(module.cv.Invalid):
                 module.validate(dict(version="v0.0.1", startup_failure=False))
+
+    def test_observer_controls_send_same_origin_json(self):
+        posts = []
+        origin = ""
+
+        class Device(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                data = json.dumps({"qualification": {"identity": qualification.MARKER.decode()}}).encode()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                if (self.headers.get("Origin") != origin or
+                        self.headers.get("Content-Type") != "application/json"):
+                    self.send_error(403, "Same-origin JSON required")
+                    return
+                posts.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+                self.do_GET()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Device)
+        origin = f"http://127.0.0.1:{server.server_port}"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(lambda: thread.join(timeout=2))
+        self.addCleanup(server.shutdown)
+        with patch.object(qualification, "device_client", return_value=(origin, build_opener())), \
+                patch.object(qualification.getpass, "getpass", return_value="test-only password"):
+            qualification.observe("192.168.1.2", Path(self.temporary.name) / "observation.jsonl", 1,
+                                  command="arm", phase="before_boot_selection")
+        self.assertEqual(posts, [("/api/firmware/qualification",
+                                 {"command": "arm", "phase": "before_boot_selection"})])
 
     def tls_feed(self):
         qualification.stage(self.directory, self.application, "v0.0.2", "a"*40)

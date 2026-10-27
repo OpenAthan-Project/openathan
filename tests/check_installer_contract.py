@@ -23,7 +23,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='openathan-contract-test-') as temporary:
         audio, _ = build_image(b'ID3-non-decodable-normal-fixture', b'ID3-non-decodable-fajr-fixture')
         for hardware, profile in PROFILES.items():
-            factory, _ = firmware(profile['flash_bytes'])
+            factory, _ = firmware(profile['flash_bytes'], hardware=hardware)
             for capability in (None, 1):
                 output = Path(temporary) / hardware / ('legacy' if capability is None else 'phone')
                 output.mkdir(parents=True)

@@ -17,12 +17,14 @@ from release_fixtures import firmware, esp_image, registry
 
 
 class HardwareReleaseTests(unittest.TestCase):
-    def bundle(self, hardware, commit='a'*40, phone_setup=None):
+    def bundle(self, hardware, commit='a'*40, phone_setup=None, *, embedded_hardware=True):
         profile = artifacts.profile(hardware)
         factory, _ = firmware(profile['flash_bytes'])
         payload = bytearray(256)
         struct.pack_into('<I', payload, 0, 0xabcd5432)
         payload[16:22] = b'v0.5.0'
+        if embedded_hardware:
+            payload += hardware.encode() + b'\0'
         app = esp_image(payload, flash_bytes=profile['flash_bytes'])
         factory = factory[:0x10000] + app
         audio, _ = build_image(b'ID3-test-normal', b'ID3-test-fajr')
@@ -201,6 +203,44 @@ class HardwareReleaseTests(unittest.TestCase):
         envelope = upgrade.sign('v0.5.0', 'a'*40, app, private, public, artifacts.AUDIO_BOARD)
         self.assertEqual(upgrade.validate(envelope, app, public, 'v0.5.0', 'a'*40, artifacts.AUDIO_BOARD)['hardware'], artifacts.AUDIO_BOARD)
         with self.assertRaises(ValueError): upgrade.validate(envelope, app, public, 'v0.5.0', 'a'*40, artifacts.WAVESHARE)
+
+    def test_same_capacity_images_cannot_be_relabelled_or_signed(self):
+        key = ec.generate_private_key(ec.SECP256R1())
+        private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                    serialization.NoEncryption())
+        public = key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        for source, target in ((artifacts.WAVESHARE, artifacts.AUDIO_BOARD),
+                               (artifacts.AUDIO_BOARD, artifacts.WAVESHARE)):
+            with self.subTest(source=source, target=target):
+                files, app = self.bundle(source)
+                factory = files[artifacts.asset_name(source, 'firmware.factory.bin')]
+                with self.assertRaisesRegex(ValueError, 'hardware identity'):
+                    artifacts.validate_firmware_images(factory, app, flash_bytes=0x1000000, hardware=target)
+                with self.assertRaisesRegex(ValueError, 'hardware identity'):
+                    upgrade.sign('v0.5.0', 'a'*40, app, private, public, target)
+
+    def test_legacy_markerless_bundles_remain_supported(self):
+        for hardware in (artifacts.HARDWARE, artifacts.WAVESHARE):
+            with self.subTest(hardware=hardware):
+                files, app = self.bundle(hardware, embedded_hardware=False)
+                artifacts.validate_profile_files(files, hardware)
+                self.assertEqual(upgrade.metadata('v0.5.0', 'a'*40, app, hardware)['hardware'], hardware)
+
+    def test_audio_board_requires_embedded_identity(self):
+        files, app = self.bundle(artifacts.AUDIO_BOARD, embedded_hardware=False)
+        with self.assertRaisesRegex(ValueError, 'missing its embedded hardware identity'):
+            artifacts.validate_profile_files(files, artifacts.AUDIO_BOARD)
+        with self.assertRaisesRegex(ValueError, 'missing its embedded hardware identity'):
+            upgrade.metadata('v0.5.0', 'a'*40, app, artifacts.AUDIO_BOARD)
+
+    def test_ambiguous_embedded_hardware_is_rejected(self):
+        files, original = self.bundle(artifacts.WAVESHARE)
+        app = esp_image(original[32:288] + artifacts.WAVESHARE.encode() + b'\0' +
+                        artifacts.AUDIO_BOARD.encode() + b'\0', flash_bytes=0x1000000)
+        factory = files[artifacts.asset_name(artifacts.WAVESHARE, 'firmware.factory.bin')][:0x10000] + app
+        for hardware in (artifacts.WAVESHARE, artifacts.AUDIO_BOARD):
+            with self.subTest(hardware=hardware), self.assertRaisesRegex(ValueError, 'hardware identity'):
+                artifacts.validate_firmware_images(factory, app, hardware=hardware, flash_bytes=0x1000000)
 
     def test_waveshare_signature_cannot_be_used_for_atom(self):
         _, app = self.bundle(artifacts.WAVESHARE)

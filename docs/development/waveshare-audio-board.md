@@ -77,6 +77,8 @@ Older single-board and two-board bundles remain valid.
 The [attended hardware report](waveshare-audio-board-hardware-2026-10-21.md)
 records one unit's installation, playback and control results, runtime
 measurements and remaining release gates.
+The [October 26 private update report](waveshare-audio-board-upgrades-2026-10-26.md)
+records later signed-update, interruption and rollback checks separately.
 Use the [provisioning runbook](../../firmware/esphome/provisioning/HARDWARE_TEST.md)
 with a new AUDIO-Board-specific preflight: identify USB port/MAC/security/flash,
 verify PCB revision/mappings, retain matching private original-flash reads, and

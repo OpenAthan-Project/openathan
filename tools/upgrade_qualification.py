@@ -238,7 +238,7 @@ def observe(host, output, seconds, interval=2, command=None, phase=None):
                 require(phase in ("before_boot_selection", "after_boot_selection"), "Choose a hold phase")
                 payload["phase"] = phase
             exchange(Request(origin + "/api/firmware/qualification", data=json_bytes(payload),
-                             headers={"Content-Type": "application/json"}))
+                             headers={"Content-Type": "application/json", "Origin": origin}))
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             time.sleep(min(interval, max(0, deadline-time.monotonic())))

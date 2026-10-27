@@ -115,6 +115,17 @@ def reject_test_material(app, *, allow_qualification=False, allow_isolated=False
             "Isolated test firmware cannot enter production release bundles")
 
 
+def validate_embedded_hardware(app, hardware):
+    profile(hardware)
+    identities = {board for board in PROFILES if board.encode() + b"\0" in app}
+    require(not identities or identities == {hardware},
+            "Embedded hardware identity differs from selected profile")
+    # Older Atom/Box releases may predate the identity token. AUDIO-Board is new
+    # and must never inherit that compatibility exception from another board.
+    require(hardware != AUDIO_BOARD or identities == {hardware},
+            "AUDIO-Board application is missing its embedded hardware identity")
+
+
 def validate_firmware_images(factory, app=None, *, allow_qualification=False, allow_isolated=False, flash_bytes=0x800000, hardware=HARDWARE):
     require(0x10020 <= len(factory) < PARTITION_OFFSET, "Invalid factory image size")
     require(flash_bytes == profile(hardware)["flash_bytes"], "Hardware and image flash capacity differ")
@@ -133,6 +144,7 @@ def validate_firmware_images(factory, app=None, *, allow_qualification=False, al
     require(app_length <= 0x180000, "Application exceeds the 1.5 MiB growth-budget target")
     actual = factory[0x10000:0x10000 + app_length]
     reject_test_material(actual, allow_qualification=allow_qualification, allow_isolated=allow_isolated)
+    validate_embedded_hardware(actual, hardware)
     if app is not None:
         require(actual == app, "Factory and OTA application payloads differ")
         esp_image(app, exact=True, flash_bytes=flash_bytes)
