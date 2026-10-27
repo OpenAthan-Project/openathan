@@ -121,7 +121,10 @@ After the owner's physical RESET, read-only USB status confirmed the original
 regular source/hardware identity, active setup, ready password storage, Wi-Fi
 reconnection and confirmed boot health. Both its regular hostname and LAN page
 returned their expected Digest authentication challenge after USB closed. The
-final owner phone-page handoff remains pending at this checkpoint.
+owner then confirmed that the normal phone page accepted the usual password,
+showed the normal timetable at the preserved 30% volume and stayed quiet.
+The regular-device handoff passed; this does not change the separate isolated
+Wi-Fi wizard limitation below.
 
 ## Limits and remaining release work
 
