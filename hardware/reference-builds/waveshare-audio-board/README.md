@@ -21,6 +21,9 @@ a computer with desktop Chrome or Edge, and 2.4 GHz WPA2/WPA3 personal Wi-Fi.
 No display, SD card, microphone accessory or battery is required.
 See the [manufacturer's hardware documentation](https://docs.waveshare.com/ESP32-S3-AUDIO-Board).
 
+An optional [3D-printable lid on MakerWorld](https://makerworld.com/models/3509161)
+makes the K1, K2 and K3 buttons easier to press.
+
 ## Implemented features
 
 Scheduled normal/Fajr Athan, Quran streaming, optional dua, local phone settings,
