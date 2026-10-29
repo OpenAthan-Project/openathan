@@ -15,6 +15,7 @@ static time::DSTRule applied_rule(const ::openathan::DstRule &r) {
 }
 void OpenAthan::setup() {
   time_format_preferences_.begin();
+  speaker_name_preferences_.begin();
   dua_preferences_.begin();
   sequence_.set_enabled(dua_preferences_.enabled());
   if (display_output_) { display_preferences_.begin(); apply_display_(); }

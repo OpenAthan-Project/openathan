@@ -82,6 +82,27 @@ bool NvsDuaStore::save(const ::openathan::SavedDua &value) {
   const auto record = ::openathan::encode_dua(value);
   return nvs_set_blob(handle_, "dua", record.data(), record.size()) == ESP_OK && nvs_commit(handle_) == ESP_OK;
 }
+::openathan::LoadResult NvsSpeakerNameStore::load(::openathan::SavedSpeakerName &value) {
+  using ::openathan::LoadResult;
+  if (!opened_) {
+    if (nvs_open(openathan_storage::PRAYER, NVS_READWRITE, &handle_) != ESP_OK) return LoadResult::ERROR;
+    opened_ = true;
+  }
+  size_t length = 0;
+  const auto result = nvs_get_blob(handle_, "speaker_name", nullptr, &length);
+  if (result == ESP_ERR_NVS_NOT_FOUND) return LoadResult::EMPTY;
+  ::openathan::SpeakerNameRecord record;
+  if (result != ESP_OK || length != record.size() ||
+      nvs_get_blob(handle_, "speaker_name", record.data(), &length) != ESP_OK || length != record.size() ||
+      !::openathan::decode_speaker_name(record, value)) return LoadResult::ERROR;
+  return LoadResult::LOADED;
+}
+bool NvsSpeakerNameStore::save(const ::openathan::SavedSpeakerName &value) {
+  std::string normalized;
+  if (!opened_ || !value.revision || (!::openathan::normalize_speaker_name(value.name, normalized) || normalized != value.name)) return false;
+  const auto record = ::openathan::encode_speaker_name(value);
+  return nvs_set_blob(handle_, "speaker_name", record.data(), record.size()) == ESP_OK && nvs_commit(handle_) == ESP_OK;
+}
 ::openathan::LoadResult NvsDisplayStore::load(::openathan::SavedDisplay &value) {
   using ::openathan::LoadResult;
   if (!opened_) {

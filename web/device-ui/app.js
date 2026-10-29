@@ -5,6 +5,7 @@ const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 const title = (value) => value[0].toUpperCase() + value.slice(1);
 const specs = {
+  speaker_name: { path: "/api/speaker-name", read: "/api/speaker-name", groups: ["name"] },
   settings: { path: "/api/settings", read: "/api/status", groups: ["volume", "preferences"] },
   display: { path: "/api/display", read: "/api/display", groups: ["screen"] },
   lights: { path: "/api/lights", read: "/api/lights", groups: ["lights"] },
@@ -102,6 +103,7 @@ function calculation(value) {
 function valueFrom(key, state) {
   if (!state) return null;
   if (key === "settings" || key === "lights") return state.settings || null;
+  if (key === "speaker_name") return typeof state.name === "string" ? { name: state.name } : null;
   if (key === "dua") return typeof state.enabled === "boolean" ? { enabled: state.enabled } : null;
   if (key === "display")
     return Number.isFinite(state.brightness_percent)
@@ -125,7 +127,7 @@ function releasedEdits(d) {
   return new Map([...d.edits].filter(([, edit]) => edit.ready));
 }
 function hasQueuedWork(d) {
-  return !!d.review || releasedEdits(d).size > 0;
+  return !!d.pendingEdits || !!d.review || releasedEdits(d).size > 0;
 }
 function groupsFor(d, review = d.review) {
   return [...specs[d.key].groups, ...(review ? ["prayer"] : [])];
@@ -287,6 +289,7 @@ function acceptDomain(key, data, order) {
       order: 0,
       application: null,
       edits: new Map(),
+      pendingEdits: null,
       review: null,
       operation: null,
       blocked: null
@@ -364,7 +367,7 @@ function domainData(key) {
 function projectSnapshot() {
   if (!observedStatus.data) return;
   snapshot = { ...observedStatus.data, ...domainData("settings") };
-  for (const key of ["display", "lights", "time_format", "dua"]) snapshot[key] = domainData(key);
+  for (const key of ["display", "lights", "time_format", "dua", "speaker_name"]) snapshot[key] = domainData(key);
   snapshot.firmware = firmware.data;
 }
 function acceptResponse({ data, order }, resource = "status", allowPlayback = true) {
@@ -377,7 +380,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
       throw new Error("Device status is incomplete");
     const previousRevision = domains.settings?.confirmed?.revision ?? 0;
     accepted.settings = acceptDomain("settings", data, order);
-    for (const key of ["display", "lights", "time_format", "dua"])
+    for (const key of ["display", "lights", "time_format", "dua", "speaker_name"])
       if (data[key]) accepted[key] = acceptDomain(key, data[key], order);
     // Prayer observations belong to their saved revision. A newly accepted
     // revision carries its timetable even if its request preceded a Stop reply.
@@ -394,6 +397,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
         display,
         lights,
         time_format,
+        speaker_name,
         firmware: update,
         playing,
         quran,
@@ -504,6 +508,7 @@ function renderPreferences() {
     settings: ["volume", "settings-volume"],
     display: ["screen-brightness"],
     lights: ["lights-brightness"],
+    speaker_name: [],
     dua: [],
     time_format: []
   })) {
@@ -536,6 +541,13 @@ function renderPreferences() {
   }
   $("dua-enabled").checked = current("dua")?.enabled ?? false;
   $("dua-enabled").disabled = !current("dua") || firstRun || !connected;
+  const name = current("speaker_name");
+  if (name && $("speaker-name").value !== name.name) $("speaker-name").value = name.name;
+  $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
+  $("speaker-name").disabled = !name || storageFault(domains.speaker_name);
+  $("save-speaker-name").disabled = !name || !domains.speaker_name?.edits.size ||
+    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !!domains.speaker_name?.pendingEdits ||
+    !connected || storageFault(domains.speaker_name);
   $("time-format").value = current("time_format")?.hours ?? "";
   for (const [key, d] of Object.entries(domains)) {
     const fault =
@@ -543,11 +555,11 @@ function renderPreferences() {
       (key === "settings" && settingsFault());
     if (
       (fault && key !== "settings") ||
-      (!d.operation && !d.blocked && !d.edits.size && !(key === "settings" && settingsFault()))
+      (!d.operation && !d.blocked && !d.edits.size && !d.pendingEdits && !(key === "settings" && settingsFault()))
     )
       notify(key, ...savedMessage(key));
     else if (!fault && !d.operation && !d.blocked)
-      notify(key, hasQueuedWork(d) ? "Waiting to save…" : "Unsaved · release to save", "warning");
+      notify(key, hasQueuedWork(d) ? "Waiting to save…" : key === "speaker_name" ? "Unsaved · choose Save name" : "Unsaved · release to save", "warning");
     if (key !== "settings")
       for (const group of specs[key].groups)
         $(group + "-recovery")
@@ -560,8 +572,8 @@ function renderPreferences() {
           ? ["screen-brightness"]
           : key === "lights"
             ? ["lights-enabled", "lights-brightness"]
-            : key === "dua" ? ["dua-enabled"] : ["time-format"];
-    elements.forEach((id) => ($(id).disabled = fault || firstRun));
+            : key === "speaker_name" ? ["speaker-name"] : key === "dua" ? ["dua-enabled"] : ["time-format"];
+    elements.forEach((id) => ($(id).disabled = fault || (firstRun && key !== "speaker_name")));
   }
   if (settingsFault()) {
     notify(
@@ -680,6 +692,9 @@ function render() {
       ? "Displayed information is stale. The speaker’s current playback state is unknown."
       : "Device status is unavailable. Check the speaker and connection, then reconnect."
   );
+  const speakerName = domains.speaker_name?.confirmed?.value.name || "";
+  text("speaker-heading", speakerName || "OpenAthan");
+  document.title = speakerName ? speakerName + " · OpenAthan" : "OpenAthan · Device settings";
   text("address", state?.hostname || "Connecting to speaker");
   const date = state?.clock_ready ? dateLabel(state.local_date) : "";
   text("device-date", date);
@@ -1080,7 +1095,10 @@ function renderDraftControls() {
     blocked =
       !d?.confirmed || ["storage_fault", "save_failed"].includes(d?.application) || settingsFault();
   document.querySelector(".navigation").hidden = firstRun;
-  document.querySelectorAll(".settings-simple").forEach((el) => (el.hidden = firstRun));
+  document.querySelectorAll(".settings-simple").forEach((el) =>
+    (el.hidden = firstRun && !el.contains($("speaker-name-group"))));
+  $("athan-preferences-group").hidden = firstRun;
+  $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
   text(
     "settings-intro",
     firstRun
@@ -1217,7 +1235,7 @@ function finishSaved(key, operation, response, verified = false) {
     );
   const [message, type] = savedMessage(key);
   if (d.edits.size || d.review)
-    notify(key, hasQueuedWork(d) ? "Waiting to save…" : "Unsaved · release to save", "warning");
+    notify(key, hasQueuedWork(d) ? "Waiting to save…" : key === "speaker_name" ? "Unsaved · choose Save name" : "Unsaved · release to save", "warning");
   else
     notify(
       key,
@@ -1264,8 +1282,9 @@ function canSaveDomain(key) {
 async function saveDomain(key) {
   const d = domains[key],
     before = clone(d.confirmed),
-    edits = captureEdits(d, releasedEdits(d)),
+    edits = d.pendingEdits || captureEdits(d, releasedEdits(d)),
     review = d.review;
+  d.pendingEdits = null;
   const patch = merge(review?.patch || {}, editPatch(edits));
   const operation = { kind: "save", before, edits, review, candidate: merge(before.value, patch) };
   if (review) review.sent = true;
@@ -1328,26 +1347,39 @@ function recovery(key) {
     element.replaceChildren();
     const choices =
       d.blocked === "uncertain"
-        ? [["Check saved state", false]]
+        ? [["Check saved state", "check"]]
         : [
-            ["Retry with my edits", false],
-            ["Use saved values", true]
+            ["Retry with my edits", "retry"],
+            ["Use saved values", "saved"]
           ];
-    for (const [label, useSaved] of choices) {
+    for (const [label, action] of choices) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent =
-        key === "settings" && d.review && !useSaved && d.blocked !== "uncertain"
+        key === "settings" && d.review && action === "retry"
           ? "Review prayer draft"
           : label;
-      button.addEventListener("click", () => resolve(key, useSaved));
+      button.addEventListener("click", () => resolve(key, action));
       element.append(button);
     }
   }
 }
-async function resolve(key, useSaved) {
+async function resolve(key, action) {
   const d = domains[key];
   if (d.operation || storageFault(d)) return;
+  const useSaved = action === "saved";
+  // Retrying a name explicitly approves this draft, including unreleased input.
+  // Keep its version and value separate from edits made during readback or queuing.
+  let nameRetry;
+  if (key === "speaker_name") {
+    d.pendingEdits = null;
+    if (action === "retry" && d.edits.has("name")) {
+      const name = validatedName();
+      if (name === null) return;
+      Object.assign(d.edits.get("name"), { value: name, ready: true });
+      nameRetry = captureEdits(d);
+    }
+  }
   // A keyboard change already released before this choice belongs to recovery;
   // subsequent input gets a new version and can never be consumed by this read.
   for (const edit of d.edits.values())
@@ -1356,14 +1388,14 @@ async function resolve(key, useSaved) {
       edit.ready = true;
     }
   const before = clone(d.confirmed),
-    edits = captureEdits(d),
+    edits = nameRetry || captureEdits(d),
     review = d.review;
   const operation = {
     kind: "recovery",
     before,
     edits,
     review,
-    candidate: merge(before.value, merge(review?.patch || {}, editPatch(releasedEdits(d))))
+    candidate: merge(before.value, merge(review?.patch || {}, editPatch(nameRetry || releasedEdits(d))))
   };
   d.operation = operation;
   notify(key, "Checking saved state…");
@@ -1408,6 +1440,8 @@ async function resolve(key, useSaved) {
               "warning"
             );
         }
+      } else if (nameRetry) {
+        d.pendingEdits = nameRetry;
       } else if (review) {
         if (d.review === review) d.review = null;
         invalidatePreview();
@@ -1683,6 +1717,45 @@ $("setup-back").addEventListener("click", () => {
 $("lights-enabled").addEventListener("change", () =>
   enqueue("lights", { enabled: $("lights-enabled").checked })
 );
+function normalizedName(input) {
+  const name = input.replace(/^[\x09-\x0d ]+|[\x09-\x0d ]+$/g, "");
+  return [...name].length <= 32 && new TextEncoder().encode(name).length <= 128 &&
+    !/[\x00-\x1f\x7f-\x9f\ud800-\udfff]/u.test(name) ? name : null;
+}
+function validatedName() {
+  const input = $("speaker-name");
+  input.setCustomValidity("");
+  const name = normalizedName(input.value);
+  if (name === null) {
+    input.setCustomValidity("Use up to 32 characters without control characters.");
+    input.reportValidity();
+  }
+  return name;
+}
+$("speaker-name").addEventListener("input", () => {
+  $("speaker-name").setCustomValidity("");
+  const d = domains.speaker_name;
+  if (!d?.confirmed || storageFault(d)) return;
+  const input = $("speaker-name").value;
+  // A queued or active save must preserve a newer edit returning to the
+  // currently confirmed name, even when that save later changes it.
+  if (input === d.confirmed.value.name && !d.operation && !d.pendingEdits) {
+    cancelTimer(d.edits.get("name"));
+    d.edits.delete("name");
+  } else editField("speaker_name", "name", input);
+  render();
+});
+$("speaker-name-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if ($("save-speaker-name").disabled) return;
+  const name = validatedName();
+  if (name === null) return;
+  const d = domains.speaker_name;
+  editField("speaker_name", "name", name, true);
+  // Capture approval now, even if another preference is still being written.
+  d.pendingEdits = captureEdits(d);
+  queueSave("speaker_name");
+});
 $("time-format").addEventListener("change", () =>
   enqueue("time_format", { hours: Number($("time-format").value) })
 );
@@ -1703,7 +1776,7 @@ for (const id of ["stop", "settings-stop"]) $(id).addEventListener("click", stop
 $("reconnect").addEventListener("click", async () => {
   if (await refresh()) {
     for (const key of Object.keys(domains))
-      if (domains[key].blocked === "uncertain") await resolve(key, false);
+      if (domains[key].blocked === "uncertain") await resolve(key, "check");
   }
   if (!timezonesReady) await loadTimezones();
 });
@@ -1712,7 +1785,7 @@ $("refresh").addEventListener("click", async () => {
   if (!timezonesReady) await loadTimezones();
 });
 addEventListener("beforeunload", (e) => {
-  if (draftDirty) {
+  if (draftDirty || domains.speaker_name?.edits.size || domains.speaker_name?.pendingEdits) {
     e.preventDefault();
     e.returnValue = "";
   }

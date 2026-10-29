@@ -9,7 +9,7 @@ add_test(NAME upgrade_safe_window COMMAND upgrade_policy_tests)
 file(GLOB ADHAN_SOURCES CONFIGURE_DEPENDS third_party/adhan-cpp/src/*.cpp)
 add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp
-  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp lib/openathan-core/src/dua.cpp ${ADHAN_SOURCES})
+  lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/speaker_name.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp lib/openathan-core/src/dua.cpp ${ADHAN_SOURCES})
 target_include_directories(openathan_core PUBLIC lib/openathan-core/include third_party/adhan-cpp/include)
 add_executable(prayer_tests tests/prayer_tests.cpp)
 target_link_libraries(prayer_tests PRIVATE openathan_core)
@@ -176,3 +176,14 @@ add_executable(audio_board_adapter_tests tests/audio_board_adapter_tests.cpp)
 target_include_directories(audio_board_adapter_tests PRIVATE tests/audio_board_stubs tests/waveshare_stubs
   tests/stubs firmware lib/openathan-core/include)
 add_test(NAME audio_board_controls_power_and_ring COMMAND audio_board_adapter_tests)
+
+foreach(mode IN ITEMS production isolated)
+  add_executable(speaker_name_${mode}_tests tests/speaker_name_tests.cpp
+    firmware/esphome/components/openathan/nvs_settings_store.cpp)
+  target_include_directories(speaker_name_${mode}_tests PRIVATE tests/stubs firmware/esphome/components/openathan)
+  target_link_libraries(speaker_name_${mode}_tests PRIVATE openathan_core)
+  if(mode STREQUAL "isolated")
+    target_compile_definitions(speaker_name_${mode}_tests PRIVATE OPENATHAN_PROVISIONING_TEST_STORAGE)
+  endif()
+  add_test(NAME speaker_name_${mode} COMMAND speaker_name_${mode}_tests)
+endforeach()

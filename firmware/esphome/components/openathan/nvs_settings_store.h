@@ -2,6 +2,7 @@
 #include "openathan/settings.h"
 #include "openathan/lights.h"
 #include "openathan/time_format.h"
+#include "openathan/speaker_name.h"
 #include "openathan/display.h"
 #include "openathan/dua.h"
 #include "storage_config.h"
@@ -44,6 +45,15 @@ class NvsDuaStore : public ::openathan::DuaStore {
   ~NvsDuaStore() override { if (opened_) nvs_close(handle_); }
   ::openathan::LoadResult load(::openathan::SavedDua &value) override;
   bool save(const ::openathan::SavedDua &value) override;
+ private:
+  nvs_handle_t handle_{};
+  bool opened_{};
+};
+class NvsSpeakerNameStore : public ::openathan::SpeakerNameStore {
+ public:
+  ~NvsSpeakerNameStore() override { if (opened_) nvs_close(handle_); }
+  ::openathan::LoadResult load(::openathan::SavedSpeakerName &value) override;
+  bool save(const ::openathan::SavedSpeakerName &value) override;
  private:
   nvs_handle_t handle_{};
   bool opened_{};

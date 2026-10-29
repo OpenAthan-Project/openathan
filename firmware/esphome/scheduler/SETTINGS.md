@@ -112,3 +112,20 @@ See the dated [reference-device results](../../../docs/development/feasibility-r
 and [settings acceptance procedure](VALIDATION.md#saved-settings-acceptance).
 Observed hardware outcomes and remaining checks are recorded separately from
 automated coverage.
+
+## Speaker name preference
+
+The optional speaker name is independent of `DeviceSettings`, activation and
+consumption history. Its hardware-independent service uses an independent
+revision and a fixed 144-byte record: `OAN`/version 1, little-endian revision,
+UTF-8 byte length, zero-padded payload and CRC32. The ESPHome adapter stores it
+under `speaker_name` in the existing selected preference namespace (`openathan`
+or isolated `oa_test`). Missing storage is a virtual empty revision 1 without a
+boot-time write. Invalid records remain untouched and fault naming alone.
+
+Names are limited to 32 Unicode code points and 128 UTF-8 bytes. Surrounding
+ASCII whitespace is trimmed; invalid UTF-8 and C0/C1 controls are rejected.
+Unchanged saves do not write flash. A failed save retains the last confirmed
+value, disables further writes until restart, and requires authoritative
+readback after uncertain completion. Older firmware ignores the new key, so
+application updates and rollback do not migrate existing settings/history.

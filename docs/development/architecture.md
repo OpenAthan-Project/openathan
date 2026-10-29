@@ -149,6 +149,11 @@ credential storage and no saved home Wi-Fi. It never follows an ordinary network
 outage. The optional display presents setup instructions; the scheduler does not
 depend on the display or on the public website. See [phone setup](phone-setup.md).
 
+An optional persisted speaker name identifies the local browser page and tab;
+it is independent of the hostname, activation, prayer settings and optional
+physical display. See the [device UI guide](../../web/device-ui/README.md#speaker-name)
+and [matched build report](speaker-naming-validation-2026-10-28.md).
+
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 
 ### Quran streaming

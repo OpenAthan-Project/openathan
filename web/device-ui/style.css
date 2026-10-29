@@ -18,3 +18,6 @@ html{scroll-padding-bottom:8rem}button,input,select,summary{scroll-margin-bottom
 select{overflow:hidden;text-overflow:ellipsis}.time-row dt{overflow-wrap:anywhere}
 label:has(>select){overflow:hidden}label:has(>select:focus){outline:3px solid var(--amber);outline-offset:3px}
 @media(max-width:767px){.navigation:has(#quran-nav:not([hidden])){grid-template-columns:repeat(3,minmax(0,1fr))}#quran-view{padding:0 20px}}
+
+.device-header>div{min-width:0;flex:1}.device-header h1{white-space:pre-wrap}#speaker-name-form input{font-variant-numeric:normal}
+@media(min-width:768px){#prayer-group{grid-row:1/span 2}.settings-grid:has(#setup-progress:not([hidden])){display:flex;max-width:640px;margin:auto}.settings-grid:has(#setup-progress:not([hidden]))>.settings-simple{display:contents}}
