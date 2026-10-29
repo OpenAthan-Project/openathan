@@ -52,6 +52,14 @@ void LocalApi::preview_(JsonObject root, const ::openathan::DeviceSettings& sett
   auto notices = root["conflicts"].to<JsonArray>();
   for (const auto& conflict : conflicts) notices.add(::openathan::describe_conflict(conflict));
 }
+void LocalApi::speaker_name_(JsonObject root) {
+  const auto &preferences = athan_->speaker_name_preferences();
+  const auto &saved = preferences.saved();
+  root["schema"] = 1;
+  root["revision"] = saved ? saved->revision : 0;
+  root["name"] = saved ? saved->name : "";
+  root["application"] = preferences.writable() ? "applied" : saved ? "save_failed" : "storage_fault";
+}
 void LocalApi::time_format_(JsonObject root) {
   const auto &preferences = athan_->time_format_preferences();
   const auto &saved = preferences.saved();
@@ -85,6 +93,7 @@ void LocalApi::snapshot_(JsonObject root) {
   root["playback_busy"] = athan_->playback_busy() || (quran_ && quran_->playback_pending());
   if (upgrade_) upgrade_->snapshot(root["firmware"].to<JsonObject>());
   time_format_(root["time_format"].to<JsonObject>());
+  speaker_name_(root["speaker_name"].to<JsonObject>());
   lights_(root["lights"].to<JsonObject>());
   display_(root["display"].to<JsonObject>());
   root["test_mode"] = openathan_storage::TEST_MODE;
@@ -141,6 +150,8 @@ void LocalApi::handle(ApiExchange& request) {
     upgrade_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/quran/catalog" && quran_)
     quran_->catalog_snapshot(root);
+  else if (request.method == "GET" && request.uri == "/api/speaker-name")
+    speaker_name_(root);
   else if (request.method == "GET" && request.uri == "/api/time-format")
     time_format_(root);
   else if (request.method == "GET" && request.uri == "/api/display")
@@ -186,6 +197,19 @@ void LocalApi::handle(ApiExchange& request) {
       std::string message; const int code = dua_->retry(message);
       if (code != 200) { error(request, code, message.c_str()); return; }
       dua_->snapshot(root);
+    } else if (request.uri == "/api/speaker-name") {
+      if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
+          !payload["expected_revision"].is<uint32_t>() || !payload["name"].is<const char *>()) {
+        error(request, 400, "Enter a speaker name of up to 32 characters"); return;
+      }
+      const auto input = payload["name"].as<JsonString>();
+      const auto result = athan_->change_speaker_name(std::string_view(input.c_str(), input.size()),
+                                                     payload["expected_revision"].as<uint32_t>());
+      using ::openathan::SpeakerNameResult;
+      if (result == SpeakerNameResult::INVALID) { error(request, 400, "Use up to 32 characters without control characters"); return; }
+      if (result == SpeakerNameResult::CONFLICT) { error(request, 409, "Reload the speaker name before saving"); return; }
+      if (result == SpeakerNameResult::STORAGE) { error(request, 503, "Speaker name could not be saved; restart the device"); return; }
+      speaker_name_(root);
     } else if (request.uri == "/api/time-format") {
       if (payload.size() != 3 || !payload["schema"].is<unsigned>() || payload["schema"].as<unsigned>() != 1 ||
           !payload["expected_revision"].is<uint32_t>() || !payload["hours"].is<unsigned>() ||

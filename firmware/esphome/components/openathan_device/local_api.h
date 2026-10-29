@@ -30,6 +30,7 @@ class LocalApi {
   void set_quran(QuranApi *quran) { quran_ = quran; }
 
  private:
+  void speaker_name_(JsonObject root);
   void time_format_(JsonObject root);
   void display_(JsonObject root);
   void lights_(JsonObject root);

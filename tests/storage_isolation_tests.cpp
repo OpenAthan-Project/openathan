@@ -60,6 +60,10 @@ void fill_test_records() {
   openathan::SavedDisplay previous_display;
   CHECK(display.load(previous_display)==LoadResult::EMPTY);
   CHECK(display.save({2,37}));
+  NvsSpeakerNameStore name;
+  openathan::SavedSpeakerName previous_name;
+  CHECK(name.load(previous_name)==LoadResult::EMPTY);
+  CHECK(name.save({2,"Test room"}));
   CHECK(gate.activate());
   CredentialStore credentials;
   CHECK(credentials.save_wifi({"test network", "test password"}));

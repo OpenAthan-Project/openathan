@@ -5,6 +5,7 @@ const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 const title = (value) => value[0].toUpperCase() + value.slice(1);
 const specs = {
+  speaker_name: { path: "/api/speaker-name", read: "/api/speaker-name", groups: ["name"] },
   settings: { path: "/api/settings", read: "/api/status", groups: ["volume", "preferences"] },
   display: { path: "/api/display", read: "/api/display", groups: ["screen"] },
   lights: { path: "/api/lights", read: "/api/lights", groups: ["lights"] },
@@ -102,6 +103,7 @@ function calculation(value) {
 function valueFrom(key, state) {
   if (!state) return null;
   if (key === "settings" || key === "lights") return state.settings || null;
+  if (key === "speaker_name") return typeof state.name === "string" ? { name: state.name } : null;
   if (key === "dua") return typeof state.enabled === "boolean" ? { enabled: state.enabled } : null;
   if (key === "display")
     return Number.isFinite(state.brightness_percent)
@@ -364,7 +366,7 @@ function domainData(key) {
 function projectSnapshot() {
   if (!observedStatus.data) return;
   snapshot = { ...observedStatus.data, ...domainData("settings") };
-  for (const key of ["display", "lights", "time_format", "dua"]) snapshot[key] = domainData(key);
+  for (const key of ["display", "lights", "time_format", "dua", "speaker_name"]) snapshot[key] = domainData(key);
   snapshot.firmware = firmware.data;
 }
 function acceptResponse({ data, order }, resource = "status", allowPlayback = true) {
@@ -377,7 +379,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
       throw new Error("Device status is incomplete");
     const previousRevision = domains.settings?.confirmed?.revision ?? 0;
     accepted.settings = acceptDomain("settings", data, order);
-    for (const key of ["display", "lights", "time_format", "dua"])
+    for (const key of ["display", "lights", "time_format", "dua", "speaker_name"])
       if (data[key]) accepted[key] = acceptDomain(key, data[key], order);
     // Prayer observations belong to their saved revision. A newly accepted
     // revision carries its timetable even if its request preceded a Stop reply.
@@ -394,6 +396,7 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
         display,
         lights,
         time_format,
+        speaker_name,
         firmware: update,
         playing,
         quran,
@@ -504,6 +507,7 @@ function renderPreferences() {
     settings: ["volume", "settings-volume"],
     display: ["screen-brightness"],
     lights: ["lights-brightness"],
+    speaker_name: [],
     dua: [],
     time_format: []
   })) {
@@ -536,6 +540,12 @@ function renderPreferences() {
   }
   $("dua-enabled").checked = current("dua")?.enabled ?? false;
   $("dua-enabled").disabled = !current("dua") || firstRun || !connected;
+  const name = current("speaker_name");
+  if (name && $("speaker-name").value !== name.name) $("speaker-name").value = name.name;
+  $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
+  $("speaker-name").disabled = !name || storageFault(domains.speaker_name);
+  $("save-speaker-name").disabled = !name || !domains.speaker_name?.edits.size ||
+    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !connected || storageFault(domains.speaker_name);
   $("time-format").value = current("time_format")?.hours ?? "";
   for (const [key, d] of Object.entries(domains)) {
     const fault =
@@ -547,7 +557,7 @@ function renderPreferences() {
     )
       notify(key, ...savedMessage(key));
     else if (!fault && !d.operation && !d.blocked)
-      notify(key, hasQueuedWork(d) ? "Waiting to save…" : "Unsaved · release to save", "warning");
+      notify(key, hasQueuedWork(d) ? "Waiting to save…" : key === "speaker_name" ? "Unsaved · choose Save name" : "Unsaved · release to save", "warning");
     if (key !== "settings")
       for (const group of specs[key].groups)
         $(group + "-recovery")
@@ -560,8 +570,8 @@ function renderPreferences() {
           ? ["screen-brightness"]
           : key === "lights"
             ? ["lights-enabled", "lights-brightness"]
-            : key === "dua" ? ["dua-enabled"] : ["time-format"];
-    elements.forEach((id) => ($(id).disabled = fault || firstRun));
+            : key === "speaker_name" ? ["speaker-name"] : key === "dua" ? ["dua-enabled"] : ["time-format"];
+    elements.forEach((id) => ($(id).disabled = fault || (firstRun && key !== "speaker_name")));
   }
   if (settingsFault()) {
     notify(
@@ -680,6 +690,9 @@ function render() {
       ? "Displayed information is stale. The speaker’s current playback state is unknown."
       : "Device status is unavailable. Check the speaker and connection, then reconnect."
   );
+  const speakerName = domains.speaker_name?.confirmed?.value.name || "";
+  text("speaker-heading", speakerName || "OpenAthan");
+  document.title = speakerName ? speakerName + " · OpenAthan" : "OpenAthan · Device settings";
   text("address", state?.hostname || "Connecting to speaker");
   const date = state?.clock_ready ? dateLabel(state.local_date) : "";
   text("device-date", date);
@@ -1080,7 +1093,10 @@ function renderDraftControls() {
     blocked =
       !d?.confirmed || ["storage_fault", "save_failed"].includes(d?.application) || settingsFault();
   document.querySelector(".navigation").hidden = firstRun;
-  document.querySelectorAll(".settings-simple").forEach((el) => (el.hidden = firstRun));
+  document.querySelectorAll(".settings-simple").forEach((el) =>
+    (el.hidden = firstRun && !el.contains($("speaker-name-group"))));
+  $("athan-preferences-group").hidden = firstRun;
+  $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
   text(
     "settings-intro",
     firstRun
@@ -1217,7 +1233,7 @@ function finishSaved(key, operation, response, verified = false) {
     );
   const [message, type] = savedMessage(key);
   if (d.edits.size || d.review)
-    notify(key, hasQueuedWork(d) ? "Waiting to save…" : "Unsaved · release to save", "warning");
+    notify(key, hasQueuedWork(d) ? "Waiting to save…" : key === "speaker_name" ? "Unsaved · choose Save name" : "Unsaved · release to save", "warning");
   else
     notify(
       key,
@@ -1683,6 +1699,35 @@ $("setup-back").addEventListener("click", () => {
 $("lights-enabled").addEventListener("change", () =>
   enqueue("lights", { enabled: $("lights-enabled").checked })
 );
+function normalizedName(input) {
+  const name = input.replace(/^[\x09-\x0d ]+|[\x09-\x0d ]+$/g, "");
+  return [...name].length <= 32 && new TextEncoder().encode(name).length <= 128 &&
+    !/[\x00-\x1f\x7f-\x9f\ud800-\udfff]/u.test(name) ? name : null;
+}
+$("speaker-name").addEventListener("input", () => {
+  $("speaker-name").setCustomValidity("");
+  const d = domains.speaker_name;
+  if (!d?.confirmed || storageFault(d)) return;
+  const input = $("speaker-name").value;
+  // Returning to the confirmed name cancels a draft, except during a save:
+  // a newer edit must survive that save's response.
+  if (input === d.confirmed.value.name && !d.operation) {
+    cancelTimer(d.edits.get("name"));
+    d.edits.delete("name");
+  } else editField("speaker_name", "name", input);
+  render();
+});
+$("speaker-name-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if ($("save-speaker-name").disabled) return;
+  const name = normalizedName($("speaker-name").value);
+  if (name === null) {
+    $("speaker-name").setCustomValidity("Use up to 32 characters without control characters.");
+    $("speaker-name").reportValidity();
+    return;
+  }
+  enqueue("speaker_name", { name });
+});
 $("time-format").addEventListener("change", () =>
   enqueue("time_format", { hours: Number($("time-format").value) })
 );
@@ -1712,7 +1757,7 @@ $("refresh").addEventListener("click", async () => {
   if (!timezonesReady) await loadTimezones();
 });
 addEventListener("beforeunload", (e) => {
-  if (draftDirty) {
+  if (draftDirty || domains.speaker_name?.edits.size) {
     e.preventDefault();
     e.returnValue = "";
   }

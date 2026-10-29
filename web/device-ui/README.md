@@ -44,7 +44,7 @@ share that pending, confirmed or unconfirmed feedback with the Quran view.
 
 ### Everyday preferences
 
-Settings groups Athan preferences, prayer calculations, optional screen/lights,
+Settings groups the speaker name, Athan preferences, prayer calculations, optional screen/lights,
 time format and updates. Markup follows the phone section order for keyboard and
 screen-reader navigation; desktop placement retains two columns. First run hides
 everyday preferences and updates until setup finishes.
@@ -65,6 +65,26 @@ profile converts an older saved percentage to keep near-equivalent output, so
 an old 80% appears as 64% after upgrade. The new maximum is higher; see the
 [calibration report](../../docs/development/atom-volume-calibration-2026-10-11.md)
 for its acceptance limits.
+
+### Speaker name
+
+An optional name identifies this speaker in the page heading and browser tab.
+The hostname remains visible beneath it. Renaming never changes the local address,
+network discovery, credentials or physical display. Empty names use the existing
+OpenAthan heading; multiple speakers may share a name.
+
+The name field appears during the first setup step and in Settings afterward.
+Choose **Save name** to persist it independently of prayer setup. It does not
+activate setup or affect the timetable. Ordinary preference autosaving does not
+save a name draft. Polls and view changes keep edits; leaving with unsaved name
+edits prompts a browser warning. The heading changes only after confirmed storage.
+Names support up to 32 Unicode code points and 128 UTF-8 bytes, including Arabic
+and emoji. Surrounding ASCII whitespace is trimmed; control characters, invalid
+UTF-8 and overlength names are rejected rather than truncated.
+
+The name uses the same revision, conflict and uncertain-save readback policy as
+other independent preferences. A naming storage fault disables naming alone.
+Older firmware without `speaker_name` retains the existing interface.
 
 ### Prayer drafts and first-run setup
 

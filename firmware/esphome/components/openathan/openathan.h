@@ -22,6 +22,10 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   ::openathan::TimeFormatResult change_time_format(uint8_t hours, uint32_t revision) {
     return maintenance_ ? ::openathan::TimeFormatResult::STORAGE : time_format_preferences_.update(hours, revision);
   }
+  const ::openathan::SpeakerNamePreferences &speaker_name_preferences() const { return speaker_name_preferences_; }
+  ::openathan::SpeakerNameResult change_speaker_name(std::string_view name, uint32_t revision) {
+    return maintenance_ ? ::openathan::SpeakerNameResult::STORAGE : speaker_name_preferences_.update(name, revision);
+  }
   void set_display_output(::openathan::DisplayOutput *output) { display_output_ = output; }
   bool has_display() const { return display_output_ != nullptr; }
   const ::openathan::DisplayPreferences &display_preferences() const { return display_preferences_; }
@@ -114,6 +118,8 @@ class OpenAthan : public PollingComponent, public ::openathan::Clock {
   NvsDuaStore dua_store_;
   ::openathan::DuaPreferences dua_preferences_{dua_store_};
   ::openathan::DuaSequence sequence_;
+  NvsSpeakerNameStore speaker_name_store_;
+  ::openathan::SpeakerNamePreferences speaker_name_preferences_{speaker_name_store_};
   NvsTimeFormatStore time_format_store_;
   ::openathan::TimeFormatPreferences time_format_preferences_{time_format_store_};
   NvsLightStore light_store_;

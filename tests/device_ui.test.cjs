@@ -36,6 +36,7 @@ async function fixture(){
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
     if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
     if(req.method==='GET' && req.url==='/api/dua'){send(200,state.device.dua);return;}
+    if(req.method==='GET' && req.url==='/api/speaker-name'){if(state.nameFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.speaker_name);return;}
     if(req.method==='GET' && req.url==='/api/time-format'){if(state.timeFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.time_format);return;}
     if(req.method==='GET' && req.url==='/api/display'){if(state.screenFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.display||{supported:false});return;}
     if(req.method==='GET' && req.url==='/api/lights'){if(state.lightFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.lights||{supported:false});return;}
@@ -66,6 +67,14 @@ async function fixture(){
       send(200,state.device.dua);return;
     }
     if(req.url==='/api/dua/retry'){state.device.dua.state='waiting';send(200,state.device.dua);return;}
+    if(req.url==='/api/speaker-name'){
+      const name=state.device.speaker_name;
+      if(payload.expected_revision!==name.revision){send(409,{error:'Reload name before saving'});return;}
+      if(state.nameSaveFail){name.application='save_failed';send(503,{error:'Name could not be saved'});return;}
+      if(payload.name!==name.name){name.name=payload.name;name.revision++;}
+      if(state.nameDrop){state.nameDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
+      send(200,name);return;
+    }
     if(req.url==='/api/time-format'){
       if(payload.expected_revision!==state.device.time_format.revision){send(409,{error:'Reload time format before saving'});return;}
       state.timeMutations=(state.timeMutations||0)+1;state.device.time_format.hours=payload.hours;state.device.time_format.revision++;
@@ -172,6 +181,105 @@ async function mockQuranCatalog(page){
   data:route.request().postDataJSON().kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters()}}));
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ function withName(f,name=''){f.state.device.speaker_name={schema:1,revision:1,name,application:'applied'};}
+ test(`${browserName}: speaker name saves explicitly, keeps drafts and clears to default`,async()=>{
+  const f=await fixture();withName(f);const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#speaker-name').fill('  غرفة النوم 🕌  ');
+   await page.locator('#time-format').selectOption('12');await saved(page,'format');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,0);
+   await refresh(page);await settings(page);assert.equal(await page.locator('#speaker-name').inputValue(),'  غرفة النوم 🕌  ');
+   assert.equal(await page.locator('#speaker-heading').textContent(),'OpenAthan');
+   await page.locator('#save-speaker-name').click();await saved(page,'name');
+   assert.equal(f.state.device.speaker_name.name,'غرفة النوم 🕌');assert.equal(f.state.mutations,0);
+   assert.equal(await page.title(),'غرفة النوم 🕌 · OpenAthan');assert.equal(await page.locator('#address').textContent(),'openathan-test.local');
+   await page.reload();await settings(page);assert.equal(await page.locator('#speaker-name').inputValue(),'غرفة النوم 🕌');
+   await page.locator('#speaker-name').fill('');await page.locator('#speaker-name').press('Enter');await saved(page,'name');
+   assert.equal(await page.title(),'OpenAthan · Device settings');assert.equal(await page.locator('#speaker-heading').textContent(),'OpenAthan');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name during setup never activates prayer settings`,async()=>{
+  const f=await fixture();withName(f);f.state.device.setup='incomplete';const o=await open(f,browserName),{page}=o;
+  try{
+   assert.ok(await page.locator('#speaker-name-group').isVisible());assert.ok(await page.locator('#speaker-name').isEnabled());
+   await page.locator('#speaker-name').fill('Living room');await page.locator('#save-speaker-name').click();await saved(page,'name');
+   assert.equal(f.state.device.setup,'incomplete');assert.equal(f.state.mutations,0);
+   await page.locator('#latitude').fill('43');await page.locator('#longitude').fill('-79');await page.locator('#timezone').fill('UTC');await page.locator('#setup-next').click();
+   assert.ok(await page.locator('#speaker-name-group').isHidden());await page.locator('#setup-back').click();assert.ok(await page.locator('#speaker-name-group').isVisible());
+   assert.equal(await page.locator('#speaker-name').inputValue(),'Living room');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name validates limits and renders text safely`,async()=>{
+  const f=await fixture();withName(f);const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);
+   for(const value of ['a'.repeat(33),'🕌'.repeat(33),'a'+String.fromCharCode(127)+'b']){
+    await page.locator('#speaker-name').fill(value);await page.locator('#save-speaker-name').click();assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,0);
+   }
+   await page.locator('#speaker-name').fill('🕌'.repeat(32));await page.locator('#save-speaker-name').click();await saved(page,'name');
+   await page.locator('#speaker-name').fill('<img src=x onerror=alert(1)>');await page.locator('#save-speaker-name').click();await saved(page,'name');
+   assert.equal(await page.locator('#speaker-heading').textContent(),'<img src=x onerror=alert(1)>');assert.equal(await page.locator('#speaker-heading img').count(),0);
+  }finally{await o.close();}
+ });
+ for(const fault of ['name','prayer'])test(`${browserName}: speaker name ${fault} storage fault stays independent`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');
+  if(fault==='name')f.state.device.speaker_name.application='storage_fault';else f.state.device.application='storage_fault';
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);
+   if(fault==='name'){assert.ok(await page.locator('#speaker-name').isDisabled());assert.ok(await page.locator('#time-format').isEnabled());assert.equal(await page.locator('#speaker-heading').textContent(),'Bedroom');}
+   else{await page.locator('#speaker-name').fill('Guest room');await page.locator('#save-speaker-name').click();await saved(page,'name');assert.equal(f.state.mutations,0);}
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name conflict keeps draft until explicit recovery`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);f.state.device.speaker_name.name='Upstairs';f.state.device.speaker_name.revision++;
+   await page.locator('#speaker-name').fill('Guest room');await page.locator('#save-speaker-name').click();
+   await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('another client'));
+   assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');assert.equal(await page.locator('#speaker-heading').textContent(),'Upstairs');
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await saved(page,'name');assert.equal(f.state.device.speaker_name.name,'Guest room');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name lost response reads back before any retry`,async()=>{
+  const f=await fixture();withName(f);f.state.nameDrop=true;f.state.nameFailRead=true;const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#speaker-name').fill('Bedroom');await page.locator('#save-speaker-name').click();
+   await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('before another write'));
+   await page.locator('#speaker-name').fill('Guest room');assert.ok(await page.locator('#save-speaker-name').isDisabled());
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+   f.state.nameFailRead=false;await page.locator('#name-recovery button').click();
+   await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('choose which values'));
+   await page.locator('#name-recovery button',{hasText:'Use saved values'}).click();await saved(page,'name');
+   assert.equal(await page.locator('#speaker-name').inputValue(),'Bedroom');assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name edit during a save needs another Save name`,async()=>{
+  const f=await fixture();withName(f);const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await page.route('**/api/speaker-name',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}started.resolve();await gate.promise;await route.continue();});
+   await settings(page);await page.locator('#speaker-name').fill('Bedroom');await page.locator('#save-speaker-name').click();await started.promise;
+   await page.locator('#speaker-name').fill('Guest room');gate.resolve();
+   await page.waitForFunction(()=>document.querySelector('#speaker-heading').textContent==='Bedroom');assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+   await page.locator('#save-speaker-name').click();await saved(page,'name');assert.equal(f.state.device.speaker_name.name,'Guest room');
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: speaker name draft warns before leaving and fits narrow screens`,async()=>{
+  const f=await fixture();withName(f,'A'.repeat(32));const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);await page.locator('#speaker-name').fill('Guest room');
+   let dismissed=false;page.once('dialog',async d=>{dismissed=d.type()==='beforeunload';await d.dismiss();});await page.goto('about:blank',{timeout:3000}).catch(()=>{});assert.ok(dismissed);
+   for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    if(process.env.OPENATHAN_NAME_SCREENSHOTS && browserName==='chromium')await page.screenshot({path:process.env.OPENATHAN_NAME_SCREENSHOTS+'/name-'+width+'.png',fullPage:true});}
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name missing on older firmware keeps existing UI`,async()=>{
+  const f=await fixture(),o=await open(f,browserName),{page}=o;
+  try{await settings(page);assert.ok(await page.locator('#speaker-name-group').isHidden());assert.equal(await page.locator('#speaker-heading').textContent(),'OpenAthan');}
+  finally{await o.close();}
+ });
+
  for(const stopView of ['quran','settings','today'])test(`${browserName}: ${stopView} Stop invalidates a Quran Play not yet delivered`,async()=>{
   const f=await fixture();f.state.device.quran={supported:true,playback_token:'boot:0',state:stopView==='quran'?'playing':'idle'};
   f.state.device.playing=stopView==='quran';f.state.device.playback_source=f.state.device.playing?'quran':'none';

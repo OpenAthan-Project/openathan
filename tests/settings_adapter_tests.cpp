@@ -854,6 +854,41 @@ static void dua_api() {
   f.device.on_shutdown();
   CHECK(!f.device.playback_busy() && !f.audio.active && f.audio.stops==stops+1);
 }
+static void speaker_name_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; f.device.require_setup(); f.begin(); LocalApi api(&f.device,nullptr,0);
+  api.set_context("openathan-test.local",true);
+  const auto prayer=*f.device.settings_service()->saved();
+  const auto records=nvs_test::committed;
+  auto call=[&](const char *method,const std::string &body="",const char *uri="/api/speaker-name") {
+    ApiExchange request; request.method=method; request.uri=uri; request.body=body;
+    api.handle(request); return request;
+  };
+  JsonDocument response; CHECK(!deserializeJson(response,call("GET").response));
+  CHECK(response["name"] == "" && response["revision"] == 1);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"name":"  غرفة النوم 🕌  "})").code == 200);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":1,"name":"Bedroom"})").code == 409);
+  CHECK(f.device.speaker_name_preferences().saved()->name=="غرفة النوم 🕌");
+  CHECK(std::string(f.device.setup_state())=="incomplete" && !f.device.activated());
+  CHECK(*f.device.settings_service()->saved()==prayer);
+  for (const auto &[key,value] : records) CHECK(nvs_test::committed.at(key)==value);
+  for (auto invalid : {"123","true","null",R"("a\u0000b")",R"("a\nb")",R"("abcdefghijklmnopqrstuvwxyz1234567")"})
+    CHECK(call("POST",std::string(R"({"schema":1,"expected_revision":2,"name":)")+invalid+"}").code==400);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"name":"Bedroom","extra":0})").code == 400);
+  CHECK(!deserializeJson(response,call("GET","","/api/status").response));
+  CHECK(response["hostname"]=="openathan-test.local" && response["speaker_name"]["revision"]==2);
+  const auto writes=nvs_test::writes;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"name":"غرفة النوم 🕌"})").code==200 && nvs_test::writes==writes);
+  CHECK(call("POST",R"({"schema":1,"expected_revision":2,"name":""})").code==200);
+  nvs_test::fail_commit=true;
+  CHECK(call("POST",R"({"schema":1,"expected_revision":3,"name":"Bedroom"})").code==503);
+  CHECK(!deserializeJson(response,call("GET").response));
+  CHECK(response["application"]=="save_failed" && response["name"]=="");
+  CHECK(*f.device.settings_service()->saved()==prayer);
+  nvs_test::fail_commit=false;
+  f.device.quiesce_for_maintenance();
+  CHECK(f.device.change_speaker_name("Room",3)==SpeakerNameResult::STORAGE);
+}
 static void time_format_api() {
   using namespace esphome::openathan_device;
   Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
@@ -1213,6 +1248,6 @@ int main() {
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); physical_volume(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  dua_api(); display_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
+  dua_api(); display_api(); speaker_name_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
 #endif
 }

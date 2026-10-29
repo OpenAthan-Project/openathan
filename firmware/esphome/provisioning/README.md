@@ -378,3 +378,20 @@ Reference firmware includes standalone prayer countdown and status lights with
 independent on/off and brightness preferences. See the [light API and validation
 contract](../../../docs/development/lights.md). Both light endpoints use the
 existing authentication and same-origin protection.
+
+## Optional speaker name
+
+`GET /api/speaker-name` returns `{schema: 1, revision, name, application}`;
+`GET /api/status` includes the same object as `speaker_name`. Authenticated,
+same-origin `POST /api/speaker-name` accepts exactly
+`{schema: 1, expected_revision, name}` and returns the confirmed record. This
+endpoint is available before and after activation. It never activates setup.
+`application` is `applied`, `save_failed` or `storage_fault`; invalid requests
+return 400, stale revisions return 409 and storage faults return 503.
+
+The name is presentation only: it changes the local browser heading and title,
+while the unique MAC-suffixed hostname, Host/Origin checks, provisioning protocol,
+Digest realm, Wi-Fi identity and physical displays remain unchanged. An empty
+name uses OpenAthan; duplicate names are permitted. Read back an uncertain save
+before retrying. See the [device UI guide](../../../web/device-ui/README.md#speaker-name)
+for user-visible behavior and text limits.
