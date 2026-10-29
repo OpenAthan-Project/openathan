@@ -83,7 +83,11 @@ and emoji. Surrounding ASCII whitespace is trimmed; control characters, invalid
 UTF-8 and overlength names are rejected rather than truncated.
 
 The name uses the same revision, conflict and uncertain-save readback policy as
-other independent preferences. A naming storage fault disables naming alone.
+other independent preferences. **Retry with my edits** validates and saves the
+name captured at that click after reading the saved state. Later typing remains
+an unsaved draft requiring another explicit save. **Check saved state** only
+reads; it does not approve a newer name draft for saving.
+A naming storage fault disables naming alone.
 Older firmware without `speaker_name` retains the existing interface.
 
 ### Prayer drafts and first-run setup

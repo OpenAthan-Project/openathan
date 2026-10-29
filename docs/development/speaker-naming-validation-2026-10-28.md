@@ -42,3 +42,34 @@ heap, fragmentation, PSRAM and concurrent networking/audio headroom were not
 measured; static RAM and build success do not establish those limits. Physical
 restart/update retention remains pending attended validation using the relevant
 runbook and fresh device/recovery evidence.
+
+## Conflict-recovery correction
+
+An unreleased name draft could encounter a concurrent rename through status
+polling or after a rejected save. **Retry with my edits** previously read the
+saved name without submitting that draft. Retry now validates and captures the
+name at the click, reads authoritative state and queues that captured value
+through the serialized writer. Later edits remain unsaved; a name already
+persisted needs no duplicate write. **Check saved state** remains a read action.
+
+The correction was compared with PR head
+`f450b63733a592a9f47dc4455980e05e1f327168` using freshly rebuilt baselines and
+the same pinned environment, source location, per-board configuration and
+development commit identity for each pair. Generated sdkconfig bytes and
+dependency locks matched. All three existing capacity checks passed.
+
+| Production profile | Before correction OTA bytes | Corrected OTA bytes | Delta | Budget remaining | Slot free |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| AtomS3R + Voice Pyramid | 1,406,144 | 1,406,416 | +272 | 166,448 | 690,736 |
+| Waveshare V2 | 1,409,952 | 1,410,240 | +288 | 162,624 | 686,912 |
+| Waveshare AUDIO-Board | 1,373,872 | 1,374,160 | +288 | 198,704 | 722,992 |
+
+Static RAM did not increase relative to the original naming implementation.
+The original application budget, both slots and shared audio are unchanged.
+All 25 UBSan host tests and 176 pinned Python tests passed without skips,
+including production and isolated JSON API tests. All 80 focused naming and
+prayer-review browser cases passed without skips. New Chromium/WebKit cases
+cover unreleased conflicts, normalization and validation, edits during readback,
+queued and active saves, failed/stale readback, storage faults, duplicate-write
+prevention, repeated conflicts, uncertain saves and saved-value recovery.
+No physical validation or runtime memory measurement was added by this correction.

@@ -182,6 +182,12 @@ async function mockQuranCatalog(page){
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
  function withName(f,name=''){f.state.device.speaker_name={schema:1,revision:1,name,application:'applied'};}
+ async function nameConflict(f,page,name='Guest room'){
+  await settings(page);await page.locator('#speaker-name').fill(name);
+  f.state.device.speaker_name.name='Upstairs';f.state.device.speaker_name.revision++;
+  await page.locator('#refresh').click();await requestsFinished(page);
+  await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('another client'));
+ }
  test(`${browserName}: speaker name saves explicitly, keeps drafts and clears to default`,async()=>{
   const f=await fixture();withName(f);const o=await open(f,browserName),{page}=o;
   try{
@@ -241,6 +247,124 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await saved(page,'name');assert.equal(f.state.device.speaker_name.name,'Guest room');
   }finally{await o.close();}
  });
+ for(const conflict of ['poll','save'])test(`${browserName}: speaker name retry saves an unreleased ${conflict} conflict draft`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   if(conflict==='poll')await nameConflict(f,page);
+   else{
+    await settings(page);f.state.device.speaker_name.name='Upstairs';f.state.device.speaker_name.revision++;
+    await page.locator('#speaker-name').fill('First draft');await page.locator('#save-speaker-name').click();
+    await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('another client'));
+    await page.locator('#speaker-name').fill('Guest room');
+   }
+   const before=f.state.posts.length;
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await saved(page,'name');
+   const posts=f.state.posts.slice(before);assert.equal(posts.length,1);
+   assert.deepEqual(posts[0].payload,{schema:1,expected_revision:2,name:'Guest room'});
+   assert.equal(f.state.device.speaker_name.name,'Guest room');assert.equal(await page.locator('#speaker-heading').textContent(),'Guest room');
+  }finally{await o.close();}
+ });
+ for(const stage of ['readback','queued','save'])test(`${browserName}: speaker name retry preserves later edits during ${stage}`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await nameConflict(f,page);
+   if(stage==='queued'){
+    await page.route('**/api/time-format',async route=>{if(route.request().method()==='POST'){started.resolve();await gate.promise;}await route.continue();});
+    await page.locator('#time-format').selectOption('12');await requestStarted(started);
+   }else await page.route('**/api/speaker-name',async route=>{
+    if(route.request().method()===(stage==='readback'?'GET':'POST')){started.resolve();await gate.promise;}
+    await route.continue();
+   });
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();
+   if(stage==='queued')await page.locator('#name-recovery').waitFor({state:'hidden'});else await requestStarted(started);
+   // Even returning to the currently confirmed value is a newer, unsaved edit.
+   await page.locator('#speaker-name').fill('Upstairs');gate.resolve();
+   await page.waitForFunction(()=>document.querySelector('#speaker-heading').textContent==='Guest room');await requestsFinished(page);
+   assert.equal(await page.locator('#speaker-name').inputValue(),'Upstairs');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+   assert.match(await page.locator('#name-feedback').textContent(),/Unsaved/);
+   await page.locator('#save-speaker-name').click();await saved(page,'name');
+   assert.equal(f.state.device.speaker_name.name,'Upstairs');assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,2);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: speaker name retry validates and normalizes the draft`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await nameConflict(f,page);
+   for(const value of ['a'.repeat(33),'🕌'.repeat(33),'a'+String.fromCharCode(127)+'b']){
+    await page.locator('#speaker-name').fill(value);await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();
+    assert.equal(f.state.posts.length,0);assert.equal(await page.locator('#speaker-name').inputValue(),value);
+    assert.ok(await page.locator('#speaker-name').evaluate(el=>!el.validity.valid));
+   }
+   for(const name of ['  غرفة النوم 🕌  ','🕌'.repeat(32),'']){
+    await nameConflict(f,page,name);await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await saved(page,'name');
+    assert.equal(f.state.device.speaker_name.name,name.trim());
+   }
+   assert.equal(f.state.posts.length,3);
+  }finally{await o.close();}
+ });
+ for(const fault of ['unavailable','stale','storage'])test(`${browserName}: speaker name retry does not write after ${fault} readback`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await nameConflict(f,page);
+   await page.route('**/api/speaker-name',route=>route.fulfill(fault==='unavailable'?{status:503,json:{error:'Unavailable'}}:
+    {json:{...f.state.device.speaker_name,...(fault==='stale'?{revision:1,name:'Bedroom'}:{application:'storage_fault'})}}));
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await requestsFinished(page);
+   assert.equal(f.state.posts.length,0);assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');
+   assert.ok(await page.locator('#save-speaker-name').isDisabled());assert.ok(await page.locator('#name-recovery').isVisible());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name retry acknowledges an already persisted name without writing`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await nameConflict(f,page);f.state.device.speaker_name.name='Guest room';f.state.device.speaker_name.revision++;
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await saved(page,'name');
+   assert.equal(f.state.posts.length,0);assert.equal(await page.locator('#speaker-heading').textContent(),'Guest room');
+   assert.ok(await page.locator('#save-speaker-name').isDisabled());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name Use saved values preserves edits typed during recovery`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await nameConflict(f,page);
+   await page.route('**/api/speaker-name',async route=>{started.resolve();await gate.promise;await route.continue();});
+   await page.locator('#name-recovery button',{hasText:'Use saved values'}).click();await requestStarted(started);
+   await page.locator('#speaker-name').fill('Living room');gate.resolve();await requestsFinished(page);
+   await page.locator('#name-recovery').waitFor({state:'hidden'});
+   assert.equal(f.state.posts.length,0);assert.equal(await page.locator('#speaker-name').inputValue(),'Living room');
+   assert.equal(await page.locator('#speaker-heading').textContent(),'Upstairs');assert.match(await page.locator('#name-feedback').textContent(),/Unsaved/);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: speaker name retry conflict needs a fresh explicit retry`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await nameConflict(f,page);
+   await page.route('**/api/speaker-name',async route=>{
+    if(route.request().method()==='POST'){f.state.device.speaker_name.name='Kitchen';f.state.device.speaker_name.revision++;}
+    await route.continue();
+   });
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();await requestsFinished(page);
+   await page.waitForFunction(()=>document.querySelector('#speaker-heading').textContent==='Kitchen');
+   assert.equal(f.state.posts.length,1);assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');
+   assert.ok(await page.locator('#save-speaker-name').isDisabled());assert.ok(await page.locator('#name-recovery').isVisible());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: speaker name retry lost response is checked without repeating the write`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o;
+  try{
+   await nameConflict(f,page);f.state.nameDrop=true;f.state.nameFailRead=true;
+   // Initial recovery readback must succeed; fail only the read after the POST.
+   await page.route('**/api/speaker-name',async route=>{
+    if(route.request().method()==='GET'&&f.state.posts.length===0)await route.fulfill({json:f.state.device.speaker_name});else await route.continue();
+   });
+   await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();
+   await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('before another write'));
+   f.state.nameFailRead=false;await page.locator('#name-recovery button',{hasText:'Check saved state'}).click();await requestsFinished(page);
+   await page.waitForFunction(()=>document.querySelector('#speaker-heading').textContent==='Guest room');
+   assert.equal(f.state.posts.length,1);assert.ok(await page.locator('#save-speaker-name').isDisabled());
+   assert.ok(await page.locator('#name-recovery').isHidden());
+  }finally{await o.close();}
+ });
  test(`${browserName}: speaker name lost response reads back before any retry`,async()=>{
   const f=await fixture();withName(f);f.state.nameDrop=true;f.state.nameFailRead=true;const o=await open(f,browserName),{page}=o;
   try{
@@ -250,6 +374,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
    f.state.nameFailRead=false;await page.locator('#name-recovery button').click();
    await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('choose which values'));
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
    await page.locator('#name-recovery button',{hasText:'Use saved values'}).click();await saved(page,'name');
    assert.equal(await page.locator('#speaker-name').inputValue(),'Bedroom');assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
   }finally{await o.close();}

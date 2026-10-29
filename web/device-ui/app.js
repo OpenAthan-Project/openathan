@@ -127,7 +127,7 @@ function releasedEdits(d) {
   return new Map([...d.edits].filter(([, edit]) => edit.ready));
 }
 function hasQueuedWork(d) {
-  return !!d.review || releasedEdits(d).size > 0;
+  return !!d.retryEdits || !!d.review || releasedEdits(d).size > 0;
 }
 function groupsFor(d, review = d.review) {
   return [...specs[d.key].groups, ...(review ? ["prayer"] : [])];
@@ -289,6 +289,7 @@ function acceptDomain(key, data, order) {
       order: 0,
       application: null,
       edits: new Map(),
+      retryEdits: null,
       review: null,
       operation: null,
       blocked: null
@@ -545,7 +546,8 @@ function renderPreferences() {
   $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
   $("speaker-name").disabled = !name || storageFault(domains.speaker_name);
   $("save-speaker-name").disabled = !name || !domains.speaker_name?.edits.size ||
-    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !connected || storageFault(domains.speaker_name);
+    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !!domains.speaker_name?.retryEdits ||
+    !connected || storageFault(domains.speaker_name);
   $("time-format").value = current("time_format")?.hours ?? "";
   for (const [key, d] of Object.entries(domains)) {
     const fault =
@@ -553,7 +555,7 @@ function renderPreferences() {
       (key === "settings" && settingsFault());
     if (
       (fault && key !== "settings") ||
-      (!d.operation && !d.blocked && !d.edits.size && !(key === "settings" && settingsFault()))
+      (!d.operation && !d.blocked && !d.edits.size && !d.retryEdits && !(key === "settings" && settingsFault()))
     )
       notify(key, ...savedMessage(key));
     else if (!fault && !d.operation && !d.blocked)
@@ -1280,8 +1282,9 @@ function canSaveDomain(key) {
 async function saveDomain(key) {
   const d = domains[key],
     before = clone(d.confirmed),
-    edits = captureEdits(d, releasedEdits(d)),
+    edits = d.retryEdits || captureEdits(d, releasedEdits(d)),
     review = d.review;
+  d.retryEdits = null;
   const patch = merge(review?.patch || {}, editPatch(edits));
   const operation = { kind: "save", before, edits, review, candidate: merge(before.value, patch) };
   if (review) review.sent = true;
@@ -1344,26 +1347,39 @@ function recovery(key) {
     element.replaceChildren();
     const choices =
       d.blocked === "uncertain"
-        ? [["Check saved state", false]]
+        ? [["Check saved state", "check"]]
         : [
-            ["Retry with my edits", false],
-            ["Use saved values", true]
+            ["Retry with my edits", "retry"],
+            ["Use saved values", "saved"]
           ];
-    for (const [label, useSaved] of choices) {
+    for (const [label, action] of choices) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent =
-        key === "settings" && d.review && !useSaved && d.blocked !== "uncertain"
+        key === "settings" && d.review && action === "retry"
           ? "Review prayer draft"
           : label;
-      button.addEventListener("click", () => resolve(key, useSaved));
+      button.addEventListener("click", () => resolve(key, action));
       element.append(button);
     }
   }
 }
-async function resolve(key, useSaved) {
+async function resolve(key, action) {
   const d = domains[key];
   if (d.operation || storageFault(d)) return;
+  const useSaved = action === "saved";
+  // Retrying a name explicitly approves this draft, including unreleased input.
+  // Keep its version and value separate from edits made during readback or queuing.
+  let nameRetry;
+  if (key === "speaker_name") {
+    d.retryEdits = null;
+    if (action === "retry" && d.edits.has("name")) {
+      const name = validatedName();
+      if (name === null) return;
+      Object.assign(d.edits.get("name"), { value: name, ready: true });
+      nameRetry = captureEdits(d);
+    }
+  }
   // A keyboard change already released before this choice belongs to recovery;
   // subsequent input gets a new version and can never be consumed by this read.
   for (const edit of d.edits.values())
@@ -1372,14 +1388,14 @@ async function resolve(key, useSaved) {
       edit.ready = true;
     }
   const before = clone(d.confirmed),
-    edits = captureEdits(d),
+    edits = nameRetry || captureEdits(d),
     review = d.review;
   const operation = {
     kind: "recovery",
     before,
     edits,
     review,
-    candidate: merge(before.value, merge(review?.patch || {}, editPatch(releasedEdits(d))))
+    candidate: merge(before.value, merge(review?.patch || {}, editPatch(nameRetry || releasedEdits(d))))
   };
   d.operation = operation;
   notify(key, "Checking saved state…");
@@ -1424,6 +1440,8 @@ async function resolve(key, useSaved) {
               "warning"
             );
         }
+      } else if (nameRetry) {
+        d.retryEdits = nameRetry;
       } else if (review) {
         if (d.review === review) d.review = null;
         invalidatePreview();
@@ -1704,14 +1722,24 @@ function normalizedName(input) {
   return [...name].length <= 32 && new TextEncoder().encode(name).length <= 128 &&
     !/[\x00-\x1f\x7f-\x9f\ud800-\udfff]/u.test(name) ? name : null;
 }
+function validatedName() {
+  const input = $("speaker-name");
+  input.setCustomValidity("");
+  const name = normalizedName(input.value);
+  if (name === null) {
+    input.setCustomValidity("Use up to 32 characters without control characters.");
+    input.reportValidity();
+  }
+  return name;
+}
 $("speaker-name").addEventListener("input", () => {
   $("speaker-name").setCustomValidity("");
   const d = domains.speaker_name;
   if (!d?.confirmed || storageFault(d)) return;
   const input = $("speaker-name").value;
-  // Returning to the confirmed name cancels a draft, except during a save:
-  // a newer edit must survive that save's response.
-  if (input === d.confirmed.value.name && !d.operation) {
+  // A queued or active save must preserve a newer edit returning to the
+  // currently confirmed name, even when that save later changes it.
+  if (input === d.confirmed.value.name && !d.operation && !d.retryEdits) {
     cancelTimer(d.edits.get("name"));
     d.edits.delete("name");
   } else editField("speaker_name", "name", input);
@@ -1720,12 +1748,8 @@ $("speaker-name").addEventListener("input", () => {
 $("speaker-name-form").addEventListener("submit", (event) => {
   event.preventDefault();
   if ($("save-speaker-name").disabled) return;
-  const name = normalizedName($("speaker-name").value);
-  if (name === null) {
-    $("speaker-name").setCustomValidity("Use up to 32 characters without control characters.");
-    $("speaker-name").reportValidity();
-    return;
-  }
+  const name = validatedName();
+  if (name === null) return;
   enqueue("speaker_name", { name });
 });
 $("time-format").addEventListener("change", () =>
@@ -1748,7 +1772,7 @@ for (const id of ["stop", "settings-stop"]) $(id).addEventListener("click", stop
 $("reconnect").addEventListener("click", async () => {
   if (await refresh()) {
     for (const key of Object.keys(domains))
-      if (domains[key].blocked === "uncertain") await resolve(key, false);
+      if (domains[key].blocked === "uncertain") await resolve(key, "check");
   }
   if (!timezonesReady) await loadTimezones();
 });
@@ -1757,7 +1781,7 @@ $("refresh").addEventListener("click", async () => {
   if (!timezonesReady) await loadTimezones();
 });
 addEventListener("beforeunload", (e) => {
-  if (draftDirty || domains.speaker_name?.edits.size) {
+  if (draftDirty || domains.speaker_name?.edits.size || domains.speaker_name?.retryEdits) {
     e.preventDefault();
     e.returnValue = "";
   }
