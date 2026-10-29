@@ -73,3 +73,44 @@ cover unreleased conflicts, normalization and validation, edits during readback,
 queued and active saves, failed/stale readback, storage faults, duplicate-write
 prevention, repeated conflicts, uncertain saves and saved-value recovery.
 No physical validation or runtime memory measurement was added by this correction.
+
+## Queued Save name correction
+
+An ordinary **Save name** submission could wait behind another preference write.
+Typing again during that wait replaced the approved edit, so the submitted name
+was never sent. Both ordinary saves and conflict retries now keep a separate
+snapshot of the validated name and edit version. Later typing remains an unsaved
+draft, including when it returns to the previously saved name. The name field
+stays editable while another name submission waits for completion or recovery.
+API requests, durable storage and network identity are unchanged.
+
+Fresh matched builds compare reviewed PR head
+`57721bf38e3a1f8211a5e0767877ad4e6466b324` with this correction, using the same
+source location, pinned environment, per-board configuration and development
+commit identity. Generated sdkconfig bytes and dependency locks match for every
+pair, and all three existing capacity checks passed.
+
+| Production profile | Before correction OTA bytes | Corrected OTA bytes | Delta | Budget remaining | Slot free |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| AtomS3R + Voice Pyramid | 1,406,416 | 1,406,464 | +48 | 166,400 | 690,688 |
+| Waveshare V2 | 1,410,240 | 1,410,288 | +48 | 162,576 | 686,864 |
+| Waveshare AUDIO-Board | 1,374,160 | 1,374,208 | +48 | 198,656 | 722,944 |
+
+Static RAM is unchanged in every pair. The application budget, both OTA slots
+and separate shared audio storage are retained. These are compile-only builds
+using synthetic audio fixtures; they must not be installed or played.
+
+All 25 UBSan host tests, 176 pinned Python tests and 58 focused Chromium/WebKit
+naming cases passed without skips. Twelve new browser cases cover queued normal
+saves with normalization, clearing, later edits returning to the saved name,
+concurrent renames, lost responses and unavailable readback. They assert the
+captured submission is sent exactly once and newer input needs an explicit save
+or recovery choice. The Python suite passed after correcting the initial test
+environment's audio-validator and adapter paths; no product change was needed.
+The complete device UI and phone-setup regression also passed all 622
+Chromium/WebKit cases without skips. JavaScript syntax, whitespace and changed
+documentation link-target checks passed.
+
+No hardware was accessed or flashed. Physical restart/update retention and
+runtime heap, fragmentation and PSRAM remain unmeasured; these checks do not
+establish release qualification.

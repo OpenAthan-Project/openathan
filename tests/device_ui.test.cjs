@@ -204,6 +204,58 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    assert.equal(await page.title(),'OpenAthan · Device settings');assert.equal(await page.locator('#speaker-heading').textContent(),'OpenAthan');
   }finally{await o.close();}
  });
+ for(const [submitted,later] of [['  Living room  ','Guest room'],['Living room','Bedroom'],['  ','Guest room']])test(`${browserName}: speaker name queued Save captures ${JSON.stringify(submitted)} before later ${JSON.stringify(later)} input`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await settings(page);
+   await page.route('**/api/time-format',async route=>{if(route.request().method()==='POST'){started.resolve();await gate.promise;}await route.continue();});
+   await page.locator('#time-format').selectOption('12');await requestStarted(started);
+   await page.locator('#speaker-name').fill(submitted);await page.locator('#save-speaker-name').click();
+   await page.locator('#speaker-name').fill(later);
+   assert.ok(await page.locator('#speaker-name').isEnabled());assert.ok(await page.locator('#save-speaker-name').isDisabled());
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,0);
+   gate.resolve();
+   await page.waitForFunction(name=>document.querySelector('#speaker-heading').textContent===(name||'OpenAthan'),submitted.trim());await requestsFinished(page);
+   const posts=f.state.posts.filter(p=>p.url==='/api/speaker-name');assert.equal(posts.length,1);
+   assert.deepEqual(posts[0].payload,{schema:1,expected_revision:1,name:submitted.trim()});
+   assert.equal(f.state.device.speaker_name.name,submitted.trim());assert.equal(await page.locator('#speaker-name').inputValue(),later);
+   assert.match(await page.locator('#name-feedback').textContent(),/Unsaved/);
+   await page.locator('#save-speaker-name').click();await saved(page,'name');
+   assert.equal(f.state.device.speaker_name.name,later);assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,2);
+  }finally{gate.resolve();await o.close();}
+ });
+ for(const outcome of ['conflict','lost response','unavailable readback'])test(`${browserName}: speaker name queued Save preserves later input after ${outcome}`,async()=>{
+  const f=await fixture();withName(f,'Bedroom');const o=await open(f,browserName),{page}=o,gate=deferred(),started=deferred();
+  try{
+   await settings(page);
+   await page.route('**/api/time-format',async route=>{if(route.request().method()==='POST'){started.resolve();await gate.promise;}await route.continue();});
+   await page.locator('#time-format').selectOption('12');await requestStarted(started);
+   await page.locator('#speaker-name').fill('Living room');await page.locator('#save-speaker-name').click();
+   await page.locator('#speaker-name').fill('Guest room');
+   if(outcome==='conflict'){f.state.device.speaker_name.name='Upstairs';f.state.device.speaker_name.revision++;}
+   else{f.state.nameDrop=true;f.state.nameFailRead=outcome==='unavailable readback';}
+   gate.resolve();
+   if(outcome==='lost response')await page.waitForFunction(()=>document.querySelector('#speaker-heading').textContent==='Living room');
+   else await page.waitForFunction(outcome=>document.querySelector('#name-feedback').textContent.includes(outcome==='conflict'?'another client':'before another write'),outcome);
+   await requestsFinished(page);
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+   assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');
+   if(outcome==='unavailable readback'){
+    f.state.nameFailRead=false;await page.locator('#name-recovery button',{hasText:'Check saved state'}).click();
+    await page.waitForFunction(()=>document.querySelector('#name-feedback').textContent.includes('choose which values'));await requestsFinished(page);
+    assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,1);
+    assert.equal(await page.locator('#speaker-name').inputValue(),'Guest room');
+   }
+   if(outcome==='lost response'){
+    assert.match(await page.locator('#name-feedback').textContent(),/Unsaved/);await page.locator('#save-speaker-name').click();
+   }else{
+    assert.ok(await page.locator('#save-speaker-name').isDisabled());
+    await page.locator('#name-recovery button',{hasText:'Retry with my edits'}).click();
+   }
+   await saved(page,'name');assert.equal(f.state.device.speaker_name.name,'Guest room');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/speaker-name').length,2);
+  }finally{gate.resolve();await o.close();}
+ });
  test(`${browserName}: speaker name during setup never activates prayer settings`,async()=>{
   const f=await fixture();withName(f);f.state.device.setup='incomplete';const o=await open(f,browserName),{page}=o;
   try{

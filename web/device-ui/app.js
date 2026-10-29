@@ -127,7 +127,7 @@ function releasedEdits(d) {
   return new Map([...d.edits].filter(([, edit]) => edit.ready));
 }
 function hasQueuedWork(d) {
-  return !!d.retryEdits || !!d.review || releasedEdits(d).size > 0;
+  return !!d.pendingEdits || !!d.review || releasedEdits(d).size > 0;
 }
 function groupsFor(d, review = d.review) {
   return [...specs[d.key].groups, ...(review ? ["prayer"] : [])];
@@ -289,7 +289,7 @@ function acceptDomain(key, data, order) {
       order: 0,
       application: null,
       edits: new Map(),
-      retryEdits: null,
+      pendingEdits: null,
       review: null,
       operation: null,
       blocked: null
@@ -546,7 +546,7 @@ function renderPreferences() {
   $("speaker-name-group").hidden = !snapshot?.speaker_name || (firstRun && setupStep !== 0);
   $("speaker-name").disabled = !name || storageFault(domains.speaker_name);
   $("save-speaker-name").disabled = !name || !domains.speaker_name?.edits.size ||
-    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !!domains.speaker_name?.retryEdits ||
+    !!domains.speaker_name?.blocked || !!domains.speaker_name?.operation || !!domains.speaker_name?.pendingEdits ||
     !connected || storageFault(domains.speaker_name);
   $("time-format").value = current("time_format")?.hours ?? "";
   for (const [key, d] of Object.entries(domains)) {
@@ -555,7 +555,7 @@ function renderPreferences() {
       (key === "settings" && settingsFault());
     if (
       (fault && key !== "settings") ||
-      (!d.operation && !d.blocked && !d.edits.size && !d.retryEdits && !(key === "settings" && settingsFault()))
+      (!d.operation && !d.blocked && !d.edits.size && !d.pendingEdits && !(key === "settings" && settingsFault()))
     )
       notify(key, ...savedMessage(key));
     else if (!fault && !d.operation && !d.blocked)
@@ -1282,9 +1282,9 @@ function canSaveDomain(key) {
 async function saveDomain(key) {
   const d = domains[key],
     before = clone(d.confirmed),
-    edits = d.retryEdits || captureEdits(d, releasedEdits(d)),
+    edits = d.pendingEdits || captureEdits(d, releasedEdits(d)),
     review = d.review;
-  d.retryEdits = null;
+  d.pendingEdits = null;
   const patch = merge(review?.patch || {}, editPatch(edits));
   const operation = { kind: "save", before, edits, review, candidate: merge(before.value, patch) };
   if (review) review.sent = true;
@@ -1372,7 +1372,7 @@ async function resolve(key, action) {
   // Keep its version and value separate from edits made during readback or queuing.
   let nameRetry;
   if (key === "speaker_name") {
-    d.retryEdits = null;
+    d.pendingEdits = null;
     if (action === "retry" && d.edits.has("name")) {
       const name = validatedName();
       if (name === null) return;
@@ -1441,7 +1441,7 @@ async function resolve(key, action) {
             );
         }
       } else if (nameRetry) {
-        d.retryEdits = nameRetry;
+        d.pendingEdits = nameRetry;
       } else if (review) {
         if (d.review === review) d.review = null;
         invalidatePreview();
@@ -1739,7 +1739,7 @@ $("speaker-name").addEventListener("input", () => {
   const input = $("speaker-name").value;
   // A queued or active save must preserve a newer edit returning to the
   // currently confirmed name, even when that save later changes it.
-  if (input === d.confirmed.value.name && !d.operation && !d.retryEdits) {
+  if (input === d.confirmed.value.name && !d.operation && !d.pendingEdits) {
     cancelTimer(d.edits.get("name"));
     d.edits.delete("name");
   } else editField("speaker_name", "name", input);
@@ -1750,7 +1750,11 @@ $("speaker-name-form").addEventListener("submit", (event) => {
   if ($("save-speaker-name").disabled) return;
   const name = validatedName();
   if (name === null) return;
-  enqueue("speaker_name", { name });
+  const d = domains.speaker_name;
+  editField("speaker_name", "name", name, true);
+  // Capture approval now, even if another preference is still being written.
+  d.pendingEdits = captureEdits(d);
+  queueSave("speaker_name");
 });
 $("time-format").addEventListener("change", () =>
   enqueue("time_format", { hours: Number($("time-format").value) })
@@ -1781,7 +1785,7 @@ $("refresh").addEventListener("click", async () => {
   if (!timezonesReady) await loadTimezones();
 });
 addEventListener("beforeunload", (e) => {
-  if (draftDirty || domains.speaker_name?.edits.size || domains.speaker_name?.retryEdits) {
+  if (draftDirty || domains.speaker_name?.edits.size || domains.speaker_name?.pendingEdits) {
     e.preventDefault();
     e.returnValue = "";
   }

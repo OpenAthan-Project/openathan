@@ -75,9 +75,14 @@ OpenAthan heading; multiple speakers may share a name.
 
 The name field appears during the first setup step and in Settings afterward.
 Choose **Save name** to persist it independently of prayer setup. It does not
-activate setup or affect the timetable. Ordinary preference autosaving does not
-save a name draft. Polls and view changes keep edits; leaving with unsaved name
-edits prompts a browser warning. The heading changes only after confirmed storage.
+activate setup or affect the timetable. The validated name is captured at the
+click, including when another preference write delays its submission. The field
+stays editable while the save is queued or active; later typing remains an
+unsaved draft requiring another explicit save. Additional name submissions wait
+until the current save completes or requires recovery. Ordinary preference
+autosaving does not save a name draft. Polls and view changes keep edits; leaving
+with unsaved name edits prompts a browser warning. The heading changes only after
+confirmed storage.
 Names support up to 32 Unicode code points and 128 UTF-8 bytes, including Arabic
 and emoji. Surrounding ASCII whitespace is trimmed; control characters, invalid
 UTF-8 and overlength names are rejected rather than truncated.
