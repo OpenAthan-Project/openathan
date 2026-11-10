@@ -266,6 +266,32 @@ settings revision, record/audio comparisons, each pass/fail/pending result, phys
 power cuts, listener observations and recovery used. No physical result is implied
 by this runbook or by successful builds.
 
+## Speaker discovery
+
+Use two spare speakers with discovery-capable firmware and one older official
+speaker on a test Wi-Fi network. Follow the attended update and preservation
+runbooks for the hardware involved. Compile-only audio fixtures must never be
+installed. The isolated `openathan-test-*` firmware does not advertise the
+production finder address.
+
+- On iPhone Safari and Android Chrome, open `http://openathan.local/` with the
+  WAN disconnected. Check a screenless speaker, duplicate saved names, an
+  unnamed speaker, and the older speaker's short ID. Rename and clear a name,
+  refresh after the next discovery round, and open each speaker's settings.
+- Verify the shared host serves the directory and its stylesheet. Verify the
+  settings and provisioning routes reject requests on that host and that the
+  individual settings pages still require their device passwords.
+- Test simultaneous startup, an unrelated responder already using the name,
+  router restart with changed DHCP addresses, and reunion after two groups each
+  picked an owner. Load the page on both phones before unplugging its owner.
+  Require the same address to work within two minutes without clearing caches
+  or changing Wi-Fi settings.
+- Record the minimum free heap, largest available internal block and worker
+  stack headroom during discovery, playback and normal settings use. Verify
+  scheduled playback and control responsiveness with and without the finder.
+  Record phone OS and browser versions, board builds and pass/fail evidence
+  before adding a public website link.
+
 ## Test-only USB contract
 
 The existing `OATHAN` v1 framing is unchanged. Production rejects both commands:

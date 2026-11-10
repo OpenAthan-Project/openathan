@@ -11,6 +11,11 @@ add_library(openathan_core STATIC lib/openathan-core/src/prayer_calculator.cpp
   lib/openathan-core/src/scheduler.cpp lib/openathan-core/src/scheduler_state.cpp
   lib/openathan-core/src/settings.cpp lib/openathan-core/src/lights.cpp lib/openathan-core/src/speaker_name.cpp lib/openathan-core/src/time_format.cpp lib/openathan-core/src/display.cpp lib/openathan-core/src/dua.cpp ${ADHAN_SOURCES})
 target_include_directories(openathan_core PUBLIC lib/openathan-core/include third_party/adhan-cpp/include)
+add_executable(speaker_finder_tests tests/speaker_finder_tests.cpp
+  firmware/esphome/components/openathan_device/speaker_finder.cpp)
+target_include_directories(speaker_finder_tests PRIVATE firmware/esphome/components/openathan_device)
+target_link_libraries(speaker_finder_tests PRIVATE openathan_core)
+add_test(NAME speaker_finder COMMAND speaker_finder_tests)
 add_executable(prayer_tests tests/prayer_tests.cpp)
 target_link_libraries(prayer_tests PRIVATE openathan_core)
 add_test(NAME prayer_reference COMMAND prayer_tests)

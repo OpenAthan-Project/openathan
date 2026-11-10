@@ -20,6 +20,7 @@
 #include "upgrade.h"
 #include "quran.h"
 #include "phone_setup.h"
+#include "speaker_discovery.h"
 
 namespace esphome::openathan_device {
 struct Asset {
@@ -54,7 +55,7 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
     zone_count_ = count;
   }
   void set_asset(unsigned index, const uint8_t* value, size_t count, const char* type) {
-    if (index < 6) assets_[index] = {value, count, type};
+    if (index < sizeof(assets_) / sizeof(assets_[0])) assets_[index] = {value, count, type};
   }
   void set_sender(std::function<void(const std::vector<uint8_t>&)> sender) { sender_ = std::move(sender); }
   float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
@@ -115,7 +116,15 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   unsigned auth_attempts_{};
   const ZoneEntry* zones_{};
   size_t zone_count_{};
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  Asset assets_[7];
+  SpeakerDiscovery discovery_;
+  uint64_t discovery_update_at_{};
+  std::string discovery_ip_() const;
+  void serve_discovery_(HttpExchange &request);
+#else
   Asset assets_[6];
+#endif
   std::unique_ptr<LocalApi> api_;
   Upgrade upgrade_;
   Quran quran_;

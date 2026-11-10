@@ -149,10 +149,13 @@ credential storage and no saved home Wi-Fi. It never follows an ordinary network
 outage. The optional display presents setup instructions; the scheduler does not
 depend on the display or on the public website. See [phone setup](phone-setup.md).
 
-An optional persisted speaker name identifies the local browser page and tab;
-it is independent of the hostname, activation, prayer settings and optional
-physical display. See the [device UI guide](../../web/device-ui/README.md#speaker-name)
-and [matched build report](speaker-naming-validation-2026-10-28.md).
+An optional persisted speaker name identifies the local browser page and tab.
+Official firmware with [speaker discovery](../../firmware/esphome/provisioning/README.md#find-a-configured-speaker)
+also advertises that name on the home network. Discovery runs in the product
+networking layer. One speaker hosts a read-only list at `openathan.local`, and
+each speaker's settings stay on its unique, password-protected address. See the
+[device UI guide](../../web/device-ui/README.md#speaker-name) and
+[matched build report](speaker-naming-validation-2026-10-28.md).
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 

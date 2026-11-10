@@ -11,6 +11,7 @@
 #include "esphome/components/wifi/scan_list.h"
 #include "esphome/core/application.h"
 #include "esphome/core/helpers.h"
+#include "speaker_finder.h"
 #include "test_maintenance.h"
 
 namespace esphome::openathan_device {
@@ -358,6 +359,13 @@ void Device::loop() {
   quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || dua_.active() || upgrade_.streaming_blocked());
   const auto now = now_ms();
   phone_loop_(now);
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  if (now >= discovery_update_at_) {
+    discovery_update_at_ = now + 250;
+    const auto &saved = athan_->speaker_name_preferences().saved();
+    discovery_.update(hostname_, discovery_ip_(), saved ? std::string_view(saved->name) : std::string_view{});
+  }
+#endif
   if (wifi_attempt_.active()) {
     auto* wifi = wifi::global_wifi_component;
     char ssid[wifi::SSID_BUFFER_SIZE];
@@ -483,7 +491,47 @@ esp_err_t Device::http_handler_(httpd_req_t* raw) {
 bool Device::valid_host_(const std::string& host) const {
   return host == hostname_ || host == hostname_ + ":80" || host == ip_() || host == ip_() + ":80";
 }
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+std::string Device::discovery_ip_() const {
+  if (!server_ || !auth_.available() || wifi_record_ != ::openathan::LoadResult::LOADED ||
+      maintenance_ || phone_setup_active() || wifi_attempt_.active() || !upgrade_.confirmed()) return {};
+  return ipv4_address();
+}
+
+void Device::serve_discovery_(HttpExchange &request) {
+  if (request.method != "GET" ||
+      (!request.origin.empty() && request.origin != "http://" + request.host)) {
+    error(request, 403, "Open the finder in your browser");
+    return;
+  }
+  if (request.uri != "/" && request.uri != "/finder.css") {
+    error(request, 404, "Open a speaker's own address for settings");
+    return;
+  }
+  const auto ip = discovery_ip_();
+  auto directory = request.local_ip == ip ? discovery_.directory(ip) : std::string{};
+  if (directory.empty()) {
+    error(request, 503, "Finder is starting or has moved to another speaker. Refresh to try again.");
+    return;
+  }
+  if (request.uri == "/finder.css") {
+    const auto &style = assets_[6];
+    request.type = style.type;
+    request.gzip = true;
+    request.response.assign(reinterpret_cast<const char *>(style.data), style.size);
+  } else {
+    request.type = "text/html; charset=utf-8";
+    request.response = std::move(directory);
+  }
+}
+#endif
 void Device::handle_http_(HttpExchange& request) {
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  if (request.host == speaker_finder::host || request.host == "openathan.local:80") {
+    serve_discovery_(request);
+    return;
+  }
+#endif
   if (maintenance_) {
     error(request, 503, "Test maintenance requires a physical restart");
     return;

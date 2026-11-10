@@ -64,6 +64,10 @@ def timezone_entries():
 
 async def to_code(config):
     cg.add_define("OPENATHAN_QURAN")
+    node = CORE.config["esphome"]
+    discovery = node["name"] == "openathan" and node["name_add_mac_suffix"]
+    if discovery:
+        cg.add_define("USE_OPENATHAN_SPEAKER_DISCOVERY")
     # Compile SoftAP support without a configured fallback AP. Runtime product
     # policy opens it only for an unconfigured, healthy first-run device.
     cg.add_define("USE_WIFI_AP")
@@ -120,12 +124,15 @@ async def to_code(config):
     cg.add_global(cg.RawStatement("static const esphome::openathan_device::ZoneEntry OA_ZONES[] = {\n"+table+"\n};"))
     cg.add(var.set_zones(cg.RawExpression("OA_ZONES"), len(entries)))
     root = root / "web/device-ui"
-    for index, (name, mime) in enumerate((("index.html", "text/html; charset=utf-8"),
-                                         ("app.js", "text/javascript; charset=utf-8"),
-                                         ("style.css", "text/css; charset=utf-8"),
-                                         ("setup/index.html", "text/html; charset=utf-8"),
-                                         ("setup/style.css", "text/css; charset=utf-8"),
-                                         ("setup/app.js", "text/javascript; charset=utf-8"))):
+    assets = [("index.html", "text/html; charset=utf-8"),
+              ("app.js", "text/javascript; charset=utf-8"),
+              ("style.css", "text/css; charset=utf-8"),
+              ("setup/index.html", "text/html; charset=utf-8"),
+              ("setup/style.css", "text/css; charset=utf-8"),
+              ("setup/app.js", "text/javascript; charset=utf-8")]
+    if discovery:
+        assets.append(("finder.css", "text/css; charset=utf-8"))
+    for index, (name, mime) in enumerate(assets):
         data = gzip.compress((root / name).read_bytes(), mtime=0)
         symbol = f"OA_ASSET_{index}"
         cg.add_global(cg.RawStatement(f"static const uint8_t {symbol}[] = {{"+",".join(map(str,data))+"};"))

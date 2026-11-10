@@ -32,6 +32,9 @@ with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary
                   "void Device::on_wifi_connect_state(StringRef ssid, std::span<const uint8_t, 6>)",
                   "void Device::loop()", "bool Device::valid_host_(const std::string& host) const", "void Device::handle_http_(HttpExchange& request)")
     bodies = [function(device, s) for s in signatures]
+    finder = ("std::string Device::discovery_ip_() const", "void Device::serve_discovery_(HttpExchange &request)")
+    bodies += ["#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY\n" +
+               "\n".join(function(device, s) for s in finder) + "#endif\n"]
     bodies += [function(network, s) for s in ("bool Device::phone_eligible_() const", "bool Device::phone_setup_active() const", "void Device::phone_loop_(uint64_t now)")]
     (directory / "phone_device_methods.inc").write_text("\n".join(bodies))
     # Same test-only compilation seam as check_upgrade_runtime.py: the
@@ -48,6 +51,8 @@ with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary
                    "-I" + str(ROOT / "lib/openathan-core/include"), "-I" + include]
         if isolated:
             command.append("-DOPENATHAN_PROVISIONING_TEST_STORAGE")
+        else:
+            command.append("-DUSE_OPENATHAN_SPEAKER_DISCOVERY")
         command += [str(ROOT / "tests/phone_setup_backend_tests.cpp"), str(DEVICE / "credential_store.cpp"),
                     str(DEVICE / "protocol.cpp"), str(DEVICE / "digest.cpp"), str(DEVICE / "test_maintenance.cpp")]
         if os.uname().sysname != "Darwin":
