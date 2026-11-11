@@ -2,8 +2,8 @@
 
 [v0.9.0](../releases/v0.9.0.md) is the published stable release for Atom,
 Waveshare Box V2 and Waveshare AUDIO-Board. The
-[v0.10.0 preparation](v0.10.0-preparation-2026-11-10.md) records the speaker-finder
-candidate and its remaining qualification checks. The
+[v0.10.0 preparation](v0.10.0-preparation-2026-11-10.md) records the speaker names,
+finder and Quran UI candidate, merged-main builds and remaining qualification checks. The
 [v0.9.0 preparation](v0.9.0-preparation-2026-10-27.md) retains its build evidence.
 The [v0.8.0 preparation](v0.8.0-preparation-2026-10-20.md)
 records the source, candidate validation and remaining qualification limits. The
