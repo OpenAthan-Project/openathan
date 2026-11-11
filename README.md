@@ -69,9 +69,12 @@ screens, lights and other peripherals are optional to OpenAthan's reusable core.
 Choose one build. These links go to the manufacturers' stores; confirm the exact
 model and revision with the seller before ordering.
 
-- **M5Stack build — buy both modules:** [AtomS3R C126](https://shop.m5stack.com/products/atoms3r-dev-kit)
-  and [Voice Pyramid A167](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom).
+- **M5Stack build — buy both modules:** [AtomS3R C126 (affiliate)](https://shop.m5stack.com/products/atoms3r-dev-kit?ref=dagcclbm)
+  and [Voice Pyramid A167 (affiliate)](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom?ref=dagcclbm).
   Confirm the Atom's **GC9107 display**; the C126 SKU alone does not guarantee it.
+  OpenAthan is a participant in the GoAffPro Affiliate Program for M5Stack. We may
+  earn advertising fees from qualifying purchases through these links. These
+  commissions support OpenAthan.
 - **Waveshare build:** [ESP32-S3-Touch-LCD-1.85C store listing](https://www.waveshare.com/product/esp32-s3-touch-lcd-1.85c.htm).
   Select the **speaker-box** option and confirm **V2**. The bare board and V1 are
   not the supported speaker build.
@@ -79,8 +82,8 @@ model and revision with the seller before ordering.
   Confirm the physical board revision and included speaker. USB-powered use does
   not require a battery. See the [v0.9.0 release and validation limits](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.9.0).
 
-These are ordinary store links. OpenAthan does not currently earn commissions
-through them. For regional sellers, see the [parts and purchase links](hardware/reference-builds/voice-pyramid/bom.md#procurement-notes)
+Waveshare and regional retailer links are ordinary links. For regional sellers,
+see the [parts and purchase links](hardware/reference-builds/voice-pyramid/bom.md#procurement-notes)
 or the manufacturers' [M5Stack distributor directory](https://m5stack.com/distributor)
 and [Waveshare distributor directory](https://www.waveshare.com/distributors).
 Prices, shipping and availability depend on the seller.

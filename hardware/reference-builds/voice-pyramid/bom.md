@@ -37,10 +37,14 @@ A second Atom/audio base may be useful to contributors for firmware experimentat
 
 Official-store purchase links (both modules are required):
 
-- [AtomS3R C126](https://shop.m5stack.com/products/atoms3r-dev-kit) — confirm the
+- [AtomS3R C126 (affiliate)](https://shop.m5stack.com/products/atoms3r-dev-kit?ref=dagcclbm) — confirm the
   **GC9107 display revision** with the seller; C126 alone does not guarantee it.
-- [Voice Pyramid A167](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom) —
+- [Voice Pyramid A167 (affiliate)](https://shop.m5stack.com/products/echo-pyramid-smart-speaker-base-without-m5atom?ref=dagcclbm) —
   the base is sold without the Atom controller.
+
+OpenAthan is a participant in the GoAffPro Affiliate Program for M5Stack. We may
+earn advertising fees from qualifying purchases through these two links. These
+commissions support OpenAthan.
 
 These purchase links are separate from the technical references above. You may
 also use a regional distributor supplying the exact supported model and revision.
@@ -58,6 +62,5 @@ guarantee about the hardware revision or current stock.
 | TinyTronics | Netherlands | [Atom](https://www.tinytronics.nl/en/development-boards/microcontroller-boards/with-wi-fi/m5stack-atoms3r-esp32-s3-pico-development-board-0.85-inch-display) | [Pyramid](https://www.tinytronics.nl/en/platforms-and-systems/m5stack/atom/m5stack-atomic-voice-pyramid-base) |
 
 More sellers appear in [M5Stack's distributor directory](https://m5stack.com/distributor).
-All purchase URLs above are ordinary links. OpenAthan does not currently earn
-commissions through them. Maintainers can find the dated
+The regional retailer links are ordinary links. Maintainers can find the dated
 [vendor and referral-program review](../../../docs/development/hardware-vendors.md).
