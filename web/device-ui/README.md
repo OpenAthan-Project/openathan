@@ -53,7 +53,7 @@ their queued saves. Older responses cannot restore them; edits remain available
 if the capability returns. Unsupported defaults are never confirmed preferences.
 
 Volume, enabled prayers, screen/light preferences and time format save automatically.
-Both volume controls edit the same value: later input in either view cancels an
+All three volume controls edit the same value: later input in another view cancels an
 older keyboard timer. Sliders display input immediately, save on release and
 coalesce keyboard changes for 350 ms. Idle focused sliders follow confirmed values;
 an ongoing drag retains its edited value. Feedback and recovery stay beside the
@@ -243,9 +243,19 @@ credential-recovery tool, with a separately gated preserving USB updater for
 capable firmware. While a USB request is active, the local Updates group displays
 transfer, interruption or owner power-handoff status and hides network cancellation;
 firmware rejects competing mutations. See the [USB protocol](../../docs/development/usb-firmware-updates.md).
-The development Quran view loads MP3Quran's live reciters with search and paging,
+The Quran view loads MP3Quran's live reciters once on first entry, with search and paging,
 then recording editions and available surahs. Catalog and playback feedback stay
-independent. Browser storage remembers selections; Play and Stop do not change
+independent. Failed loads offer an explicit retry; returning to the view does not
+repeat requests. Dependent selection controls appear when their recording data is
+available. Refresh and paging remain secondary browsing actions.
+The current recording, Stop and shared speaker volume lead the view. Active
+playback controls stay sticky while browsing when enough space remains for the
+selector; short viewports and enlarged content retain normal scrolling. Focused
+selection fields account for the sticky player's height. Desktop places playback
+beside the selector. Recording identity follows observed playback identifiers,
+not the edited next selection. Known reciter names are retained for the browser
+session; unresolved names are not inferred. Play explains when it replaces an
+active recording. Browser storage remembers selections; Play and Stop do not change
 prayer settings. One surah plays on the speaker even after the page closes;
 Athan interrupts without automatic resume. Play carries the current device playback
 token, so a delayed request cannot restart audio after Stop or reboot. An uncertain

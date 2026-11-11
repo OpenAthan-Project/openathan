@@ -76,20 +76,30 @@
 <p class="device-help"><button id="refresh" type="button">Refresh status</button><br>Keep your phone on the same network as your speaker. Wi-Fi or password changed? Connect by USB to recover access.</p></section>
 <section id="quran-view" hidden aria-labelledby="quran-heading">
   <h2 id="quran-heading">Listen to Quran</h2>
-  <p class="hint">Choose a reciter and one surah. Athan takes priority; press Play again afterward.</p>
-  <section class="setting-group" aria-label="Quran selection">
-    <div class="actions"><button id="quran-load" type="button">Load reciters</button></div>
+  <p class="hint">One surah at a time. Athan takes priority.</p>
+  <div class="quran-layout">
+  <section id="quran-player" class="quran-player" aria-label="Speaker playback">
+    <div class="quran-player-heading"><div><h3 id="quran-playing-title">Speaker playback</h3><p id="quran-playing-reciter" class="hint" hidden></p></div><button id="quran-stop" class="primary" type="button" hidden>Stop playback</button></div>
+    <p id="quran-feedback" class="feedback" role="status" hidden></p>
+    <div class="quran-volume"><label for="quran-volume" class="range-label">Speaker volume <output id="quran-volume-value" for="quran-volume">—</output></label><input id="quran-volume" type="range" min="0" max="100" disabled aria-describedby="quran-volume-feedback"><p id="quran-volume-feedback" class="feedback" role="status">Reading saved preferences…</p><div id="quran-volume-recovery" class="actions" hidden></div></div>
+  </section>
+  <section class="quran-selection" aria-labelledby="quran-selection-heading">
+    <h3 id="quran-selection-heading">Choose a recording</h3>
+    <div id="quran-selector-fields" hidden>
     <label for="quran-search">Search reciters<input id="quran-search" type="search" maxlength="128" disabled autocomplete="off"></label>
     <label for="quran-reciter">Reciter<select id="quran-reciter" disabled><option value="">Choose a reciter</option></select></label>
     <button id="quran-more" type="button" hidden>Load more reciters</button>
-    <p id="quran-count" class="hint"></p>
-    <label id="quran-edition-label" for="quran-edition" hidden>Recording edition<select id="quran-edition" disabled></select></label>
+    <label id="quran-edition-label" for="quran-edition" hidden>Recording edition<select id="quran-edition" disabled aria-describedby="quran-edition-help"></select></label><p id="quran-edition-help" class="hint" hidden>This reciter offers more than one recording.</p>
+    <div id="quran-surah-fields" hidden>
     <label for="quran-surah">Surah<select id="quran-surah" disabled><option value="">Choose a surah</option></select></label>
-    <div class="actions"><button id="quran-play" class="primary" type="button" disabled>Play on speaker</button><button id="quran-stop" type="button" hidden>Stop playback</button></div>
-    <p id="quran-catalog-feedback" class="feedback" role="status">Load the catalog to choose a recording.</p>
-    <p id="quran-feedback" class="feedback" role="status" hidden></p>
+    <div class="actions"><button id="quran-play" class="primary" type="button" disabled>Play on speaker</button></div>
+    <p id="quran-replacement" class="hint" hidden>This replaces the current recording.</p>
+    </div></div>
+    <div class="quran-catalog-tools"><p id="quran-count" class="hint"></p><button id="quran-load" type="button" hidden>Retry loading reciters</button></div>
+    <p id="quran-catalog-feedback" class="feedback" role="status"></p>
   </section>
-  <p class="hint">Internet is required. Playback continues when you close this page. Audio and catalog provided by <a href="https://www.mp3quran.net/eng" target="_blank" rel="noopener noreferrer">MP3Quran</a>.</p>
+  </div>
+  <div class="quran-note"><p class="hint">Playback continues when you close this page. After Athan, press Play to listen again.</p><p class="hint">Internet required. Audio and catalog by <a href="https://www.mp3quran.net/eng" target="_blank" rel="noopener noreferrer">MP3Quran</a>.</p></div>
 </section>
   </main>
 
