@@ -283,9 +283,14 @@ production finder address.
 - Verify the shared host serves the directory and its stylesheet. Verify the
   settings and provisioning routes reject requests on that host and that the
   individual settings pages still require their device passwords.
-- Test simultaneous startup, an unrelated responder already using the name,
-  router restart with changed DHCP addresses, and reunion after two groups each
-  picked an owner. Load the page on both phones before unplugging its owner.
+- Test simultaneous startup, an unrelated responder already using the name, and
+  router restart with changed DHCP addresses.
+- Let two isolated groups each pick an owner. Load the finder on both phones
+  through the owner that will yield, then reconnect the groups and reload the
+  same tabs. Verify both phones can open the directory and follow speaker links
+  to the password prompt. Capture the surviving owner's multicast cache-flush A
+  response for `openathan.local` after the former owner withdraws.
+- Load the page on both phones before unplugging its owner.
   Require the same address to work within two minutes without clearing caches
   or changing Wi-Fi settings.
 - During an attended OTA update, keep the finder active through the automatic

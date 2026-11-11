@@ -156,6 +156,9 @@ networking layer. One speaker hosts a read-only list at `openathan.local`, and
 each speaker's settings stay on its unique, password-protected address. See the
 [device UI guide](../../web/device-ui/README.md#speaker-name) and
 [matched build report](speaker-naming-validation-2026-10-28.md).
+During ownership handoff, the former host keeps the read-only finder available
+for cached clients while the surviving host refreshes the shared address. See
+the [handoff validation report](speaker-finder-handoff-validation-2026-11-10.md).
 
 The generic ESPHome web UI may be useful during development but is not the intended permanent product interface.
 

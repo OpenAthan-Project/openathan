@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -26,6 +27,7 @@ class SpeakerDiscovery : public Component {
 
   std::mutex mutex_;
   std::string hostname_, ip_, name_, directory_;
+  std::optional<TickType_t> directory_withdrawn_at_;
   TaskHandle_t worker_{};
   std::atomic<bool> stopping_{};
   unsigned network_generation_{};

@@ -25,14 +25,34 @@ constexpr char tcp[] = "_tcp";
 constexpr uint16_t port = 80;
 constexpr unsigned query_timeout_ms = 800;
 constexpr unsigned shutdown_timeout_ms = 1500;
+constexpr auto handoff_settle_ticks = pdMS_TO_TICKS(1100);
+// Espressif's address TTL is 120 seconds. Allow five more seconds for cached clients.
+constexpr auto handoff_grace_ticks = pdMS_TO_TICKS(125000);
 constexpr char tag[] = "openathan.discovery";
 using Results = std::unique_ptr<mdns_result_t, decltype(&mdns_query_results_free)>;
+
+struct Handoff {
+  std::optional<TickType_t> withdrawn_at;
+  unsigned refreshes_left{2};
+};
+
+bool elapsed(TickType_t since, TickType_t duration) {
+  return static_cast<TickType_t>(xTaskGetTickCount() - since) >= duration;
+}
 
 esp_err_t query(const char *host, const char *service, uint16_t type, Results &results) {
   mdns_result_t *raw = nullptr;
   const auto status = mdns_query(host, service, service ? tcp : nullptr, type, query_timeout_ms, 32, &raw);
   results.reset(raw);
   return status;
+}
+
+void refresh_alias() {
+  mdns_result_t *raw = nullptr;
+  // A multicast question elicits a cache-flush answer from the surviving owner.
+  mdns_query_generic(finder::alias, nullptr, nullptr, MDNS_TYPE_A, MDNS_QUERY_MULTICAST,
+                     query_timeout_ms, 32, &raw);
+  mdns_query_results_free(raw);
 }
 
 std::string_view txt(const mdns_result_t &result, std::string_view key) {
@@ -123,6 +143,7 @@ void SpeakerDiscovery::update(std::string_view ip, std::string_view name) {
     ip_ = ip;
     ++network_generation_;
     directory_.clear();
+    directory_withdrawn_at_.reset();
   }
   if (name_changed) name_ = name;
   if (!worker_ && !ip_.empty()) {
@@ -142,13 +163,16 @@ void SpeakerDiscovery::update(std::string_view ip, std::string_view name) {
 
 std::string SpeakerDiscovery::directory(std::string_view ip) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (directory_withdrawn_at_ && elapsed(*directory_withdrawn_at_, handoff_grace_ticks)) return {};
   return !ip.empty() && ip == ip_ ? directory_ : std::string{};
 }
 
 void SpeakerDiscovery::run_() {
   finder::Election election;
+  std::optional<Handoff> handoff;
   bool owner = false;
   bool delegated = false;
+  bool withdrawal_queued = false;
   bool advertised = false;
   bool advertised_owner = false;
   std::string advertised_name;
@@ -164,11 +188,20 @@ void SpeakerDiscovery::run_() {
     }
     if (generation != network_generation) {
       owner = false;
+      handoff.reset();
       election = {};
       generation = network_generation;
       if (!stopping_ && advertised && mdns_service_remove(peer_service, tcp) == ESP_OK) advertised = false;
     }
-    if (!stopping_ && !owner && delegated && mdns_delegate_hostname_remove(finder::alias) == ESP_OK) delegated = false;
+    if (!stopping_ && !owner && delegated) {
+      if (!withdrawal_queued)
+        withdrawal_queued = mdns_delegate_hostname_remove(finder::alias) == ESP_OK;
+      if (withdrawal_queued && !stopping_ && !mdns_hostname_exists(finder::alias)) {
+        delegated = false;
+        withdrawal_queued = false;
+        if (handoff) handoff->withdrawn_at = xTaskGetTickCount();
+      }
+    }
     const auto *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (ip.empty() || !sta) {
       ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(250));
@@ -197,7 +230,7 @@ void SpeakerDiscovery::run_() {
         case finder::Action::WAIT: break;
         case finder::Action::YIELD:
           owner = false;
-          if (!stopping_ && mdns_delegate_hostname_remove(finder::alias) == ESP_OK) delegated = false;
+          handoff.emplace();
           break;
         case finder::Action::CHECK_ALIAS: {
           if (delegated || !alias_available(sta, stopping_)) break;
@@ -206,17 +239,36 @@ void SpeakerDiscovery::run_() {
             if (generation != network_generation_) break;
           }
           owner = claim_alias(hostname_, ip, delegated, stopping_);
+          if (owner) handoff.reset();
           break;
         }
       }
     }
 
     if (stopping_) break;
-    if (owner) discover("_http", sta, false, peers);
-    auto html = owner ? finder::page(peers) : std::string{};
+    if (handoff && handoff->withdrawn_at && elapsed(*handoff->withdrawn_at, handoff_grace_ticks))
+      handoff.reset();
+    if (handoff && handoff->refreshes_left && handoff->withdrawn_at &&
+        elapsed(*handoff->withdrawn_at, handoff_settle_ticks)) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (generation != network_generation_) continue;
+      }
+      if (stopping_) break;
+      --handoff->refreshes_left;
+      refresh_alias();
+    }
+
+    if (stopping_) break;
+    const bool serve = owner || handoff.has_value();
+    if (serve) discover("_http", sta, false, peers);
+    auto html = serve ? finder::page(peers) : std::string{};
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (!stopping_ && generation == network_generation_) directory_ = std::move(html);
+      if (!stopping_ && generation == network_generation_) {
+        directory_ = std::move(html);
+        directory_withdrawn_at_ = handoff ? handoff->withdrawn_at : std::nullopt;
+      }
     }
     // Reconcile ownership promptly after a transition, and jitter later
     // rounds so neighboring speakers do not repeatedly transmit in sync.

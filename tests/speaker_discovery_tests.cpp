@@ -1,8 +1,11 @@
 #include "speaker_discovery_platform.h"
 #include "speaker_discovery.h"
 
+#include <atomic>
 #include <cassert>
 #include <condition_variable>
+#include <cstdio>
+#include <limits>
 #include <mutex>
 #include <string_view>
 #include <thread>
@@ -17,9 +20,12 @@ struct Platform {
   std::mutex mutex;
   std::condition_variable changed;
   std::vector<uint16_t> queries;
-  unsigned sleeps{}, notifications{}, ticks{}, freed{};
+  std::vector<TickType_t> refreshes;
+  std::atomic<TickType_t> ticks{};
+  unsigned sleeps{}, notifications{}, freed{}, withdrawals{};
   uint16_t blocked_query{};
   bool querying{}, release_query{}, stall{}, delegated{}, exited{}, legacy_peer{};
+  bool other_owner{}, defer_withdrawal{}, block_refresh{}, fail_first_refresh{};
 
   void wait_for_sleep(unsigned count) {
     std::unique_lock lock(mutex);
@@ -28,6 +34,14 @@ struct Platform {
   void wait_for_query() {
     std::unique_lock lock(mutex);
     changed.wait(lock, [&] { return querying; });
+  }
+  void next_round(TickType_t elapsed = 0) {
+    std::unique_lock lock(mutex);
+    const auto next_sleep = sleeps + 1;
+    ticks += elapsed;
+    ++notifications;
+    changed.notify_all();
+    changed.wait(lock, [&] { return sleeps >= next_sleep; });
   }
 };
 Platform *platform;
@@ -67,6 +81,123 @@ void single_speaker() {
   assert(!state.worker.joinable());
 }
 
+void reunion_preserves_cached_clients(TickType_t started, bool fail_first_refresh) {
+  Platform state;
+  state.ticks = started;
+  state.fail_first_refresh = fail_first_refresh;
+  platform = &state;
+  SpeakerDiscovery discovery;
+  discovery.setup();
+  discovery.update(ip, "Kitchen");
+  state.wait_for_sleep(1);
+  state.next_round();
+  assert(!discovery.directory(ip).empty());
+  {
+    std::lock_guard lock(state.mutex);
+    state.other_owner = true;
+    state.defer_withdrawal = true;
+  }
+  state.next_round();
+  if (discovery.directory(ip).empty()) {
+    std::fputs("Cached finder client lost its directory as soon as the speaker yielded\n", stderr);
+    std::abort();
+  }
+  state.next_round(2000);
+  assert(state.withdrawals == 1 && state.delegated && state.refreshes.empty());
+  {
+    std::lock_guard lock(state.mutex);
+    state.delegated = false;
+  }
+  state.next_round();
+  const auto withdrawn_at = state.ticks.load();
+  assert(discovery.directory(ip).find("http://openathan-000001.local/") != std::string::npos);
+  state.next_round(1099);
+  assert(state.refreshes.empty());
+  state.next_round(1);
+  state.next_round(3500);
+  state.next_round(3500);
+  assert((state.refreshes == std::vector<TickType_t>{withdrawn_at + 1100, withdrawn_at + 4600}));
+  state.ticks = withdrawn_at + 124999;
+  assert(!discovery.directory(ip).empty());
+  state.ticks = withdrawn_at + 125000;
+  assert(discovery.directory(ip).empty());
+  discovery.on_shutdown();
+  state.worker.join();
+}
+
+enum class CancelHandoff { NETWORK, ADDRESS, REACQUIRE, SHUTDOWN };
+void cancel_handoff(CancelHandoff reason) {
+  Platform state;
+  platform = &state;
+  SpeakerDiscovery discovery;
+  discovery.setup();
+  discovery.update(ip, "Kitchen");
+  state.wait_for_sleep(1);
+  state.next_round();
+  {
+    std::lock_guard lock(state.mutex);
+    state.other_owner = true;
+  }
+  state.next_round();
+  state.next_round();
+  assert(!state.delegated && !discovery.directory(ip).empty() && state.refreshes.empty());
+  if (reason == CancelHandoff::NETWORK || reason == CancelHandoff::ADDRESS) {
+    discovery.update(reason == CancelHandoff::ADDRESS ? "192.168.1.13" : "", "Kitchen");
+    assert(discovery.directory(ip).empty());
+    state.wait_for_sleep(5);
+    state.next_round(2000);
+    assert(discovery.directory(ip).empty());
+  } else if (reason == CancelHandoff::REACQUIRE) {
+    {
+      std::lock_guard lock(state.mutex);
+      state.other_owner = false;
+    }
+    state.next_round();
+    state.next_round();
+    assert(state.delegated && !discovery.directory(ip).empty());
+    state.next_round(125000);
+    assert(!discovery.directory(ip).empty());
+  }
+  discovery.on_shutdown();
+  state.worker.join();
+  assert(state.refreshes.empty() && discovery.directory(ip).empty());
+}
+
+void stop_during_refresh(bool stall) {
+  Platform state;
+  state.stall = stall;
+  platform = &state;
+  SpeakerDiscovery discovery;
+  discovery.setup();
+  discovery.update(ip, "Kitchen");
+  state.wait_for_sleep(1);
+  state.next_round();
+  {
+    std::lock_guard lock(state.mutex);
+    state.other_owner = true;
+    state.block_refresh = true;
+  }
+  state.next_round();
+  state.next_round();
+  state.ticks = 1100;
+  xTaskNotifyGive(&state);
+  state.wait_for_query();
+  const auto queries_before = state.queries.size();
+  const auto freed_before = state.freed;
+  try {
+    discovery.on_shutdown();
+    assert(!stall && state.freed == freed_before + 1);
+  } catch (const Restart &) {
+    assert(stall && state.freed == freed_before);
+    std::lock_guard lock(state.mutex);
+    state.release_query = true;
+    state.changed.notify_all();
+  }
+  state.worker.join();
+  assert(state.exited && state.freed == freed_before + 1 && state.queries.size() == queries_before);
+  assert(state.refreshes.size() == 1 && discovery.directory(ip).empty());
+}
+
 void stop_during_query(uint16_t type, bool stall) {
   Platform state;
   state.blocked_query = type;
@@ -99,7 +230,7 @@ void stop_during_query(uint16_t type, bool stall) {
 }  // namespace
 
 void esphome::arch_restart() { throw Restart{}; }
-unsigned xTaskGetTickCount() { return platform->ticks; }
+TickType_t xTaskGetTickCount() { return platform->ticks; }
 void xTaskCreate(void (*entry)(void *), const char *, unsigned, void *arg, unsigned, TaskHandle_t *task) {
   *task = platform;
   platform->worker = std::thread(entry, arg);
@@ -147,10 +278,32 @@ esp_err_t mdns_query(const char *, const char *service, const char *, uint16_t t
     state.changed.notify_all();
     state.changed.wait(lock, [&] { return state.release_query; });
     *result = new mdns_result_t{};
+  } else if (state.other_owner && service && std::string_view(service) == "_openathan") {
+    static mdns_txt_item_t records[] = {{"v", "1"}, {"owner", "1"}};
+    static unsigned lengths[] = {1, 1};
+    *result = new mdns_result_t{.esp_netif = &sta, .port = 80, .hostname = "openathan-000001", .ttl = 120,
+                               .txt = records, .txt_count = 2, .txt_value_len = lengths};
   } else if (state.legacy_peer && service && std::string_view(service) == "_http") {
     *result = new mdns_result_t{.esp_netif = &sta, .port = 80, .hostname = "openathan-abcdef", .ttl = 120};
   }
   return ESP_OK;
+}
+esp_err_t mdns_query_generic(const char *host, const char *service, const char *proto, uint16_t type,
+                             mdns_query_transmission_type_t transmission, unsigned, size_t, mdns_result_t **result) {
+  auto &state = *platform;
+  std::unique_lock lock(state.mutex);
+  assert(std::string_view(host) == "openathan" && !service && !proto);
+  assert(type == MDNS_TYPE_A && transmission == MDNS_QUERY_MULTICAST && !state.delegated);
+  state.refreshes.push_back(xTaskGetTickCount());
+  if (state.block_refresh) {
+    state.querying = true;
+    state.changed.notify_all();
+    state.changed.wait(lock, [&] { return state.release_query; });
+    *result = new mdns_result_t{};
+  } else {
+    *result = nullptr;
+  }
+  return state.fail_first_refresh && state.refreshes.size() == 1 ? -1 : ESP_OK;
 }
 void mdns_query_results_free(mdns_result_t *result) {
   delete result;
@@ -161,7 +314,11 @@ esp_err_t mdns_delegate_hostname_add(const char *, const mdns_ip_addr_t *) {
   platform->delegated = true;
   return ESP_OK;
 }
-esp_err_t mdns_delegate_hostname_remove(const char *) { return ESP_OK; }
+esp_err_t mdns_delegate_hostname_remove(const char *) {
+  ++platform->withdrawals;
+  if (!platform->defer_withdrawal) platform->delegated = false;
+  return ESP_OK;
+}
 esp_err_t mdns_service_add_for_host(const char *instance, const char *, const char *, const char *,
                                    uint16_t, const mdns_txt_item_t *, unsigned) {
   assert(std::string_view(instance) == esphome::App.get_name());
@@ -179,6 +336,14 @@ esp_err_t mdns_service_txt_set(const char *, const char *, const mdns_txt_item_t
 
 int main() {
   single_speaker();
+  reunion_preserves_cached_clients(0, false);
+  reunion_preserves_cached_clients(std::numeric_limits<TickType_t>::max() - 2000, true);
+  cancel_handoff(CancelHandoff::NETWORK);
+  cancel_handoff(CancelHandoff::ADDRESS);
+  cancel_handoff(CancelHandoff::REACQUIRE);
+  cancel_handoff(CancelHandoff::SHUTDOWN);
+  stop_during_refresh(false);
+  stop_during_refresh(true);
   stop_during_query(MDNS_TYPE_PTR, false);
   stop_during_query(MDNS_TYPE_A, false);
   stop_during_query(MDNS_TYPE_PTR, true);

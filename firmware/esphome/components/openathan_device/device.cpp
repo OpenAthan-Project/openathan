@@ -484,8 +484,12 @@ esp_err_t Device::http_handler_(httpd_req_t* raw) {
   if (!request->challenge.empty()) httpd_resp_set_hdr(raw, "WWW-Authenticate", request->challenge.c_str());
   if (request->gzip) httpd_resp_set_hdr(raw, "Content-Encoding", "gzip");
   if (!request->redirect.empty()) httpd_resp_set_hdr(raw, "Location", request->redirect.c_str());
+  if (request->close_after_send) httpd_resp_set_hdr(raw, "Connection", "close");
   const auto result = httpd_resp_send(raw, request->response.data(), request->response.size());
   request->response_result = result == ESP_OK ? 1 : 2;
+  if (result == ESP_OK && request->close_after_send &&
+      httpd_sess_trigger_close(raw->handle, httpd_req_to_sockfd(raw)) != ESP_OK)
+    return ESP_FAIL;  // ESP-IDF closes the session when the handler returns an error.
   return result;
 }
 bool Device::valid_host_(const std::string& host) const {
@@ -499,6 +503,7 @@ std::string Device::discovery_ip_() const {
 }
 
 void Device::serve_discovery_(HttpExchange &request) {
+  request.close_after_send = true;
   if (request.method != "GET" ||
       (!request.origin.empty() && request.origin != "http://" + request.host)) {
     error(request, 403, "Open the finder in your browser");

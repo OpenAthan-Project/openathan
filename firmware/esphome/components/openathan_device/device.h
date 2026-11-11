@@ -38,6 +38,7 @@ struct HttpExchange : public ApiExchange {
   std::string type{"application/json"}, challenge;
   std::string redirect;
   bool gzip{};
+  bool close_after_send{};
   bool phone_connect{};
   std::atomic<unsigned> response_result{};  // 0 pending, 1 sent, 2 failed.
   // This lock serializes timeout/cancellation with a mutating main-loop action.

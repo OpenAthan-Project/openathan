@@ -24,13 +24,15 @@ def function(source, signature):
 
 with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary:
     directory = Path(temporary)
-    helpers = ("uint64_t now_ms()", "std::string random_nonce()", "void error(HttpExchange& request, int code, const char* message)")
+    helpers = ("uint64_t now_ms()", "std::string random_nonce()", "void error(HttpExchange& request, int code, const char* message)",
+               "std::string header(httpd_req_t* request, const char* name, size_t limit = 2048)", "const char* http_status(int code)")
     (directory / "phone_device_helpers.inc").write_text("\n".join(function(device, s) for s in helpers))
     signatures = ("void Device::restore_wifi_()", "void Device::send_(bool extension, uint8_t type, const std::vector<uint8_t>& data)",
                   "void Device::result_(bool extension, uint8_t command, const std::vector<std::string>& fields)",
                   "uint8_t Device::wifi_state_() const", "void Device::serial_request(const Frame& request)",
                   "void Device::on_wifi_connect_state(StringRef ssid, std::span<const uint8_t, 6>)",
-                  "void Device::loop()", "bool Device::valid_host_(const std::string& host) const", "void Device::handle_http_(HttpExchange& request)")
+                  "void Device::loop()", "bool Device::valid_host_(const std::string& host) const", "void Device::handle_http_(HttpExchange& request)",
+                  "esp_err_t Device::http_handler_(httpd_req_t* raw)")
     bodies = [function(device, s) for s in signatures]
     finder = ("std::string Device::discovery_ip_() const", "void Device::serve_discovery_(HttpExchange &request)")
     bodies += ["#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY\n" +

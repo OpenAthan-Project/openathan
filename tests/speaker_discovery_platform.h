@@ -24,7 +24,8 @@ inline Application App;
 #define pdMS_TO_TICKS(ms) (ms)
 #define pdTRUE 1
 using TaskHandle_t = void *;
-unsigned xTaskGetTickCount();
+using TickType_t = unsigned;
+TickType_t xTaskGetTickCount();
 void xTaskCreate(void (*entry)(void *), const char *, unsigned, void *, unsigned, TaskHandle_t *);
 void xTaskNotifyGive(TaskHandle_t);
 void ulTaskNotifyTake(int, unsigned);
@@ -35,6 +36,7 @@ using esp_err_t = int;
 inline constexpr esp_err_t ESP_OK = 0;
 inline constexpr int ESP_IPADDR_TYPE_V4 = 0;
 inline constexpr int MDNS_TYPE_A = 1, MDNS_TYPE_PTR = 12, MDNS_TYPE_AAAA = 28;
+enum mdns_query_transmission_type_t { MDNS_QUERY_UNICAST, MDNS_QUERY_MULTICAST };
 struct esp_netif_t {};
 struct mdns_ip_addr_t {
   struct {
@@ -62,6 +64,8 @@ struct mdns_result_t {
 const esp_netif_t *esp_netif_get_handle_from_ifkey(const char *);
 unsigned esp_random();
 esp_err_t mdns_query(const char *, const char *, const char *, uint16_t, unsigned, unsigned, mdns_result_t **);
+esp_err_t mdns_query_generic(const char *, const char *, const char *, uint16_t, mdns_query_transmission_type_t,
+                             unsigned, size_t, mdns_result_t **);
 void mdns_query_results_free(mdns_result_t *);
 bool mdns_hostname_exists(const char *);
 esp_err_t mdns_delegate_hostname_add(const char *, const mdns_ip_addr_t *);
