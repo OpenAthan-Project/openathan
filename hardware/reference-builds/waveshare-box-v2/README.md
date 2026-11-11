@@ -21,6 +21,13 @@ confirm **V2** with the seller. Do not choose the bare board or V1 for this buil
 You may also use a regional distributor supplying the exact supported model and
 revision. Prices, shipping and availability depend on the seller.
 
+[Waveshare's distributor directory](https://www.waveshare.com/distributors)
+lists regional sellers. Confirm that a seller supplies the complete Box V2,
+rather than a bare development board. This is an ordinary store link; OpenAthan
+does not currently earn a commission through it. See the dated
+[vendor and referral-program review](../../../docs/development/hardware-vendors.md)
+for maintainer enrollment information.
+
 ## Required parts
 
 | Item | What to check |

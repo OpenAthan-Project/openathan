@@ -46,13 +46,14 @@ available controls depend on firmware and hardware.*
 
 ## Supported speakers
 
-Both options run the same core Athan and Quran features and use the browser
+These builds run the same core Athan and Quran features and use the browser
 installer. Buy the exact supported model and revision.
 
 | Speaker | Assembly and interface | Setup guide |
 | --- | --- | --- |
 | **M5Stack AtomS3R C126 + Voice Pyramid A167** | Two modules to connect; small screen, front button and prayer-status lights | [Parts and setup](hardware/reference-builds/voice-pyramid/assembly.md) |
 | **Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2** | Pre-assembled speaker; round screen and BOOT button | [Parts and setup](hardware/reference-builds/waveshare-box-v2/README.md) |
+| **Waveshare ESP32-S3-AUDIO-Board** | Screenless speaker; RGB lights and physical volume/Stop buttons | [Parts and setup](hardware/reference-builds/waveshare-audio-board/README.md) |
 
 **Check before buying:** Waveshare **V1 is unsupported**. The Atom profile targets
 the **GC9107 display**; newer ST7735 revisions are not qualified. A167 is also
@@ -74,8 +75,14 @@ model and revision with the seller before ordering.
 - **Waveshare build:** [ESP32-S3-Touch-LCD-1.85C store listing](https://www.waveshare.com/product/esp32-s3-touch-lcd-1.85c.htm).
   Select the **speaker-box** option and confirm **V2**. The bare board and V1 are
   not the supported speaker build.
+- **Screenless Waveshare build:** [ESP32-S3-AUDIO-Board store listing](https://www.waveshare.com/product/arduino/boards-kits/esp32-s3/esp32-s3-audio-board.htm).
+  Confirm the physical board revision and included speaker. USB-powered use does
+  not require a battery. See the [v0.9.0 release and validation limits](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.9.0).
 
-You can also buy the exact supported hardware from a distributor in your region.
+These are ordinary store links. OpenAthan does not currently earn commissions
+through them. For regional sellers, see the [parts and purchase links](hardware/reference-builds/voice-pyramid/bom.md#procurement-notes)
+or the manufacturers' [M5Stack distributor directory](https://m5stack.com/distributor)
+and [Waveshare distributor directory](https://www.waveshare.com/distributors).
 Prices, shipping and availability depend on the seller.
 
 <a id="supported-paths"></a>
