@@ -216,6 +216,22 @@ feedback phrases or additional test-only controller state is needed.
 Linux requires OpenSSL development headers. To use a different build directory,
 set `OPENATHAN_DIGEST_TEST_BRIDGE` to the adapter's absolute path.
 
+### Run focused browser cases
+
+After building the adapter and installing the test dependencies above, run the
+affected cases from `web/device-ui`. For example, run the explicit speaker-name
+save case in Chromium.
+
+```sh
+OPENATHAN_TEST_BROWSERS=chromium node --test \
+  --test-name-pattern='speaker name saves explicitly' ../../tests/device_ui.test.cjs
+```
+
+Use `../../tests/phone_setup_ui.test.cjs` for phone setup cases. Check that the
+pattern selected the cases you intended. For browser-specific behavior, repeat
+the command with `OPENATHAN_TEST_BROWSERS=webkit`. Reuse the installed browsers
+and rebuild the adapter when its sources change.
+
 See the [light contract](../../docs/development/lights.md) for countdown/status
 colors, separate persistence, and LED hardware acceptance.
 

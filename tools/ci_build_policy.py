@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Omit firmware compilation only for verified documentation-only PR merges."""
+"""Omit code checks only for verified documentation-only PR merges."""
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -22,9 +22,11 @@ DOCUMENTATION = frozenset({
     "firmware/esphome/scheduler/SETTINGS.md",
     "firmware/esphome/scheduler/VALIDATION.md",
     "firmware/esphome/upgrades/VALIDATION.md",
-    "hardware/LICENSE.md", "hardware/expansions/README.md",
+    "hardware/LICENSE.md", "hardware/README.md", "hardware/expansions/README.md",
     "hardware/reference-builds/voice-pyramid/assembly.md",
     "hardware/reference-builds/voice-pyramid/bom.md",
+    "hardware/reference-builds/waveshare-audio-board/README.md",
+    "hardware/reference-builds/waveshare-box-v2/README.md",
     "lib/openathan-core/README.md", "web/device-ui/README.md",
 })
 
@@ -61,7 +63,7 @@ def classify(root, environment):
         paths = changed[:-1].split("\0")
         if not all(is_documentation(path) for path in paths):
             return True, "Changes include firmware inputs or unrecognized paths."
-        return False, "Documentation-only PR: firmware compilation intentionally omitted."
+        return False, "Documentation-only PR. Host tests, browser tests, and firmware builds are skipped."
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         return True, "Change detection was unavailable; running full firmware checks."
 

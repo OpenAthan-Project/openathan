@@ -70,6 +70,15 @@ class BuildPolicyTests(unittest.TestCase):
         (self.root / "README.md").unlink()
         self.assertFalse(self.required(self.merge()))
 
+    def test_existing_hardware_guides_are_documentation(self):
+        for guide in (
+            "hardware/README.md",
+            "hardware/reference-builds/waveshare-audio-board/README.md",
+            "hardware/reference-builds/waveshare-box-v2/README.md",
+        ):
+            self.write(guide)
+        self.assertFalse(self.required(self.merge()))
+
     def test_large_diff_and_unusual_filenames(self):
         for number in range(350):
             self.write(f"docs/guide {number}.md")
@@ -92,7 +101,8 @@ class BuildPolicyTests(unittest.TestCase):
 
     def test_unknown_and_release_paths(self):
         for path in ("AUDIO-LICENSES.md", "third_party/adhan-cpp/UPSTREAM.md",
-                     "unknown.md", "docs/input.json", "tools/check.py",
+                     "unknown.md", "docs/input.json", "hardware/new-board/README.md",
+                     "tools/check.py", "release/firmware.json",
                      ".github/workflows/firmware.yml"):
             self.assertFalse(policy.is_documentation(path), path)
         self.write("AUDIO-LICENSES.md")
@@ -152,7 +162,8 @@ class BuildPolicyTests(unittest.TestCase):
                        env={**os.environ, **environment, "GITHUB_OUTPUT": str(output),
                             "GITHUB_STEP_SUMMARY": str(summary)})
         self.assertEqual(output.read_text(), "build_required=false\n")
-        self.assertIn("intentionally omitted", summary.read_text())
+        self.assertIn("Host tests, browser tests, and firmware builds are skipped.",
+                      summary.read_text())
 
     def test_git_timeout_falls_back_to_build(self):
         self.write("README.md", "edited\n")
@@ -171,27 +182,36 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertEqual(step["with"]["repository"], pin["repository"])
         self.assertEqual(step["with"]["ref"], pin["commit"])
 
-    def test_all_expensive_steps_require_successful_docs_only_detection_to_skip(self):
+    def test_only_verified_docs_prs_skip_code_jobs(self):
+        import yaml
+        workflow = yaml.load((ROOT / ".github/workflows/firmware.yml").read_text(),
+                             Loader=yaml.BaseLoader)
+        self.assertEqual(workflow["on"], {"pull_request": "", "push": {"branches": ["main"]}})
+        jobs = workflow["jobs"]
+        policy_job = jobs["change-policy"]
+        self.assertEqual(policy_job["if"], "github.event_name == 'pull_request'")
+        self.assertEqual(policy_job["steps"][0]["with"]["fetch-depth"], "2")
+        self.assertEqual(policy_job["outputs"]["build_required"],
+                         "${{ steps.classify.outcome == 'success' && "
+                         "steps.classify.outputs.build_required || 'true' }}")
+        whitespace = next(step for step in policy_job["steps"]
+                          if step.get("name") == "Check documentation whitespace")
+        self.assertEqual(whitespace["if"], "steps.classify.outputs.build_required == 'false'")
+        self.assertEqual(whitespace["run"], "git diff --check --no-ext-diff HEAD^1 HEAD --")
+
+        for name in ("host-tests", "firmware-build", "device-ui"):
+            self.assertEqual(jobs[name]["needs"], "change-policy")
+            self.assertEqual(jobs[name]["if"],
+                             "${{ !cancelled() && (github.event_name != 'pull_request' || "
+                             "needs.change-policy.outputs.build_required != 'false') }}")
+
+    def test_full_run_covers_all_firmware_profiles_and_browsers(self):
         import yaml
         workflow = yaml.safe_load((ROOT / ".github/workflows/firmware.yml").read_text())
         build = workflow["jobs"]["firmware-build"]
-        self.assertNotIn("if", build)
         self.assertEqual(build["strategy"]["matrix"]["configuration"], [
             "device", "validation", "reference", "provisioning-validation",
             "upgrade-qualification", "upgrade-startup-failure", "audio-board-production", "audio-board-development", "audio-board-upgrade", "audio-board-startup-failure", "waveshare-production", "waveshare-audio", "waveshare-display", "waveshare-diagnostics", "quran-qualification", "dua-qualification", "waveshare-dua-qualification"])
-        steps = build["steps"]
-        self.assertEqual(steps[0]["with"]["fetch-depth"], 2)
-        detector = next(step for step in steps if step.get("id") == "build_policy")
-        self.assertTrue(detector["continue-on-error"])
-        expensive = [step for step in steps if step.get("name") in (
-            "Install build dependencies", "Compile and inspect firmware",
-            "Test settings JSON with the resolved firmware library",
-            "Test update request formatting with the resolved SDK")]
-        self.assertEqual(len(expensive), 4)
-        for step in expensive:
-            self.assertIn("steps.build_policy.outcome != 'success'", step["if"])
-            self.assertIn("steps.build_policy.outputs.build_required != 'false'", step["if"])
-        for job in ("host-tests", "device-ui"):
-            self.assertNotIn("if", workflow["jobs"][job])
-            self.assertTrue(all("build_policy" not in step.get("if", "")
-                                for step in workflow["jobs"][job]["steps"]))
+        browser = workflow["jobs"]["device-ui"]
+        self.assertEqual(browser["strategy"]["matrix"]["browser"], ["chromium", "webkit"])
+        self.assertEqual(browser["env"]["OPENATHAN_TEST_BROWSERS"], "${{ matrix.browser }}")

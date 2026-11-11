@@ -2007,7 +2007,8 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
 
 }
 
-for (const name of ['chromium','webkit']) {
+const duaBrowsers=(process.env.OPENATHAN_TEST_BROWSERS||'chromium,webkit').split(',');
+for (const name of duaBrowsers) {
  test(name+' dua preferences save independently of media availability',async()=>{
   const f=await fixture();
   f.state.device.dua={schema:1,revision:1,enabled:true,ready:false,supported:false,application:'applied',state:'unavailable',phase:'idle'};
@@ -2032,7 +2033,7 @@ for (const name of ['chromium','webkit']) {
  });
 }
 
-for (const name of ['chromium','webkit']) test(name+' dua saves reconcile and pause retains Stop',async()=>{
+for (const name of duaBrowsers) test(name+' dua saves reconcile and pause retains Stop',async()=>{
  const f=await fixture();
  f.state.device.dua={schema:1,revision:1,enabled:false,ready:false,supported:true,application:'applied',state:'waiting',phase:'idle'};
  const o=await open(f,name,{viewport:{width:390,height:844}}),{page}=o;

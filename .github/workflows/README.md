@@ -41,11 +41,12 @@ the bridge against pinned ESPHome timezone conversion code. Additional host test
 cover the production local API, USB protocol, activation/credential storage, Digest
 authentication and Wi-Fi transactions. Python tests generate both provisioning
 configurations and exercise the pinned ESPHome scan policy to protect discovery
-of alternative networks while connected. A separate browser job builds the production
-C++ Digest verifier and runs the embedded UI with simulated settings endpoints in
-Chromium and WebKit. It covers sustained authentication, client-nonce rotation,
-expiry renewal on reads and writes, revision conflicts, dropped responses and
-narrow-screen layout. Chromium checks that renewal causes no second sign-in prompt.
+of alternative networks while connected. The Chromium and WebKit jobs run in
+parallel. Each builds the production C++ Digest verifier and tests the embedded UI
+with simulated settings endpoints. The tests cover sustained authentication,
+client-nonce rotation, expiry renewal on reads and writes, revision conflicts,
+dropped responses, and narrow-screen layout. Chromium checks that renewal causes
+no second sign-in prompt.
 
 The device build also runs `tools/check_phone_setup.py --arduinojson PATH` with
 the resolved library. Production and isolated tests execute the bootstrap HTTP,
@@ -89,20 +90,45 @@ build, package and draft-upload commands.
 
 ## Documentation-only pull requests
 
-All firmware check names remain present on every pull request. Each firmware job
-checks the PR merge identity and complete changed-path list before installing
-build dependencies. For documentation-only changes, it reports an intentional
-omission in its job summary and skips dependency installation, compilation,
-capacity checks and the regressions requiring resolved firmware libraries.
-Host tests and browser tests still run normally.
+The `change-policy` job verifies the PR merge commit and checks all changed
+paths once. For a documentation-only PR, it checks the diff for whitespace
+errors and reports the skipped host, browser, and firmware jobs in its summary.
 
-The policy in `tools/ci_build_policy.py` allows Markdown under `docs/` and an
-explicit list of existing prose-only Markdown paths elsewhere. It excludes
-`AUDIO-LICENSES.md`, which release tooling consumes, and third-party metadata.
-Unknown paths, mixed changes, renames involving non-documentation paths, empty
-diffs and detection failures run the complete builds. Every push to `main` also
-runs the complete suite. The workflow uses step conditions rather than skipping
-the workflow or removing matrix entries, preserving all existing check names.
+`tools/ci_build_policy.py` accepts Markdown under `docs/` and listed prose
+files elsewhere, including the hardware overview and Waveshare board guides.
+Changes to release inputs such as `AUDIO-LICENSES.md`, third-party metadata,
+and unknown paths run the complete suite. The complete suite also runs for
+mixed changes, renames involving code, empty diffs, failed classification, and
+every push to `main`.
+
+## Run focused checks
+
+Use the pinned prerequisites below. Configure a host build once in your
+worktree, then rebuild the target and select its CTest cases. For scheduler
+changes, run these commands from the repository root.
+
+```sh
+cmake -S . -B build -DCMAKE_CXX_FLAGS='-fsanitize=undefined -fno-sanitize-recover=all'
+cmake --build build --target scheduler_tests
+ctest --test-dir build --output-on-failure --no-tests=error -R '^scheduler_scenarios$'
+```
+
+For changes to the CI policy, run this Python test file in the ESPHome virtual
+environment. Use the relevant `test_*.py` file for other changes and build any
+host targets it needs first.
+
+```sh
+python -m unittest discover -s tests -p test_ci_build_policy.py -v
+```
+
+For YAML changes, validate the affected ESPHome profiles before compiling. In a
+disposable checkout with the compile-only settings from `prepare_ci.py`, run
+`python -m esphome config firmware/esphome/scheduler/device.yaml` to check the
+device profile. Use the affected configuration paths for other profiles. For
+firmware changes that affect the OTA image, use the capacity checks below with
+matching before and after builds.
+
+For UI changes, follow the [focused browser commands](../../web/device-ui/README.md#run-focused-browser-cases).
 
 ## Reproduce from a clean checkout
 
