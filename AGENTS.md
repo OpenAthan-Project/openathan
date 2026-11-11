@@ -59,14 +59,23 @@
   Use the [device UI guide](web/device-ui/README.md) for browser-test prerequisites
   and commands. CI audio fixtures are synthetic and must not be installed or played.
 - Match validation to the change. For documentation-only changes, check whitespace,
-  links and consistency with source; firmware builds and hardware access are not
-  required. Update relevant documentation when behavior changes.
-- Keep changes focused. Before creating a PR, rebase onto the latest `main`, review
-  the final diff again, resolve findings or ask about unresolved issues, and rerun
-  affected checks when the rebase changes the result.
+  changed links, and consistency with source. For code changes, start with the
+  [affected host targets or Python tests](.github/workflows/README.md#run-focused-checks).
+  For UI changes, start with [focused Chromium cases](web/device-ui/README.md#run-focused-browser-cases).
+  Run those cases in WebKit too when the change depends on browser behavior.
+- Reuse the worktree's build directory, Python environment, and browser installation.
+  Rebuild affected targets and refresh dependencies when pins change or prerequisites
+  are missing. For ESPHome YAML changes, run `esphome config` on affected profiles
+  before compiling. Complete the applicable OTA size and capacity checks before handoff.
+- Batch related edits before pushing. Before creating a PR, rebase onto the latest
+  `main`, review the final diff again, resolve findings or ask about unresolved
+  issues, and rerun affected checks when the rebase changes the result. Update
+  relevant documentation when behavior changes.
 - Follow the [PR template](.github/pull_request_template.md). Describe the problem
   and resulting behavior for external contributors; summarize automated and
-  hardware validation separately, including material limitations.
+  hardware validation separately, including material limitations. Report which
+  local checks ran and the CI status for the pushed revision. Follow CI through
+  completion when requested or when the next step depends on it.
 
 ## Licensing and private material
 
