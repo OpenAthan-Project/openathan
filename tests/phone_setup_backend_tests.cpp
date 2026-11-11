@@ -8,10 +8,12 @@
 #include "protocol.h"
 #include "wifi_attempt.h"
 #include "phone_setup.h"
+#include "speaker_finder.h"
 #include "upgrade_policy.h"
 #include "test_maintenance.h"
 #include "openathan/usb_upgrade.h"
 #include "openathan/scheduler.h"
+#include "openathan/speaker_name.h"
 #include "nvs_memory.h"
 #include <algorithm>
 #include <atomic>
@@ -23,11 +25,60 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <arpa/inet.h>
+#include <map>
 
 int64_t now_us{};
 int64_t esp_timer_get_time() { return now_us; }
 void esp_fill_random(void *buffer, size_t size) { std::memset(buffer, 0xAB, size); }
 void xSemaphoreGive(void *) {}
+int http_done;
+std::function<void()> http_wait;
+using esp_err_t = int;
+constexpr int ESP_FAIL = -1, HTTP_GET = 0, HTTP_POST = 1, HTTPD_RESP_USE_STRLEN = -1;
+#define pdMS_TO_TICKS(ms) (ms)
+#define pdTRUE 1
+struct httpd_req_t {
+  void *user_ctx{}, *handle{};
+  size_t content_len{};
+  const char *uri{"/"};
+  int method{HTTP_GET}, send_result{ESP_OK}, close_result{ESP_OK};
+  unsigned closes{};
+  std::string host, response;
+  std::map<std::string, std::string> headers;
+};
+int xSemaphoreTake(void *, unsigned) { http_wait(); return pdTRUE; }
+size_t httpd_req_get_hdr_value_len(httpd_req_t *request, const char *name) {
+  return std::string_view(name) == "Host" ? request->host.size() : 0;
+}
+esp_err_t httpd_req_get_hdr_value_str(httpd_req_t *request, const char *, char *out, size_t size) {
+  std::strncpy(out, request->host.c_str(), size);
+  return ESP_OK;
+}
+int httpd_req_to_sockfd(httpd_req_t *) { return 7; }
+int httpd_req_recv(httpd_req_t *, char *, size_t) { return 0; }
+esp_err_t httpd_resp_set_status(httpd_req_t *, const char *) { return ESP_OK; }
+esp_err_t httpd_resp_set_type(httpd_req_t *, const char *) { return ESP_OK; }
+esp_err_t httpd_resp_set_hdr(httpd_req_t *request, const char *key, const char *value) {
+  request->headers[key] = value;
+  return ESP_OK;
+}
+esp_err_t httpd_resp_send(httpd_req_t *request, const char *body, ssize_t size) {
+  request->response.assign(body, size == HTTPD_RESP_USE_STRLEN ? std::strlen(body) : size);
+  return request->send_result;
+}
+esp_err_t httpd_sess_trigger_close(void *handle, int fd) {
+  auto &request = *static_cast<httpd_req_t *>(handle);
+  assert(fd == 7 && !request.response.empty());
+  ++request.closes;
+  return request.close_result;
+}
+int http_getsockname(int, sockaddr *address, socklen_t *) {
+  auto &local = *reinterpret_cast<sockaddr_in *>(address);
+  local.sin_family = AF_INET;
+  inet_pton(AF_INET, "192.168.1.42", &local.sin_addr);
+  return 0;
+}
 namespace esphome {
 using StringRef = std::string;
 struct AppProbe { bool complete{true}; bool is_setup_complete() const { return complete; } } App;
@@ -66,6 +117,13 @@ namespace openathan_component {
 struct SettingsProbe { bool ok{true}; bool healthy() const { return ok; } };
 struct OpenAthan {
   bool incomplete{true},busy{}; SettingsProbe settings;
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  struct {
+    std::optional<::openathan::SavedSpeakerName> value;
+    const auto &saved() const { return value; }
+  } speaker_name;
+  const auto &speaker_name_preferences() const { return speaker_name; }
+#endif
   struct AudioProbe {
     bool playing() const { return false; }
     bool ready() const { return false; }
@@ -91,8 +149,8 @@ struct HttpExchange {
   std::string method{"GET"},uri{"/setup/status"},body,response;
   std::string host{"192.168.4.1"}, origin, site{"same-origin"}, content_type{"application/json"}, local_ip{"192.168.4.1"};
   std::string authorization,challenge,type{"application/json"},redirect;
-  bool gzip{},phone_connect{},cancelled{};
-  int code{200}; void *done{};
+  bool gzip{},phone_connect{},cancelled{},close_after_send{};
+  int code{200}; void *done{&http_done};
   std::atomic<unsigned> response_result{};
   std::mutex mutex;
 };
@@ -121,6 +179,7 @@ struct ApiProbe {
   void handle(HttpExchange &request) { ++calls; request.code=200; }
 };
 struct Device {
+  static esp_err_t http_handler_(httpd_req_t *);
   void loop(); void serial_request(const Frame &);
   void on_wifi_connect_state(StringRef,std::span<const uint8_t,6>);
   void handle_http_(HttpExchange &); bool handle_phone_http_(HttpExchange &);
@@ -147,7 +206,20 @@ struct Device {
   phone_setup::State phone_state_{phone_setup::State::CLOSED};
   std::string phone_ssid_{"OpenAthan-Setup-a1b2c3"},phone_error_;
   struct Network { std::string ssid; int rssi; bool secured; }; std::vector<Network> phone_networks_;
-  struct Asset { const uint8_t *data{};size_t size{};const char *type{}; } assets_[6];
+  struct Asset { const uint8_t *data{};size_t size{};const char *type{}; } assets_[7];
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  bool server_{true};
+  uint64_t discovery_update_at_{};
+  std::string discovery_ip_() const;
+  void serve_discovery_(HttpExchange &);
+  struct {
+    std::string ip;
+    void update(std::string_view address, std::string_view) { ip = address; }
+    std::string directory(std::string_view address) const {
+      return !ip.empty() && ip == address ? "<h1>Find my speaker</h1>" : "";
+    }
+  } discovery_;
+#endif
   std::shared_ptr<HttpExchange> phone_response_;
   DuaProbe dua_;
   bool playback_busy() const { return athan_->playback_busy(); }
@@ -158,7 +230,9 @@ namespace {
 #include "phone_device_helpers.inc"
 }
 #include "phone_http.inc"
+#define getsockname http_getsockname
 #include "phone_device_methods.inc"
+#undef getsockname
 }
 }
 using namespace esphome::openathan_device;
@@ -352,8 +426,98 @@ void interruptions_and_storage_faults() {
     assert(f.call("GET","/setup/status")->code==200 && f.call("POST","/setup/scan","{}")->code==503);f.preserved(); }
   { Fixture f;f.athan.incomplete=false;f.device.loop();assert(!f.device.phone_session_ && !f.device.phone_setup_active());f.preserved(); }
 }
+void discovery_routes() {
+  Fixture f(false);
+  f.device.wifi_record_ = LoadResult::LOADED;
+  f.device.auth_.configure("OpenAthan-test", std::string(32, 'a'));
+  f.join();
+  auto request = [&](std::string_view host, std::string_view method, std::string_view uri, int code, bool close,
+                     std::string_view ip = "192.168.1.42", std::string_view origin = {}) {
+    HttpExchange exchange;
+    exchange.host = host;
+    exchange.method = method;
+    exchange.uri = uri;
+    exchange.local_ip = ip;
+    exchange.origin = origin;
+    f.device.handle_http_(exchange);
+    assert(exchange.code == code && exchange.close_after_send == close);
+  };
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  request("openathan.local", "GET", "/", 200, true);
+  request("openathan.local:80", "GET", "/finder.css", 200, true);
+  request("openathan.local", "GET", "/api/status", 404, true);
+  request("openathan.local", "GET", "/setup/", 404, true);
+  request("openathan.local", "POST", "/api/stop", 403, true);
+  request("openathan.local", "GET", "/", 403, true, "192.168.1.42", "https://other.example");
+  request("openathan.local", "GET", "/", 503, true, "192.168.4.1");
+  f.device.discovery_.ip.clear();
+  request("openathan.local", "GET", "/", 503, true);
+  request("openathan.local", "GET", "/finder.css", 503, true);
+#else
+  request("openathan.local", "GET", "/", 403, false);
+#endif
+  request("openathan-a1b2c3.local", "GET", "/", 401, false);
+
+  HttpExchange unauthenticated;
+  unauthenticated.host = unauthenticated.local_ip = "192.168.1.42";
+  unauthenticated.uri = "/";
+  f.device.handle_http_(unauthenticated);
+  assert(unauthenticated.code == 401);
+  const std::string marker = "nonce=\"";
+  const auto nonce_start = unauthenticated.challenge.find(marker);
+  assert(nonce_start != std::string::npos);
+  const auto start = nonce_start + marker.size();
+  const auto nonce = unauthenticated.challenge.substr(start, unauthenticated.challenge.find('"', start) - start);
+  const auto response = md5_hex(std::string(32, 'a') + ":" + nonce + ":00000001:review:auth:" + md5_hex("GET:/"));
+  HttpExchange authenticated;
+  authenticated.host = authenticated.local_ip = unauthenticated.host;
+  authenticated.uri = "/";
+  authenticated.authorization = "Digest username=\"admin\", realm=\"OpenAthan-test\", uri=\"/\", nonce=\"" + nonce +
+      "\", qop=auth, nc=00000001, cnonce=\"review\", response=\"" + response + "\"";
+  f.device.handle_http_(authenticated);
+  assert(authenticated.code == 200 && authenticated.gzip && authenticated.response == "setup" && !authenticated.close_after_send);
+  assert(f.device.api_storage.calls == 0);
+}
+
+void finder_connections_close() {
+  Fixture f(false);
+  f.device.wifi_record_ = LoadResult::LOADED;
+  f.device.auth_.configure("OpenAthan-test", std::string(32, 'a'));
+  f.join();
+  auto request = [&](const char *host, const char *uri, int send_result, int close_result) {
+    httpd_req_t raw;
+    raw.user_ctx = &f.device;
+    raw.handle = &raw;
+    raw.host = host;
+    raw.uri = uri;
+    raw.send_result = send_result;
+    raw.close_result = close_result;
+    std::shared_ptr<HttpExchange> exchange;
+    http_wait = [&] { exchange = f.device.requests_.front(); f.device.loop(); };
+    const auto result = Device::http_handler_(&raw);
+    assert(exchange->response_result == (send_result == ESP_OK ? 1 : 2));
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+    const bool finder = std::string_view(host) == "openathan.local";
+#else
+    const bool finder = false;
+#endif
+    assert(raw.headers.contains("Connection") == finder);
+    assert(raw.closes == (finder && send_result == ESP_OK ? 1u : 0u));
+    if (finder) assert(raw.headers.at("Connection") == "close");
+    assert(result == (send_result != ESP_OK || (finder && close_result != ESP_OK) ? ESP_FAIL : ESP_OK));
+    http_wait = {};
+  };
+  request("openathan.local", "/", ESP_OK, ESP_OK);
+  request("openathan.local", "/finder.css", ESP_OK, ESP_OK);
+  request("openathan.local", "/api/status", ESP_OK, ESP_OK);
+  request("openathan.local", "/", ESP_FAIL, ESP_OK);
+  request("openathan.local", "/", ESP_OK, ESP_FAIL);
+  request("openathan-a1b2c3.local", "/", ESP_OK, ESP_OK);
+}
 int main() {
   if (!usb_before_first_loop()) return 1;
   closed_startup();busy_admission();busy_diagnostics();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
+  discovery_routes();
+  finder_connections_close();
   std::cout << "Production phone HTTP, AP admission, password protection, deferred join, storage faults and USB exclusion passed\n";
 }

@@ -1,0 +1,50 @@
+:root {
+  color-scheme: dark;
+  background: #101820;
+  color: #f3f6f8;
+  font: 1rem/1.5 system-ui, sans-serif;
+}
+
+main {
+  max-width: 32rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+main > p {
+  color: #b6c5d1;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: #f0bb67;
+  text-underline-offset: .18em;
+}
+
+a:focus-visible {
+  outline: 3px solid #f0bb67;
+  outline-offset: 3px;
+}
+
+li a {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  padding: .75rem;
+  background: #19252f;
+  color: #f3f6f8;
+  border: 1px solid #7a8d9c;
+  border-radius: .5rem;
+  margin: .5rem 0;
+  overflow-wrap: anywhere;
+}
+
+small {
+  color: #b6c5d1;
+  font-variant-numeric: tabular-nums;
+}

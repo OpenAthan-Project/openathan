@@ -24,14 +24,19 @@ def function(source, signature):
 
 with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary:
     directory = Path(temporary)
-    helpers = ("uint64_t now_ms()", "std::string random_nonce()", "void error(HttpExchange& request, int code, const char* message)")
+    helpers = ("uint64_t now_ms()", "std::string random_nonce()", "void error(HttpExchange& request, int code, const char* message)",
+               "std::string header(httpd_req_t* request, const char* name, size_t limit = 2048)", "const char* http_status(int code)")
     (directory / "phone_device_helpers.inc").write_text("\n".join(function(device, s) for s in helpers))
     signatures = ("void Device::restore_wifi_()", "void Device::send_(bool extension, uint8_t type, const std::vector<uint8_t>& data)",
                   "void Device::result_(bool extension, uint8_t command, const std::vector<std::string>& fields)",
                   "uint8_t Device::wifi_state_() const", "void Device::serial_request(const Frame& request)",
                   "void Device::on_wifi_connect_state(StringRef ssid, std::span<const uint8_t, 6>)",
-                  "void Device::loop()", "bool Device::valid_host_(const std::string& host) const", "void Device::handle_http_(HttpExchange& request)")
+                  "void Device::loop()", "bool Device::valid_host_(const std::string& host) const", "void Device::handle_http_(HttpExchange& request)",
+                  "esp_err_t Device::http_handler_(httpd_req_t* raw)")
     bodies = [function(device, s) for s in signatures]
+    finder = ("std::string Device::discovery_ip_() const", "void Device::serve_discovery_(HttpExchange &request)")
+    bodies += ["#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY\n" +
+               "\n".join(function(device, s) for s in finder) + "#endif\n"]
     bodies += [function(network, s) for s in ("bool Device::phone_eligible_() const", "bool Device::phone_setup_active() const", "void Device::phone_loop_(uint64_t now)")]
     (directory / "phone_device_methods.inc").write_text("\n".join(bodies))
     # Same test-only compilation seam as check_upgrade_runtime.py: the
@@ -39,15 +44,17 @@ with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary
     http = (DEVICE / "phone_setup_http.cpp").read_text()
     http = http.split("namespace esphome::openathan_device {", 1)[1].rsplit("}", 1)[0]
     (directory / "phone_http.inc").write_text(http)
-    for isolated in (False, True):
-        output = directory / ("isolated" if isolated else "production")
+    for variant in ("production", "mdns-disabled", "isolated"):
+        output = directory / variant
         command = [os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined", "-fno-sanitize-recover=all",
                    '-DOPENATHAN_HARDWARE="test-board"', '-DOPENATHAN_FIRMWARE_VERSION="test-version"',
                    "-I" + str(directory), "-I" + str(ROOT / "tests/upgrade_stubs"), "-I" + str(ROOT / "tests/stubs"),
                    "-I" + str(ROOT / "tests"), "-I" + str(DEVICE), "-I" + str(ROOT / "firmware"),
                    "-I" + str(ROOT / "lib/openathan-core/include"), "-I" + include]
-        if isolated:
+        if variant == "isolated":
             command.append("-DOPENATHAN_PROVISIONING_TEST_STORAGE")
+        elif variant == "production":
+            command.append("-DUSE_OPENATHAN_SPEAKER_DISCOVERY")
         command += [str(ROOT / "tests/phone_setup_backend_tests.cpp"), str(DEVICE / "credential_store.cpp"),
                     str(DEVICE / "protocol.cpp"), str(DEVICE / "digest.cpp"), str(DEVICE / "test_maintenance.cpp")]
         if os.uname().sysname != "Darwin":

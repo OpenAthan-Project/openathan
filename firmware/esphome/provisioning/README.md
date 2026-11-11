@@ -49,6 +49,20 @@ interfaces, storage boundaries and physical acceptance requirements. Older
 firmware retains USB enrollment. The [October 19 follow-up](../../../docs/development/phone-setup-validation-2026-10-19.md)
 records later wizard and rediscovery results within their tested scope.
 
+## Find a configured speaker
+
+On firmware with speaker discovery, open `http://openathan.local/` from a
+browser on the same home Wi-Fi. An updated speaker hosts the list. Choose a
+speaker to open its own settings page and sign in as usual. An older speaker
+may appear by its short device ID. Updating it also lets it host the list and
+share its saved name.
+
+Saved names appear on the local network before sign-in. Use a name you are
+comfortable sharing with other people on that network. The finder needs Wi-Fi
+that allows devices to reach each other. If the shared address is unavailable,
+you can still open a speaker at its own address. See the
+[discovery validation checklist](HARDWARE_TEST.md#speaker-discovery).
+
 ## Build and developer access
 
 Use the pinned ESPHome environment described in [firmware feasibility](../feasibility/README.md).
