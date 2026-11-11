@@ -319,6 +319,17 @@ words. Only successful-feedback text has a color transition (150ms ease-out),
 and only when reduced motion is not requested. Network response delays are not design
 motion tokens.
 
+### Quran listening
+
+The Quran view leads with reported playback, a prominent Stop and the shared
+speaker-volume control. A ruled, flat playback section stays sticky during active
+playback. Phone layouts place it above recording selection; desktop places the two
+groups side by side. Stop takes the amber emphasis while playback is active;
+starting a replacement recording uses a secondary action and explains its effect.
+Reciters load on first entry, dependent fields appear when available, and refresh
+and paging support the selection task. Catalog errors and playback observations
+remain separate live messages; completed selection steps do not retain instructions.
+
 ### Timetable rows
 
 A definition list pairs the prayer name and smaller eligibility text with a

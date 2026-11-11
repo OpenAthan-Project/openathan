@@ -84,6 +84,14 @@ rules. This brief records the approved hierarchy and interaction presentation.
   lights, time format and updates. Native controls show input immediately, with
   nearby save feedback and recovery choices. Reviewed calculations use a
   separate timetable and explicit confirmation.
+- Quran leads with reported recording identity, Stop and the same speaker volume
+  used by Today and Settings. Playback sits above selection on phones and beside
+  it on desktop. Sticky playback yields to normal scrolling when enlarged content
+  or a short viewport leaves too little room; focused fields account for its height.
+- Quran loads reciters once on entry, reveals dependent recording choices as they
+  become available, and keeps retry/refresh/paging secondary. Playing identity
+  remains tied to reported identifiers while the household edits a replacement.
+  Catalog and playback feedback stay independent, with obsolete guidance removed.
 - First run presents Location → Calculation → Review timetable → Finish setup,
   with destination focus on step changes. Everyday preferences, navigation and
   updates stay outside this flow. Manual entry stays available; the optional
