@@ -2,9 +2,6 @@
 
 namespace esphome::openathan_device {
 void Device::on_shutdown() {
-#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
-  discovery_.update({}, {}, {});
-#endif
   dua_.shutdown();
   upgrade_.shutdown();
   quran_.shutdown();

@@ -164,7 +164,7 @@ struct Device {
   void serve_discovery_(HttpExchange &);
   struct {
     std::string ip;
-    void update(std::string_view, std::string_view address, std::string_view) { ip = address; }
+    void update(std::string_view address, std::string_view) { ip = address; }
     std::string directory(std::string_view address) const {
       return !ip.empty() && ip == address ? "<h1>Find my speaker</h1>" : "";
     }
@@ -374,7 +374,6 @@ void interruptions_and_storage_faults() {
     assert(f.call("GET","/setup/status")->code==200 && f.call("POST","/setup/scan","{}")->code==503);f.preserved(); }
   { Fixture f;f.athan.incomplete=false;f.device.loop();assert(!f.device.phone_session_ && !f.device.phone_setup_active());f.preserved(); }
 }
-#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
 void discovery_routes() {
   Fixture f(false);
   f.device.wifi_record_ = LoadResult::LOADED;
@@ -391,6 +390,7 @@ void discovery_routes() {
     f.device.handle_http_(exchange);
     return exchange.code;
   };
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
   assert(request("openathan.local", "GET", "/") == 200);
   assert(request("openathan.local:80", "GET", "/finder.css") == 200);
   assert(request("openathan.local", "GET", "/api/status") == 404);
@@ -398,15 +398,34 @@ void discovery_routes() {
   assert(request("openathan.local", "POST", "/api/stop") == 403);
   assert(request("openathan.local", "GET", "/", "192.168.1.42", "https://other.example") == 403);
   assert(request("openathan.local", "GET", "/", "192.168.4.1") == 503);
+#else
+  assert(request("openathan.local", "GET", "/") == 403);
+#endif
   assert(request("openathan-a1b2c3.local", "GET", "/") == 401);
+
+  HttpExchange unauthenticated;
+  unauthenticated.host = unauthenticated.local_ip = "192.168.1.42";
+  unauthenticated.uri = "/";
+  f.device.handle_http_(unauthenticated);
+  assert(unauthenticated.code == 401);
+  const std::string marker = "nonce=\"";
+  const auto nonce_start = unauthenticated.challenge.find(marker);
+  assert(nonce_start != std::string::npos);
+  const auto start = nonce_start + marker.size();
+  const auto nonce = unauthenticated.challenge.substr(start, unauthenticated.challenge.find('"', start) - start);
+  const auto response = md5_hex(std::string(32, 'a') + ":" + nonce + ":00000001:review:auth:" + md5_hex("GET:/"));
+  HttpExchange authenticated;
+  authenticated.host = authenticated.local_ip = unauthenticated.host;
+  authenticated.uri = "/";
+  authenticated.authorization = "Digest username=\"admin\", realm=\"OpenAthan-test\", uri=\"/\", nonce=\"" + nonce +
+      "\", qop=auth, nc=00000001, cnonce=\"review\", response=\"" + response + "\"";
+  f.device.handle_http_(authenticated);
+  assert(authenticated.code == 200 && authenticated.gzip && authenticated.response == "setup");
   assert(f.device.api_storage.calls == 0);
 }
-#endif
 int main() {
   if (!usb_before_first_loop()) return 1;
   closed_startup();busy_admission();busy_diagnostics();admissions();success_and_usb_race();failed_join_and_existing_password();interruptions_and_storage_faults();
-#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
   discovery_routes();
-#endif
   std::cout << "Production phone HTTP, AP admission, password protection, deferred join, storage faults and USB exclusion passed\n";
 }

@@ -363,7 +363,7 @@ void Device::loop() {
   if (now >= discovery_update_at_) {
     discovery_update_at_ = now + 250;
     const auto &saved = athan_->speaker_name_preferences().saved();
-    discovery_.update(hostname_, discovery_ip_(), saved ? std::string_view(saved->name) : std::string_view{});
+    discovery_.update(discovery_ip_(), saved ? std::string_view(saved->name) : std::string_view{});
   }
 #endif
   if (wifi_attempt_.active()) {

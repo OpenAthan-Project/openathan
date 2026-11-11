@@ -17,14 +17,22 @@ DEPENDENCIES = ["esp32", "wifi", "openathan"]
 AUTO_LOAD = ["json", "mdns"]
 ns = cg.esphome_ns.namespace("openathan_device")
 Device = ns.class_("Device", cg.Component)
+SpeakerDiscovery = ns.class_("SpeakerDiscovery", cg.Component)
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Device),
+    cv.GenerateID("speaker_discovery_id"): cv.declare_id(SpeakerDiscovery),
     cv.Required("openathan_id"): cv.use_id(openathan.OpenAthan),
     cv.Optional("hardware", default="atoms3r-c126-pyramid-a167"): cv.one_of(
         "atoms3r-c126-pyramid-a167", "waveshare-esp32-s3-touch-lcd-1_85c-box-v2",
         "waveshare-esp32-s3-audio-board"),
     cv.Optional("updates_enabled", default=True): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
+
+
+def speaker_discovery_enabled(full):
+    node = full["esphome"]
+    return (node["name"] == "openathan" and node["name_add_mac_suffix"]
+            and not full.get("mdns", {}).get("disabled", False))
 
 
 def validate(config):
@@ -39,6 +47,9 @@ def validate(config):
         raise cv.Invalid("OpenAthan owns Wi-Fi credentials; omit networks/AP and set enable_on_boot false")
     if "web_server" in full or "captive_portal" in full or "esp32_improv" in full:
         raise cv.Invalid("OpenAthan owns provisioning and the local server")
+    if not speaker_discovery_enabled(full):
+        # ESPHome sizes its component table from the validated IDs.
+        CORE.component_ids.discard(config["speaker_discovery_id"].id)
     return config
 
 
@@ -64,8 +75,7 @@ def timezone_entries():
 
 async def to_code(config):
     cg.add_define("OPENATHAN_QURAN")
-    node = CORE.config["esphome"]
-    discovery = node["name"] == "openathan" and node["name_add_mac_suffix"]
+    discovery = speaker_discovery_enabled(CORE.config)
     if discovery:
         cg.add_define("USE_OPENATHAN_SPEAKER_DISCOVERY")
     # Compile SoftAP support without a configured fallback AP. Runtime product
@@ -110,6 +120,9 @@ async def to_code(config):
     esp32.include_builtin_idf_component("esp_http_client")
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+    if discovery:
+        finder = cg.Pvariable(config["speaker_discovery_id"], var.get_speaker_discovery())
+        await cg.register_component(finder, {})
     cg.add(var.set_openathan(await cg.get_variable(config["openathan_id"])))
     # Connected USB recovery scans must include networks beyond the saved SSID.
     wifi.request_wifi_scan_results()

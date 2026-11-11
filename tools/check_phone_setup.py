@@ -42,16 +42,16 @@ with tempfile.TemporaryDirectory(prefix="openathan-phone-backend-") as temporary
     http = (DEVICE / "phone_setup_http.cpp").read_text()
     http = http.split("namespace esphome::openathan_device {", 1)[1].rsplit("}", 1)[0]
     (directory / "phone_http.inc").write_text(http)
-    for isolated in (False, True):
-        output = directory / ("isolated" if isolated else "production")
+    for variant in ("production", "mdns-disabled", "isolated"):
+        output = directory / variant
         command = [os.environ.get("CXX", "c++"), "-std=c++20", "-fsanitize=undefined", "-fno-sanitize-recover=all",
                    '-DOPENATHAN_HARDWARE="test-board"', '-DOPENATHAN_FIRMWARE_VERSION="test-version"',
                    "-I" + str(directory), "-I" + str(ROOT / "tests/upgrade_stubs"), "-I" + str(ROOT / "tests/stubs"),
                    "-I" + str(ROOT / "tests"), "-I" + str(DEVICE), "-I" + str(ROOT / "firmware"),
                    "-I" + str(ROOT / "lib/openathan-core/include"), "-I" + include]
-        if isolated:
+        if variant == "isolated":
             command.append("-DOPENATHAN_PROVISIONING_TEST_STORAGE")
-        else:
+        elif variant == "production":
             command.append("-DUSE_OPENATHAN_SPEAKER_DISCOVERY")
         command += [str(ROOT / "tests/phone_setup_backend_tests.cpp"), str(DEVICE / "credential_store.cpp"),
                     str(DEVICE / "protocol.cpp"), str(DEVICE / "digest.cpp"), str(DEVICE / "test_maintenance.cpp")]

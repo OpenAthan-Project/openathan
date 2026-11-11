@@ -274,6 +274,8 @@ runbooks for the hardware involved. Compile-only audio fixtures must never be
 installed. The isolated `openathan-test-*` firmware does not advertise the
 production finder address.
 
+- Start with one updated speaker and verify the finder lists it once and opens
+  its password-protected settings. Repeat with the saved name cleared.
 - On iPhone Safari and Android Chrome, open `http://openathan.local/` with the
   WAN disconnected. Check a screenless speaker, duplicate saved names, an
   unnamed speaker, and the older speaker's short ID. Rename and clear a name,
@@ -286,6 +288,9 @@ production finder address.
   picked an owner. Load the page on both phones before unplugging its owner.
   Require the same address to work within two minutes without clearing caches
   or changing Wi-Fi settings.
+- During an attended OTA update, keep the finder active through the automatic
+  restart. Verify the speaker boots the selected image, preserves settings and
+  history, and rejoins discovery without a crash or watchdog reset.
 - Record the minimum free heap, largest available internal block and worker
   stack headroom during discovery, playback and normal settings use. Verify
   scheduled playback and control responsiveness with and without the finder.

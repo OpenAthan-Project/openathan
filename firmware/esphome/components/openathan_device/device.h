@@ -62,6 +62,9 @@ class Device : public Component, public wifi::WiFiScanResultsListener, public wi
   void setup() override;
   void loop() override;
   void on_shutdown() override;
+#ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
+  SpeakerDiscovery *get_speaker_discovery() { return &discovery_; }
+#endif
   void serial_request(const Frame& request);
   void on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanResult>& results) override;
   void on_wifi_connect_state(StringRef ssid, std::span<const uint8_t, 6> bssid) override;
