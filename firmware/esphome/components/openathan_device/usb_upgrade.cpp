@@ -70,6 +70,7 @@ bool Upgrade::usb_abort_() {
   if (usb_handle_) { esp_ota_abort(usb_handle_); usb_handle_ = 0; }
   if (usb_hash_live_) { mbedtls_sha256_free(&usb_hash_); usb_hash_live_ = false; }
   usb_token_ = 0; std::string{}.swap(usb_descriptor_); usb_descriptor_bytes_ = 0; staged_ = nullptr;
+  if (usb_request_ && !queued_.version.empty() && automatic_ok_ && !suppress_(queued_.version)) return false;
   if (usb_request_ && !persist_("", "")) return false;
   usb_request_ = false; queued_ = {}; received_ = 0; state_ = "idle";
   return true;

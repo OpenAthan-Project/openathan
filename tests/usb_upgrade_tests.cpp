@@ -163,6 +163,16 @@ int main() {
     std::cout<<"USB handoff confirms only after startup health\n";return 0;
   }
   check_selection_reads();
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    const auto token=start_usb(u);std::vector<std::string> reply;
+    assert(u.usb_command(VERIFY,{token},reply)==0);
+    assert(u.usb_command(ABORT,{token},reply)==0);
+    offer(u);u.loop(true);assert(state(u)=="available" && boot_selections==0);
+    JsonDocument status;u.snapshot(status.to<JsonObject>());assert(status["automatic_updates"]["release_skipped"]==true);
+    Upgrade reboot;begin(reboot,a);offer(reboot);reboot.loop(true);assert(state(reboot)=="available");
+    const auto retry=start_usb(reboot);assert(reboot.usb_command(VERIFY,{retry},reply)==0);
+    assert(reboot.usb_command(ABORT,{retry},reply)==0);
+  }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);signature_valid=false;
     const auto token=start_usb(u);std::vector<std::string> reply;
     assert(u.usb_command(VERIFY,{token},reply)==1);assert(erases==0&&writes==0&&saved_record.empty());}

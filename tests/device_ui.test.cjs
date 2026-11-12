@@ -54,8 +54,14 @@ async function fixture(){
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
     if(req.url.startsWith('/api/firmware/')){
       const firmware=state.device.firmware;
-      if(req.url.endsWith('/check'))firmware.state='available';
-      else if(req.url.endsWith('/install')){firmware.state='queued';firmware.queued_version=payload.version;}
+      if(req.url.endsWith('/automatic')){
+        const preference=firmware.automatic_updates;
+        if(payload.expected_revision!==preference.revision){send(409,{error:'Reload automatic updates before saving'});return;}
+        if(payload.enabled!==preference.enabled){preference.enabled=payload.enabled;preference.revision++;state.automaticMutations=(state.automaticMutations||0)+1;}
+        if(!payload.enabled&&firmware.queue_source==='automatic'){firmware.state='idle';firmware.queued_version='';delete firmware.queue_source;}
+      }
+      else if(req.url.endsWith('/check'))firmware.state='available';
+      else if(req.url.endsWith('/install')){firmware.state='queued';firmware.queued_version=payload.version;firmware.queue_source='manual';}
       else if(req.url.endsWith('/cancel')){firmware.state='idle';firmware.queued_version='';}
       if(state.firmwareDrop){state.firmwareDrop=false;res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return;}
       send(200,firmware);return;
@@ -181,6 +187,81 @@ async function mockQuranCatalog(page){
   data:route.request().postDataJSON().kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters()}}));
 }
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ function withAutomatic(f){f.state.device.firmware={version:'v0.2.0',state:'idle',updates_enabled:true,supported:true,last_check:100,result:'',error:'',
+   automatic_updates:{schema:1,revision:0,enabled:true,application:'applied',supported:true,skipped_version:'',release_skipped:false}};}
+ test(`${browserName}: automatic updates default on, persist and reconcile a dropped save`,async()=>{
+  const f=await fixture();withAutomatic(f);const o=await open(f,browserName,{viewport:{width:390,height:844}}),{page}=o;
+  try{
+   await settings(page);assert.ok(await page.locator('#automatic-updates-enabled').isChecked());
+   assert.match(await page.locator('#firmware-status').textContent(),/checks daily/);
+   if(process.env.OPENATHAN_AUTO_SCREENSHOTS){await page.locator('#firmware-section').scrollIntoViewIfNeeded();await page.screenshot({path:join(process.env.OPENATHAN_AUTO_SCREENSHOTS,browserName+'-phone.png')});await page.setViewportSize({width:1280,height:900});await page.screenshot({path:join(process.env.OPENATHAN_AUTO_SCREENSHOTS,browserName+'-desktop.png')});}
+   await page.locator('#automatic-updates-enabled').uncheck();await saved(page,'automatic-updates');
+   assert.equal(f.state.automaticMutations,1);assert.equal(f.state.device.firmware.automatic_updates.enabled,false);
+   await page.reload();await requestsFinished(page);await settings(page);assert.ok(!(await page.locator('#automatic-updates-enabled').isChecked()));
+   f.state.firmwareDrop=true;await page.locator('#automatic-updates-enabled').check();await saved(page,'automatic-updates');
+   assert.equal(f.state.automaticMutations,2);assert.ok(await page.locator('#automatic-updates-enabled').isChecked());
+   await page.setViewportSize({width:320,height:640});await page.evaluate(()=>document.documentElement.style.fontSize='32px');
+   await page.locator('#automatic-updates-enabled').scrollIntoViewIfNeeded();
+   assert.ok(await page.locator('#automatic-updates-enabled').isEnabled());
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  }finally{await o.close();}
+ });
+ test(`${browserName}: automatic updates opt-out cancels its download and keeps manual installation`,async()=>{
+  const f=await fixture();withAutomatic(f);Object.assign(f.state.device.firmware,{state:'downloading',queue_source:'automatic',queued_version:'v0.3.0',available:{version:'v0.3.0'},received:20,total:100});
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);assert.ok(await page.locator('#automatic-updates-enabled').isEnabled());
+   await page.locator('#automatic-updates-enabled').uncheck();await saved(page,'automatic-updates');
+   assert.equal(f.state.device.firmware.state,'idle');assert.ok(await page.locator('#firmware-install').isVisible());
+   await page.locator('#firmware-install').click();await page.waitForFunction(()=>document.getElementById('firmware-status').textContent.includes('Update queued'));
+   assert.equal(f.state.device.firmware.queue_source,'manual');assert.equal(f.state.device.firmware.automatic_updates.enabled,false);
+   f.state.device.firmware.automatic_updates.release_skipped=true;await page.locator('#firmware-cancel').click();
+   await page.locator('#firmware-skipped').waitFor({state:'visible'});assert.match(await page.locator('#firmware-skipped').textContent(),/manually/);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: automatic updates uncertain save requires readback before another write`,async()=>{
+  const f=await fixture();withAutomatic(f);const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);f.state.firmwareDrop=true;f.state.failRead=true;
+   await page.locator('#automatic-updates-enabled').uncheck();
+   await page.waitForFunction(()=>document.getElementById('automatic-updates-feedback').textContent.includes('before another write'));
+   assert.equal(f.state.automaticMutations,1);f.state.failRead=false;await page.locator('#refresh').click();await requestsFinished(page);
+   assert.equal(f.state.automaticMutations,1);await page.locator('#automatic-updates-recovery button').first().click();
+   await page.waitForFunction(()=>document.getElementById('automatic-updates-recovery').hidden);
+   assert.ok(!(await page.locator('#automatic-updates-enabled').isChecked()));assert.equal(f.state.automaticMutations,1);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: automatic updates stale save cannot overwrite a newer preference`,async()=>{
+  const f=await fixture();withAutomatic(f);const o=await open(f,browserName),{page}=o;const gate=deferred(),started=deferred();let attempts=0;
+  try{
+   await settings(page);await page.route('**/api/firmware/automatic',async route=>{
+    attempts++;
+    const preference=f.state.device.firmware.automatic_updates;preference.enabled=false;preference.revision=1;
+    const raw=structuredClone(f.state.device.firmware);started.resolve();await gate.promise;await route.fulfill({status:200,json:raw});
+   });
+   await page.locator('#automatic-updates-enabled').uncheck();await requestStarted(started);
+   Object.assign(f.state.device.firmware.automatic_updates,{enabled:true,revision:2});
+   f.state.device.firmware.version='v0.2.1';await page.locator('#refresh').click();
+   await page.waitForFunction(()=>document.getElementById('firmware-version').textContent.includes('v0.2.1'));
+   gate.resolve();await page.locator('#automatic-updates-recovery').waitFor({state:'visible'});
+   await page.locator('#automatic-updates-recovery button').last().click();
+   await page.waitForFunction(()=>document.getElementById('automatic-updates-recovery').hidden);
+   assert.ok(await page.locator('#automatic-updates-enabled').isChecked());
+   assert.equal(attempts,1);
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: automatic updates hides unsupported controls and isolates its storage fault`,async()=>{
+  const f=await fixture();f.state.device.firmware={version:'v0.2.0',state:'idle'};const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);assert.ok(await page.locator('#automatic-updates-group').isHidden());
+   withAutomatic(f);f.state.device.firmware.supported=false;await page.locator('#refresh').click();await requestsFinished(page);
+   assert.ok(await page.locator('#automatic-updates-group').isHidden());
+   f.state.device.firmware.supported=true;delete f.state.device.firmware.automatic_updates.enabled;
+   f.state.device.firmware.automatic_updates.application='storage_fault';await page.locator('#refresh').click();await requestsFinished(page);
+   assert.ok(await page.locator('#automatic-updates-enabled').isDisabled());assert.match(await page.locator('#automatic-updates-feedback').textContent(),/storage/);
+   await slide(page,'settings-volume',40);await saved(page,'preferences');assert.equal(f.state.device.settings.volume,40);
+  }finally{await o.close();}
+ });
  function withName(f,name=''){f.state.device.speaker_name={schema:1,revision:1,name,application:'applied'};}
  async function nameConflict(f,page,name='Guest room'){
   await settings(page);await page.locator('#speaker-name').fill(name);

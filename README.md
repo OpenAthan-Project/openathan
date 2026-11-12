@@ -85,7 +85,10 @@ Keep your phone and speaker on the same home Wi-Fi for everyday controls. Phone
 enrollment uses a temporary open setup network; perform initial setup in a trusted
 place. You can join that network manually without scanning a QR code.
 
-**Already installed?** Open the speaker's settings to check for updates, or use
+**Already installed?** Open the speaker's settings to check for updates. Firmware
+with automatic-update support enables it by default, installs signed stable
+releases between prayers and provides a saved opt-out in Settings → Updates.
+Older speakers need one preserving update to receive this feature. Use
 USB setup for Wi-Fi/password recovery. Do not choose a fresh installation to
 update an existing speaker. See the [preserving update guide](docs/development/firmware-upgrades.md)
 for older firmware or bootloader compatibility.

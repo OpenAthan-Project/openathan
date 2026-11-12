@@ -211,7 +211,15 @@ The generic ESPHome package does not configure Wi-Fi. Reference firmware provide
 
 The public website and browser installer live in the separate [`OpenAthan-Project/website`](https://github.com/OpenAthan-Project/website) repository. Firmware builds and release artifacts originate in this repository; the website consumes published artifacts and does not compile firmware.
 
-The device UI remains in this repository and must function without the public website or cloud infrastructure. The deployed website can suggest a location and adopt approved stable releases after verification; neither is required for local controls or daily operation. Automatic website adoption does not request a speaker update: owners queue signed application updates through the device's Firmware section.
+The device UI remains in this repository and must function without the public
+website or cloud infrastructure. The deployed website can suggest a location and
+adopt approved stable releases after verification; neither is required for local
+controls or daily operation. The official firmware independently discovers signed
+stable releases and installs them during safe gaps, with automatic updates enabled
+by default and a durable local opt-out. Manual installation remains available in
+Settings. Website adoption does not send device commands. The updater owns its
+preference and request metadata separately from prayer settings and consumption;
+see the [upgrade contract](firmware-upgrades.md).
 
 ## Screenless AUDIO-Board
 

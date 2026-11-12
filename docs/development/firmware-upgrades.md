@@ -1,9 +1,10 @@
 # Firmware upgrades
 
 Official production firmware can check for published stable releases and install
-application-only updates from its authenticated device page. Prayer calculation,
-scheduling and recordings continue to work independently of the release service.
-The flow is included in published pre-1.0 reference releases. See the
+application-only updates automatically or from its authenticated device page.
+Prayer calculation, scheduling and recordings continue to work independently of
+the release service. The manual updater is included in published pre-1.0 reference
+releases; automatic installation requires firmware with this feature. See the
 [current production/public evidence and limits](release-validation-2026-10-03.md)
 and [source-bound qualification results](upgrade-qualification-2026-10-01.md).
 The [maintainer qualification runbook](../../firmware/esphome/upgrades/VALIDATION.md)
@@ -17,11 +18,34 @@ and clock synchronization, then approximately daily. **Check for updates** also
 starts a check. A failed check retains the current application and does not pause
 the scheduler.
 
+**Automatic updates** is on by default, including for existing speakers once they
+receive firmware with this feature through one preserving manual or USB update.
+No browser needs to stay open. After setup and startup health confirmation, a
+verified newer stable release is queued automatically during a safe gap. The
+speaker installs and restarts only when playback is idle and the next announcement
+is at least 15 minutes away. Quran loading/playback, the dua sequence, recording
+downloads and provisioning retain their existing exclusions. An automatic queue
+waiting for a safe gap does not prevent the owner from starting playback.
+
+Turn the setting off to retain manual installation and daily release discovery.
+The preference saves immediately and survives restart and preserving updates.
+Turning it off cancels an automatic request before boot selection, including
+during download; it does not cancel an explicit manual or USB request. After boot
+selection, restart is already committed and the setting cannot change until the
+speaker returns.
+
 **Install update** durably queues that specific offered release. Closing the page
 or restarting does not cancel the request. Installation waits until playback ends
 and the next announcement is at least 15 minutes away. An activated device must
 have a healthy schedule and a valid clock. **Cancel queued update** cancels before
 boot selection, including during a download; the old application remains active.
+Cancellation skips that release and earlier versions for automatic installation,
+even after restart. A newer release remains eligible. Turning the setting off and
+on or checking again does not remove the skip; **Install update** explicitly
+retries an offered skipped version. Downloaded-image checksum, image validation
+and version failures, startup rollback, and aborted verified USB requests also
+skip automatic installation through that version. Temporary network failures and
+short downloads keep the existing queued-request retry policy.
 
 The worker streams into the inactive application slot. Interrupted downloads
 restart from the beginning after a five-minute retry delay and a fresh safe-window
@@ -41,6 +65,22 @@ Existing settings, credentials, prayer consumption/skip records, light preferenc
 and shared recordings are preserved. Upgrade bookkeeping has its own NVS namespace
 (`oa_upgrade`, or `oa_upgrade_test` in isolated builds). Storage failures fail
 closed without erasing or restoring existing records.
+Automatic preferences use a separate schema-1 `automatic` record in that same
+namespace. It contains `enabled`, its independent `revision`, the highest skipped
+version and the version/SHA-256 identity of an automatic request. Missing metadata
+defaults to enabled; unreadable or invalid metadata disables automatic installation
+and reports an independent preference storage fault. It does not prevent startup
+health confirmation or prayer scheduling. An existing Wi-Fi request with unknown
+origin stays blocked until explicitly canceled; valid USB ownership is retained.
+Manual installation requires healthy automatic metadata, while manual discovery
+and cancellation remain available. No prayer-settings, shared-audio or signed
+release format changes are required.
+
+The existing schema-1 Wi-Fi and schema-2 USB journals remain readable by older
+firmware, which ignores the new preference record. Automatic origin is committed
+before its matching request; an opt-out or skipped version is committed before
+clearing the request. Interrupted saves cannot revive a canceled automatic request.
+Explicit manual retries clear the automatic origin before storing their request.
 
 ## Local API
 
@@ -52,10 +92,19 @@ All endpoints use the existing Digest authentication and same-origin policy.
 | `POST /api/firmware/check` | `{}` | Starts an asynchronous check |
 | `POST /api/firmware/install` | `{"version":"vX.Y.Z"}` | Persists the exact offered version |
 | `POST /api/firmware/cancel` | `{}` | Cancels before boot selection |
+| `POST /api/firmware/automatic` | `{"schema":1,"expected_revision":N,"enabled":false}` | Saves the preference and returns firmware status |
 
 `GET /api/status` includes the same state as `firmware`. Conflicting actions return
 409; unavailable initialization/storage returns 503. An uncertain POST response
 must be reconciled with a GET, never automatically repeated.
+Firmware status adds `automatic_updates` with `schema`, `revision`, `enabled`,
+`supported`, `application`, `skipped_version` and `release_skipped`; `enabled` is
+absent when metadata cannot be read. `queue_source` identifies an existing request
+as `automatic`, `manual`, `usb` or `unknown`. Preference conflicts return 409 and
+storage failures return 503. Old clients can keep using the existing actions;
+new clients hide the toggle when the capability is absent or unsupported.
+The [automatic update validation report](automatic-updates-validation-2026-11-12.md)
+records automated results, matched image sizes and pending physical checks.
 
 ## Release contract and trust
 
@@ -65,7 +114,8 @@ and checksum list. The OTA application must equal the factory application's byte
 The website importer verifies its selected manifest, factory and audio assets;
 extra upgrade assets do not alter the fresh-install manifest. Its automatic
 policy adopts published stable latest after validation, with a manual pin or
-disable policy available. This does not install updates on existing speakers.
+disable policy available. Speakers with automatic updates enabled independently
+discover and install the selected release; website adoption does not send a device command.
 
 `upgrade.json` contains `payload` (the exact signed JSON string) and `signature`
 (lowercase hexadecimal DER ECDSA signature). SHA-256/P-256 verification uses the

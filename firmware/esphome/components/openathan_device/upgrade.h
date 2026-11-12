@@ -45,7 +45,7 @@ class Upgrade : public UpgradeApi {
   bool confirmed() const { return confirmed_; }
   bool usb_busy() const { return usb_token_ || usb_request_; }
   bool active() const { return active_; }
-  bool streaming_blocked() const { return usb_busy() || active_ || state_ == "queued" || state_ == "installing"; }
+  bool streaming_blocked() const { return usb_busy() || active_ || (!automatic_request_ && state_ == "queued") || state_ == "restarting"; }
  private:
   static void worker_(void *argument);
   void run_();
@@ -53,6 +53,14 @@ class Upgrade : public UpgradeApi {
   bool descriptor_(const std::string &envelope, UpgradeRelease &release);
   bool persist_(const std::string &queue, const std::string &expected);
   void fail_(const char *message);
+  void reject_(const char *message);
+  void load_automatic_();
+  bool save_automatic_(bool enabled, uint32_t revision, const std::string &skipped, const std::string &request);
+  int change_automatic_(JsonObjectConst input, std::string &error);
+  bool suppress_(const std::string &version);
+  bool cancel_request_();
+  void automatic_loop_();
+  static std::string request_identity_(const UpgradeRelease &release);
   enum class UsbSelection { UNKNOWN, SELECTED, UNSELECTED, REJECTED };
   UsbSelection usb_selection_();
   bool usb_safe_();
@@ -65,6 +73,12 @@ class Upgrade : public UpgradeApi {
   const esp_partition_t *staged_{};
   nvs_handle_t nvs_{};
   bool storage_ok_{}, server_ready_{}, confirmed_{}, install_job_{}, bootloader_ok_{};
+  struct Automatic {
+    bool enabled{true};
+    uint32_t revision{};
+    std::string skipped, request;
+  } automatic_;
+  bool automatic_ok_{true}, automatic_request_{};
   std::atomic<bool> active_{false}, cancel_{false}, safe_{false};
   std::atomic<uint32_t> received_{0};
   uint64_t boot_ms_{}, next_check_ms_{}, retry_ms_{};

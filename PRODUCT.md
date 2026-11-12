@@ -95,9 +95,10 @@ restarts, with unplugged retention and battery behavior still unqualified.
   must survive compatible updates and recovery. Historical full-flash images
   are not routine settings or credential recovery mechanisms.
 - Pre-1.0 reference releases include the public installer, phone/USB setup,
-  approved stored recordings, optional displays/lights, and owner-requested
-  signed application updates. Website release adoption does not update speakers
-  automatically. Atom's display profile targets GC9107; ST7735 revisions remain
+  approved stored recordings, optional displays/lights, and signed application
+  updates. Automatic installation defaults on in capable firmware, with a saved
+  opt-out and manual installation controls. Website release adoption does not send
+  device commands. Atom's display profile targets GC9107; ST7735 revisions remain
   unqualified. The screen is optional to the reusable core and phone enrollment
   offers manual network/address entry without QR scanning.
 - [MP3Quran streaming](docs/development/quran-streaming.md), published in v0.6.0,

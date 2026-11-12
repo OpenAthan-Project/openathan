@@ -5,6 +5,7 @@ const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 const title = (value) => value[0].toUpperCase() + value.slice(1);
 const specs = {
+  automatic_updates: { path: "/api/firmware/automatic", read: "/api/firmware", groups: ["automatic-updates"] },
   speaker_name: { path: "/api/speaker-name", read: "/api/speaker-name", groups: ["name"] },
   settings: { path: "/api/settings", read: "/api/status", groups: ["volume", "preferences", "quran-volume"] },
   display: { path: "/api/display", read: "/api/display", groups: ["screen"] },
@@ -104,7 +105,7 @@ function valueFrom(key, state) {
   if (!state) return null;
   if (key === "settings" || key === "lights") return state.settings || null;
   if (key === "speaker_name") return typeof state.name === "string" ? { name: state.name } : null;
-  if (key === "dua") return typeof state.enabled === "boolean" ? { enabled: state.enabled } : null;
+  if (key === "dua" || key === "automatic_updates") return typeof state.enabled === "boolean" ? { enabled: state.enabled } : null;
   if (key === "display")
     return Number.isFinite(state.brightness_percent)
       ? { brightness_percent: state.brightness_percent }
@@ -418,8 +419,9 @@ function acceptResponse({ data, order }, resource = "status", allowPlayback = tr
       observedStatus.playbackOrder = order;
       playbackAccepted = true;
     }
-  } else if (resource !== "firmware") accepted[resource] = acceptDomain(resource, data, order);
-  const update = resource === "firmware" ? data : resource === "status" ? data.firmware : null;
+  } else if (!["firmware", "automatic_updates"].includes(resource)) accepted[resource] = acceptDomain(resource, data, order);
+  const update = ["firmware", "automatic_updates"].includes(resource) ? data : resource === "status" ? data.firmware : null;
+  if (update?.automatic_updates) accepted.automatic_updates = acceptDomain("automatic_updates", update.automatic_updates, order);
   if (update && order >= firmware.order) {
     firmware.data = update;
     firmware.order = order;
@@ -481,7 +483,7 @@ function acceptSavedResponse(key, response) {
     if (result?.lower) error.status = 409;
     throw error;
   }
-  return response.data;
+  return key === "automatic_updates" ? response.data.automatic_updates : response.data;
 }
 // Rendering and setup navigation
 function savedMessage(key) {
@@ -572,7 +574,7 @@ function renderPreferences() {
           ? ["screen-brightness"]
           : key === "lights"
             ? ["lights-enabled", "lights-brightness"]
-            : key === "speaker_name" ? ["speaker-name"] : key === "dua" ? ["dua-enabled"] : ["time-format"];
+            : key === "speaker_name" ? ["speaker-name"] : key === "dua" ? ["dua-enabled"] : key === "automatic_updates" ? ["automatic-updates-enabled"] : ["time-format"];
     elements.forEach((id) => ($(id).disabled = fault || (firstRun && key !== "speaker_name")));
   }
   if (settingsFault()) {
@@ -1229,6 +1231,7 @@ function bodyFor(key, before, candidate, review) {
       : { ...base, ...candidate };
 }
 function matches(key, actual, expected, before, review) {
+  if (key === "automatic_updates" && actual.automatic_updates) actual = actual.automatic_updates;
   if (!valueFrom(key, actual) || !Number.isInteger(actual.revision)) return false;
   const value = clone(valueFrom(key, actual)),
     wanted = clone(expected);
@@ -1976,6 +1979,16 @@ function renderFirmware(state = firmware.data) {
   $("firmware-section").hidden = !state;
   if (!state) return;
   const updatesEnabled = state.updates_enabled !== false;
+  $("automatic-updates-group").hidden = !updatesEnabled || !state.automatic_updates ||
+    state.automatic_updates.supported === false || state.supported === false;
+  const automatic = current("automatic_updates");
+  $("automatic-updates-enabled").indeterminate = !automatic;
+  if (automatic) $("automatic-updates-enabled").checked = automatic.enabled;
+  $("automatic-updates-enabled").disabled = !automatic || storageFault(domains.automatic_updates) || !connected ||
+    firmwareBusy || firmwareUncertain || state.transport === "usb" || state.state === "restarting";
+  $("firmware-skipped").hidden = !state.automatic_updates?.release_skipped;
+  if (state.automatic_updates?.release_skipped)
+    text("firmware-skipped", "Automatic installation is skipped for this release. Choose Install update to try it manually.");
   $("firmware-check").hidden = !updatesEnabled;
   $("firmware-last-check").hidden = !updatesEnabled;
   if (!updatesEnabled) {
@@ -2002,7 +2015,9 @@ function renderFirmware(state = firmware.data) {
     (state.supported === false
       ? "This speaker needs a maintainer USB update before Wi-Fi installation. "
       : "") +
-      (firmwareMessages[state.state] || "Reading update status…") +
+      (state.state === "idle" && automatic?.enabled ? "Automatic updates are on. The speaker checks daily." :
+        state.state === "queued" && state.queue_source === "automatic" ? "Automatic update queued. Waiting for a safe time between prayers." :
+        firmwareMessages[state.state] || "Reading update status…") +
       progress +
       (state.error ? ` ${state.error}` : "")
   );
@@ -2081,6 +2096,8 @@ async function firmwareAction(action) {
 }
 for (const action of ["check", "install", "cancel"])
   $("firmware-" + action).addEventListener("click", () => firmwareAction(action));
+$("automatic-updates-enabled").addEventListener("change", () =>
+  enqueue("automatic_updates", { enabled: $("automatic-updates-enabled").checked }));
 setInterval(async () => {
   if (document.hidden || firmwareBusy || !firmware.data) return;
   try {

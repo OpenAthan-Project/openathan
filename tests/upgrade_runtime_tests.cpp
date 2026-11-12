@@ -15,23 +15,34 @@ using namespace esphome::openathan_device;
 int64_t now_us{};
 int64_t esp_timer_get_time(){return now_us;}
 std::string saved_record, staged_record;
+std::string saved_automatic, staged_automatic;
+bool staged_request_dirty{}, staged_automatic_dirty{};
 unsigned nvs_commits{};
 bool commit_ok=true;
 bool cut_after_commit=false;
+unsigned cut_commit_number{};
 struct PowerCut {};
 int nvs_open(const char *,int,nvs_handle_t *h){*h=1;return 0;}
-int nvs_get_blob(nvs_handle_t,const char *,void *out,size_t *size){
-  if(saved_record.empty())return ESP_ERR_NVS_NOT_FOUND;
-  if(out)memcpy(out,saved_record.data(),saved_record.size());
-  *size=saved_record.size();return 0;
+int nvs_get_blob(nvs_handle_t,const char *key,void *out,size_t *size){
+  const auto &record=std::string_view(key)=="automatic"?saved_automatic:saved_record;
+  if(record.empty())return ESP_ERR_NVS_NOT_FOUND;
+  if(out)memcpy(out,record.data(),record.size());
+  *size=record.size();return 0;
 }
-int nvs_set_blob(nvs_handle_t,const char *,const void *data,size_t size){staged_record.assign(static_cast<const char *>(data),size);return 0;}
-int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok)return -1;saved_record=staged_record;if(cut_after_commit)throw PowerCut{};return 0;}
+int nvs_set_blob(nvs_handle_t,const char *key,const void *data,size_t size){
+  if(std::string_view(key)=="automatic"){staged_automatic.assign(static_cast<const char *>(data),size);staged_automatic_dirty=true;}
+  else {staged_record.assign(static_cast<const char *>(data),size);staged_request_dirty=true;}return 0;
+}
+int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok)return -1;
+  if(staged_request_dirty)saved_record=staged_record;if(staged_automatic_dirty)saved_automatic=staged_automatic;
+  staged_request_dirty=staged_automatic_dirty=false;if(cut_after_commit||nvs_commits==cut_commit_number)throw PowerCut{};return 0;}
 void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
 int action(Upgrade &update,const char *name,const char *version=nullptr){JsonDocument doc;auto root=doc.to<JsonObject>();if(version)root["version"]=version;std::string error;return update.action(name,root,error);}
 void reset(){reset_http();assert(live_read_buffers==0);read_buffer_allocation_fails=false;read_buffer_allocation_attempts=0;now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;
+  saved_automatic.clear();staged_automatic.clear();staged_request_dirty=staged_automatic_dirty=false;
+  cut_commit_number=0;
   boot_query_fails=description_query_fails=candidate_query_fails=false;inactive_state_result=ESP_OK;selection_fails=selection_writes_before_failure=false;metadata_erased=false;nvs_commits=0;
   running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
   application_response=std::string(512,'a');uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
@@ -270,7 +281,7 @@ int main(){
     assert(erases==0 && writes==0 && aborts==0 && boot_selections==0);
     assert(state(u)==(callback==cancel_download?"idle":"queued"));
   }
-  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);application_response[20]='b';u.loop(true);run_worker();u.loop(true);assert(boot_selections==0 && aborts==1);assert(state(u)=="queued");}
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);application_response[20]='b';u.loop(true);run_worker();u.loop(true);assert(boot_selections==0 && aborts==1);assert(state(u)=="failed");}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);image_valid=false;u.loop(true);run_worker();u.loop(true);assert(boot_selections==0);}
   for(const bool allocation_failure:{false,true}) {
     reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);

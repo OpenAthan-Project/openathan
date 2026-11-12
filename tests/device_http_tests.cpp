@@ -128,7 +128,7 @@ void check_http(Upgrade &upgrade, esphome::openathan_component::OpenAthan &athan
   const auto calls = device.api_storage.calls;
   for (const char *path : {"/api/settings", "/api/preview", "/api/activate", "/api/skip", "/api/cancel-skip",
        "/api/lights", "/api/display", "/api/time-format", "/api/firmware/check", "/api/firmware/install",
-       "/api/firmware/cancel", "/api/stop/", "/api/stop?ignored=true", "/api/stop-extra"}) {
+       "/api/firmware/cancel", "/api/firmware/automatic", "/api/stop/", "/api/stop?ignored=true", "/api/stop-extra"}) {
     assert(client.call("POST", path).code == 409);
   }
   assert(device.api_storage.calls == calls);
