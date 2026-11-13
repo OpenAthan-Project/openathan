@@ -359,7 +359,10 @@ void Upgrade::run_() {
 #endif
   if (esp_ota_end(handle) != ESP_OK) { reject_("The firmware image failed validation; automatic retry is disabled for this release"); return; }
   esp_app_desc_t description{};
-  if (esp_ota_get_partition_description(partition, &description) != ESP_OK || release.version != description.version) {
+  if (esp_ota_get_partition_description(partition, &description) != ESP_OK) {
+    fail_("Could not read the downloaded firmware version; retrying after five minutes"); return;
+  }
+  if (release.version != description.version) {
     reject_("The firmware version does not match the verified release; automatic retry is disabled for this release"); return;
   }
   std::lock_guard<std::mutex> lock(mutex_);
