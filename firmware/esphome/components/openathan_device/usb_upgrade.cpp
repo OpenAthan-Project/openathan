@@ -21,7 +21,8 @@ Upgrade::~Upgrade() {
   if (usb_hash_live_) mbedtls_sha256_free(&usb_hash_);
 }
 bool Upgrade::usb_safe_() {
-  if (!OPENATHAN_UPDATES_ENABLED || !confirmed_ || !storage_ok_ || !bootloader_ok_) return false;
+  if (!OPENATHAN_UPDATES_ENABLED || !confirmed_ || !storage_ok_ || !verify_ok_ || !bootloader_ok_ ||
+      (!usb_token_ && !verify_hold_.empty())) return false;
   const auto status = athan_->status();
   const auto *settings = athan_->settings_service();
   if (!server_ready_ || athan_->is_failed() || !settings || !settings->healthy() ||
@@ -35,44 +36,34 @@ bool Upgrade::usb_safe_() {
 std::vector<std::string> Upgrade::usb_info() {
   std::lock_guard<std::mutex> lock(mutex_);
   return {"1", OPENATHAN_FIRMWARE_VERSION, OPENATHAN_BUILD_COMMIT,
-      OPENATHAN_UPDATES_ENABLED && bootloader_ok_ ? "supported" : "unsupported", storage_ok_ ? state_ : "storage_fault",
-      confirmed_ ? "confirmed" : "pending", result_, queued_.version, std::to_string(received_.load()), OPENATHAN_HARDWARE};
+      OPENATHAN_UPDATES_ENABLED && bootloader_ok_ ? "supported" : "unsupported", storage_ok_ && verify_ok_ ? state_ : "storage_fault",
+      confirmed_ ? "confirmed" : "pending", result_, queued_.version.empty() ? expected_ : queued_.version,
+      std::to_string(received_.load()), OPENATHAN_HARDWARE};
 }
 Upgrade::UsbSelection Upgrade::usb_selection_() {
-  // Called with mutex_ held. Empty expected can also be a handoff marker that
-  // an older firmware cleared; it is never proof that selection did not happen.
-  const auto *running = esp_ota_get_running_partition();
-  const auto *candidate = esp_ota_get_next_update_partition(nullptr);
-  if (!running || !candidate || candidate == running || queued_.envelope.empty()) return UsbSelection::UNKNOWN;
-  esp_app_desc_t description{};
-  const bool identified = esp_ota_get_partition_description(candidate, &description) == ESP_OK &&
-      queued_.version == description.version;
-  esp_ota_img_states_t image_state{};
-  const auto state_result = identified ? esp_ota_get_state_partition(candidate, &image_state) : ESP_ERR_NOT_FOUND;
-  // Read selection last, including when the inactive OTA entry is absent.
-  const auto *boot = esp_ota_get_boot_partition();
-  if (!boot || (boot != running && boot != candidate)) return UsbSelection::UNKNOWN;
-  if (boot == candidate) {
-    if (!identified || state_result != ESP_OK || image_state == ESP_OTA_IMG_INVALID ||
-        image_state == ESP_OTA_IMG_ABORTED) return UsbSelection::UNKNOWN;
-    return UsbSelection::SELECTED;
+  handoff_state_ = handoff_();
+  switch (handoff_state_) {
+    case Handoff::SELECTED: return UsbSelection::SELECTED;
+    case Handoff::REJECTED: return UsbSelection::REJECTED;
+    case Handoff::INTERRUPTED: return UsbSelection::UNSELECTED;
+    case Handoff::UNKNOWN: return UsbSelection::UNKNOWN;
   }
-  if ((!expected_.empty() && !identified) || (state_result != ESP_OK && state_result != ESP_ERR_NOT_FOUND))
-    return UsbSelection::UNKNOWN;
-  if (!expected_.empty() && identified && state_result == ESP_OK &&
-      (image_state == ESP_OTA_IMG_INVALID || image_state == ESP_OTA_IMG_ABORTED)) return UsbSelection::REJECTED;
-  // OTA begin can leave no inactive entry, and a partial image may have no
-  // readable description. The successful running-slot selection is the proof.
-  return UsbSelection::UNSELECTED;
+  return UsbSelection::UNKNOWN;
 }
-bool Upgrade::usb_abort_() {
-  if (!expected_.empty() || state_ == "awaiting_power") return false;
+void Upgrade::usb_release_() {
   if (usb_handle_) { esp_ota_abort(usb_handle_); usb_handle_ = 0; }
   if (usb_hash_live_) { mbedtls_sha256_free(&usb_hash_); usb_hash_live_ = false; }
   usb_token_ = 0; std::string{}.swap(usb_descriptor_); usb_descriptor_bytes_ = 0; staged_ = nullptr;
-  if (usb_request_ && !queued_.version.empty() && automatic_ok_ && !suppress_(queued_.version)) return false;
+}
+bool Upgrade::usb_abort_() {
+  if (!expected_.empty() || state_ == "awaiting_power") return false;
+  usb_release_();
+  if (usb_request_ && !queued_.version.empty() && !suppress_(queued_.version)) {
+    error_ = "USB cancellation could not be saved; restart the speaker"; return false;
+  }
+  if (!save_verify_hold_("")) return false;
   if (usb_request_ && !persist_("", "")) return false;
-  usb_request_ = false; queued_ = {}; received_ = 0; state_ = "idle";
+  usb_request_ = false; queued_ = {}; received_ = 0; state_ = "idle"; handoff_state_ = Handoff::UNKNOWN;
   return true;
 }
 uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fields,
@@ -123,6 +114,7 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
     usb_request_ = true;
     if (!persist_(release.envelope, "")) { usb_abort_(); return 255; }
     queued_ = release;
+    handoff_state_ = Handoff::UNKNOWN; retry_ms_ = 0;
     const auto *partition = esp_ota_get_next_update_partition(nullptr);
     if (!partition || partition->size != 0x200000 || esp_ota_begin(partition, release.bytes, &usb_handle_) != ESP_OK) {
       usb_abort_(); return 255;
@@ -134,6 +126,7 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
   }
   if (command == FINISH) {
     if (state_ != "usb_receiving" || received_ != queued_.bytes || !usb_safe_()) return 255;
+    if (!save_verify_hold_(request_identity_(queued_))) { usb_release_(); return 255; }
     uint8_t digest[32];
     if (mbedtls_sha256_finish(&usb_hash_, digest) != 0) { usb_abort_(); return 255; }
     mbedtls_sha256_free(&usb_hash_); usb_hash_live_ = false;
@@ -144,15 +137,21 @@ uint8_t Upgrade::usb_command(uint8_t command, const std::vector<std::string> &fi
     if (esp_ota_end(handle) != ESP_OK) { usb_abort_(); return 1; }
     const auto *partition = esp_ota_get_next_update_partition(nullptr);
     esp_app_desc_t description{};
-    if (!partition || esp_ota_get_partition_description(partition, &description) != ESP_OK ||
-        queued_.version != description.version) { usb_abort_(); return 1; }
+    if (!partition || esp_ota_get_partition_description(partition, &description) != ESP_OK) {
+      save_verify_hold_(""); usb_release_(); state_ = "usb_interrupted";
+      error_ = "Could not read the downloaded firmware version; reconcile through USB"; return 255;
+    }
+    if (queued_.version != description.version) { usb_abort_(); return 1; }
+    if (!save_verify_hold_("")) { usb_release_(); return 255; }
     // Persist the handoff before selecting. A lost reply is never permission to retry.
     if (!persist_(queued_.envelope, queued_.version)) return 255;
     expected_ = queued_.version;
+    handoff_state_ = Handoff::UNKNOWN;
     usb_token_ = 0;
     if (esp_ota_set_boot_partition(partition) != ESP_OK) {
-      state_ = "usb_selection_uncertain"; return 255;
+      retry_ms_ = usb_now() + 5000; state_ = "usb_selection_uncertain"; return 255;
     }
+    handoff_state_ = Handoff::SELECTED;
     state_ = "awaiting_power";
     reply = {"verified", queued_.version}; return 0;
   }
@@ -171,10 +170,13 @@ bool Upgrade::usb_chunk(const ::openathan::usb_upgrade::Chunk &chunk) {
     // Keep the write buffer in internal stack RAM while flash disables the PSRAM cache.
     std::array<uint8_t, ::openathan::usb_upgrade::CHUNK> internal{};
     std::copy(chunk.bytes.begin(), chunk.bytes.end(), internal.begin());
+    const bool first = received_ == 0 && !chunk.bytes.empty();
+    if (first && !save_verify_hold_(request_identity_(queued_))) { usb_release_(); return false; }
     if (esp_ota_write(usb_handle_, internal.data(), chunk.bytes.size()) != ESP_OK ||
         mbedtls_sha256_update(&usb_hash_, internal.data(), chunk.bytes.size()) != 0) {
       usb_abort_(); return false;
     }
+    if (first && !save_verify_hold_("")) { usb_release_(); return false; }
     received_ += chunk.bytes.size();
   }
   usb_last_ms_ = usb_now(); return true;

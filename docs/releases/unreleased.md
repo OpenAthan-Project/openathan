@@ -16,6 +16,10 @@ away. Settings, credentials, prayer history and recordings are retained. Cancele
 or rejected releases stay skipped automatically across restarts; a newer release
 or an explicit manual installation can proceed.
 
+An interrupted verification requires a manual retry. Failed cancellation keeps
+the request and reports an error. Uncertain boot selection retains its recovery
+record until the speaker can establish which application is selected.
+
 The [validation record](../development/automatic-updates-validation-2026-11-12.md)
 contains automated checks and firmware measurements. Physical update/recovery and
 runtime-memory checks remain pending before release.

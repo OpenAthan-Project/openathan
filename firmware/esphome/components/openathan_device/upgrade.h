@@ -61,9 +61,16 @@ class Upgrade : public UpgradeApi {
   bool cancel_request_();
   void automatic_loop_();
   static std::string request_identity_(const UpgradeRelease &release);
+  static std::string identity_version_(const std::string &identity);
+  void load_verify_hold_();
+  bool save_verify_hold_(const std::string &identity);
+  bool recover_verification_();
+  enum class Handoff { UNKNOWN, REJECTED, SELECTED, INTERRUPTED };
+  Handoff handoff_();
   enum class UsbSelection { UNKNOWN, SELECTED, UNSELECTED, REJECTED };
   UsbSelection usb_selection_();
   bool usb_safe_();
+  void usb_release_();
   bool usb_abort_();
   openathan_component::OpenAthan *athan_{};
   std::mutex mutex_;
@@ -79,6 +86,9 @@ class Upgrade : public UpgradeApi {
     std::string skipped, request;
   } automatic_;
   bool automatic_ok_{true}, automatic_request_{};
+  bool verify_ok_{true};
+  std::string verify_hold_;
+  Handoff handoff_state_{Handoff::UNKNOWN};
   std::atomic<bool> active_{false}, cancel_{false}, safe_{false};
   std::atomic<uint32_t> received_{0};
   uint64_t boot_ms_{}, next_check_ms_{}, retry_ms_{};

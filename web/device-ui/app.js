@@ -2050,7 +2050,8 @@ function renderFirmware(state = firmware.data) {
     firmwareUncertain ||
     state.state === "storage_fault" ||
     state.supported === false;
-  $("firmware-cancel").hidden = state.transport === "usb" || !["queued", "downloading", "verifying"].includes(state.state);
+  $("firmware-cancel").hidden = state.transport === "usb" ||
+    (!["queued", "downloading", "verifying"].includes(state.state) && !(state.state === "failed" && state.queued_version));
   $("firmware-cancel").disabled = firmwareBusy || writing() || !connected || firmwareUncertain;
   $("firmware-notes").hidden = !state.available;
   if (state.available)

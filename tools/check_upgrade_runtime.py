@@ -46,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
             str(ROOT / "tests" / source), str(ROOT / "firmware/esphome/components/openathan_device/upgrade.cpp"),
             str(ROOT / "firmware/esphome/components/openathan_device/usb_upgrade.cpp"),
             str(ROOT / "firmware/esphome/components/openathan_device/automatic_updates.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan_device/upgrade_recovery.cpp"),
             str(ROOT / "lib/openathan-core/src/dua.cpp"),
             *additional,
             *([str(ROOT / "firmware/esphome/components/openathan_upgrade_qualification/qualification.cpp")]

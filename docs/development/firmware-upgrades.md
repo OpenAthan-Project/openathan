@@ -48,6 +48,12 @@ skip automatic installation through that version. Temporary network failures,
 short downloads and firmware-description read failures keep the existing
 queued-request retry policy.
 
+If power is lost during image verification, the next startup skips that release
+for automatic installation. Use **Check for updates**, then **Install update** to
+try it manually. The updater records verification before checking the image, so
+a failed storage write cannot turn a rejected image into an automatic retry.
+Ordinary incomplete downloads still use the five-minute retry policy.
+
 The worker streams into the inactive application slot. Interrupted downloads
 restart from the beginning after a five-minute retry delay and a fresh safe-window
 check. If playback starts or scheduling becomes unsafe, staging stops. A verified,
@@ -61,6 +67,11 @@ immediately before flash erase/write/finalization. If the worker cannot be creat
 the durable request remains queued and cancellable, with a five-minute retry delay.
 Failed OTA starts release any handle allocated before an erase failure; retries
 retain the request without accumulating those allocations.
+If boot selection returns an error, the updater retains its handoff record until
+read-only checks establish which slot is selected. Missing or unreadable metadata
+does not authorize another download or erase. Unresolved checks retry after five
+seconds. Cancellation and preference changes return 409 while selection remains
+unresolved or the candidate is already selected.
 
 Existing settings, credentials, prayer consumption/skip records, light preferences
 and shared recordings are preserved. Upgrade bookkeeping has its own NVS namespace
@@ -72,16 +83,27 @@ version and the version/SHA-256 identity of an automatic request. Missing metada
 defaults to enabled; unreadable or invalid metadata disables automatic installation
 and reports an independent preference storage fault. It does not prevent startup
 health confirmation or prayer scheduling. An existing Wi-Fi request with unknown
-origin stays blocked until explicitly canceled; valid USB ownership is retained.
-Manual installation requires healthy automatic metadata, while manual discovery
-and cancellation remain available. No prayer-settings, shared-audio or signed
-release format changes are required.
+origin stays blocked. Cancellation returns 503 until the speaker can save the
+release skip, and retains the request for recovery after a healthy restart.
+Valid USB ownership is retained. Manual installation requires healthy updater
+metadata. Manual discovery remains available when no request is pending and
+verification storage is healthy.
+No prayer-settings, shared-audio or signed release format changes are required.
+
+A separate optional schema-1 `verify_hold` record binds verification to the exact
+version and SHA-256 of its signed request. The updater commits the record before
+image validation. Permanent rejection and cancellation commit suppression before
+clearing the verification record and request. Successful verification clears the
+record before staging an image for selection. An unreadable record blocks updates
+without blocking prayer scheduling or startup health confirmation.
 
 The existing schema-1 Wi-Fi and schema-2 USB journals remain readable by older
 firmware, which ignores the new preference record. Automatic origin is committed
 before its matching request; an opt-out or skipped version is committed before
 clearing the request. Interrupted saves cannot revive a canceled automatic request.
 Explicit manual retries clear the automatic origin before storing their request.
+Older firmware ignores `verify_hold` and does not enforce its verification-recovery
+protection. Restoring an older application does not provide this newer guarantee.
 
 ## Local API
 

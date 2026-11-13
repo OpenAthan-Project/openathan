@@ -50,8 +50,9 @@ bool Upgrade::suppress_(const std::string &version) {
 }
 bool Upgrade::cancel_request_() {
   cancel_ = true;
-  if (!persist_("", "")) return false;
+  if (!save_verify_hold_("") || !persist_("", "")) return false;
   queued_ = {}; staged_ = nullptr; expected_.clear(); automatic_request_ = false;
+  usb_request_ = false; handoff_state_ = Handoff::UNKNOWN;
   state_ = "idle"; error_.clear();
   return true;
 }
@@ -80,7 +81,7 @@ int Upgrade::change_automatic_(JsonObjectConst input, std::string &error) {
   return 200;
 }
 void Upgrade::automatic_loop_() {
-  if (!automatic_ok_ || !automatic_.enabled || !bootloader_ok_ || !athan_->activated() || !safe_ ||
+  if (!automatic_ok_ || !verify_ok_ || !verify_hold_.empty() || !automatic_.enabled || !bootloader_ok_ || !athan_->activated() || !safe_ ||
       offered_.envelope.empty() || (!automatic_.skipped.empty() && !newer_release(offered_.version, automatic_.skipped))) return;
   // The source marker precedes the backward-readable request. An orphan marker
   // authorizes nothing; only an exact matching, verified request is automatic.
@@ -91,7 +92,9 @@ void Upgrade::automatic_loop_() {
 void Upgrade::reject_(const char *message) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (cancel_) return;
-  if (!suppress_(queued_.version) || !cancel_request_()) return;
+  if (!suppress_(queued_.version) || !cancel_request_()) {
+    state_ = "failed"; error_ = "Rejected firmware could not be recorded; restart the speaker"; return;
+  }
   state_ = "failed"; error_ = message;
 }
 }  // namespace esphome::openathan_device

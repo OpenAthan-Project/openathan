@@ -218,6 +218,14 @@ power loss; they are not durable product controls.
 | Unattended update | Confirm the default or enable Automatic updates, arm the required hold, then offer a newer private release. Close the browser without choosing Install. Verify safe staging, slot switch, startup confirmation and preserved settings/history/audio. |
 | Saved opt-out | Disable automatic updates before selection, including during a delayed download. Verify cancellation and no automatic installation after restart; manual requests remain intact. |
 | Rejected-release suppression | After cancellation, checksum/image rejection or startup rollback, keep offering that release across restart. No automatic erase/selection may repeat. Offer a newer release and verify eligibility returns. |
+| Interrupted verification | A retained verification record prevents another automatic attempt after restart. Healthy recovery skips that release; an explicit manual installation can retry it. Ordinary partial downloads still retry. |
+| Unavailable cancellation storage | Cancel reports failure and retains the request when suppression cannot be saved. A healthy restart and successful explicit cancellation preserve the skip. |
+| Uncertain selection or metadata | Preserve the handoff record, deny cancellation/preference changes, and do not erase or select again until read-only reconciliation establishes the outcome. |
+
+Host fault injection covers exact storage and selection boundaries, including a
+selection write that succeeds before reporting failure. For attended hardware
+interruptions, record the observed phase and actual intervention. A host result
+does not establish a physical cut at that exact instruction boundary.
 
 Complete at least **ten recorded interrupted attempts** while an older VALID
 application is retained. Repeat transport, cancellation and pre-selection cases
