@@ -1,7 +1,9 @@
 # Firmware release preparation
 
-[v0.9.0](../releases/v0.9.0.md) is the published stable release for Atom,
-Waveshare Box V2 and Waveshare AUDIO-Board. The
+[v0.11.0](../releases/v0.11.0.md) adds default-on signed automatic updates for
+Atom, Waveshare Box V2 and Waveshare AUDIO-Board. The
+[attended Box V2 record](automatic-update-hardware-2026-11-13.md) retains the
+source-bound interruption, preservation, playback and continuous-hour results. The
 [v0.10.0 preparation](v0.10.0-preparation-2026-11-10.md) records the speaker names,
 finder and Quran UI candidate, merged-main builds and remaining qualification checks. The
 [v0.9.0 preparation](v0.9.0-preparation-2026-10-27.md) retains its build evidence.
@@ -200,8 +202,12 @@ checks pass; no per-release catalog PR is needed. The generated review flags
 record that human publication policy rather than proving physical qualification.
 A reviewed catalog PR is still used for a persistent manual pin/rollback or
 disabling fresh installation. See the [website deployment policy](https://github.com/OpenAthan-Project/website/blob/main/deployment/README.md).
-Website adoption does not queue an update on existing speakers; owners choose
-**Install update** on the authenticated device page.
+Speakers with automatic updates enabled can install a newer stable release in
+a safe gap. Speakers on firmware without automatic installation need one
+preserving manual or USB update first. Website adoption makes the release
+available through the installer; the speaker's own saved update policy controls
+installation. Owners can still choose **Install update** on the authenticated
+device page.
 
 ## Validation
 
