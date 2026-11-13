@@ -57,6 +57,7 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
         run("upgrade_runtime_tests.cpp", version)
     for version in ("v0.2.0", "v0.3.0"):
         run("automatic_update_tests.cpp", version)
+    run("upgrade_recovery_tests.cpp", "v0.2.0")
     run("usb_upgrade_tests.cpp", "v0.2.0")
     run("usb_upgrade_tests.cpp", "v0.3.0")
     run("usb_upgrade_tests.cpp", "v0.4.0")

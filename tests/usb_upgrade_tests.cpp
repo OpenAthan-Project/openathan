@@ -192,7 +192,7 @@ int main() {
     send_app(u,token);assert(u.usb_command(FINISH,{token},reply)==0);assert(reply[0]=="verified");assert(state(u)=="awaiting_power"&&boot_selections==1);
     const auto record=saved_record;now_us+=100000000;u.loop(true);assert(saved_record==record&&esphome::App.reboots==0&&http_requests.empty());}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
-    assert(u.usb_command(VERIFY,{token},reply)==0);application_response[0]='b';send_app(u,token);
+    assert(u.usb_command(VERIFY,{token},reply)==0);application_response[20]='b';send_app(u,token);
     assert(u.usb_command(FINISH,{token},reply)==1&&boot_selections==0&&live_ota_handles==0);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
     assert(u.usb_command(VERIFY,{token},reply)==0);now_us+=41000000;u.loop(false);assert(aborts==1&&boot_selections==0&&!u.usb_busy());}

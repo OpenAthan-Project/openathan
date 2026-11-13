@@ -262,6 +262,25 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await slide(page,'settings-volume',40);await saved(page,'preferences');assert.equal(f.state.device.settings.volume,40);
   }finally{await o.close();}
  });
+ for(const code of [409,503])test(`${browserName}: automatic updates failed cancellation ${code} retains queued status`,async()=>{
+  const f=await fixture();withAutomatic(f);
+  Object.assign(f.state.device.firmware,{state:'queued',queued_version:'v0.3.0',queue_source:'automatic',available:{version:'v0.3.0',bytes:512}});
+  const message=code===503?'Automatic update storage is unavailable; restart before canceling':'Update selection is unresolved; wait for status before canceling';
+  const o=await open(f,browserName),{page}=o;let attempts=0;
+  try{
+   await settings(page);
+   await page.route('**/api/firmware/cancel',async route=>{
+    attempts++;f.state.device.firmware.error=message;
+    await route.fulfill({status:code,json:{error:message}});
+   });
+   await page.locator('#firmware-cancel').click();
+   await page.waitForFunction(message=>document.getElementById('firmware-status').textContent.includes(message),message);
+   assert.match(await page.locator('#firmware-version').textContent(),/Queued: v0.3.0/);
+   assert.ok(await page.locator('#firmware-cancel').isVisible());assert.ok(await page.locator('#firmware-install').isHidden());
+   assert.equal(f.state.device.firmware.state,'queued');assert.equal(attempts,1);
+   await slide(page,'settings-volume',40);await saved(page,'preferences');assert.equal(f.state.device.settings.volume,40);
+  }finally{await o.close();}
+ });
  function withName(f,name=''){f.state.device.speaker_name={schema:1,revision:1,name,application:'applied'};}
  async function nameConflict(f,page,name='Guest room'){
   await settings(page);await page.locator('#speaker-name').fill(name);
