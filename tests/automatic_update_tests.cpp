@@ -192,7 +192,8 @@ int main() {
     Upgrade u; esphome::openathan_component::OpenAthan a; begin(u, a); u.loop(true);
     assert(confirmations == 1 && !pending_worker && erases == 0 && snapshot(u)["queue_source"] == "unknown");
     assert(snapshot(u)["automatic_updates"]["enabled"].isNull() && automatic(u, false, 0) == 503);
-    assert(action(u, "cancel") == 200); expect_record("", "");
+    const auto request = saved_record;
+    assert(action(u, "cancel") == 503 && saved_record == request);
   }
   std::cout << "Default-on automatic updates, opt-out, safe gaps, interruption and rejection suppression passed\n";
 }

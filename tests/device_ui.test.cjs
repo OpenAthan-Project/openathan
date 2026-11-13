@@ -281,6 +281,18 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    await slide(page,'settings-volume',40);await saved(page,'preferences');assert.equal(f.state.device.settings.volume,40);
   }finally{await o.close();}
  });
+ test(`${browserName}: interrupted verification keeps cancellation available`,async()=>{
+  const f=await fixture();withAutomatic(f);
+  Object.assign(f.state.device.firmware,{state:'failed',queued_version:'v0.3.0',error:'Interrupted firmware verification must be canceled before another installation'});
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await settings(page);assert.ok(await page.locator('#firmware-cancel').isVisible());
+   await page.locator('#firmware-cancel').click();
+   await page.waitForFunction(()=>document.getElementById('firmware-cancel').hidden);
+   assert.equal(f.state.device.firmware.queued_version,'');assert.equal(f.state.device.firmware.state,'idle');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/firmware/cancel').length,1);
+  }finally{await o.close();}
+ });
  function withName(f,name=''){f.state.device.speaker_name={schema:1,revision:1,name,application:'applied'};}
  async function nameConflict(f,page,name='Guest room'){
   await settings(page);await page.locator('#speaker-name').fill(name);

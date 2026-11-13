@@ -13,6 +13,7 @@ inline esp_partition_t running{0x200000,0x10000,0x1000,ESP_PARTITION_TYPE_APP,0x
     inactive{0x200000,0x210000,0x1000,ESP_PARTITION_TYPE_APP,0x11},
     otadata{0x2000,0xe000,0x1000,ESP_PARTITION_TYPE_DATA,ESP_PARTITION_SUBTYPE_DATA_OTA};
 inline bool raw_read_fails=false, raw_metadata_override=false;
+inline int raw_read_failure_sector=-1;
 inline unsigned raw_read_calls{};
 inline std::array<esp_ota_select_entry_t,2> raw_metadata;
 inline bool metadata_erased=false;
@@ -34,6 +35,7 @@ inline int write_error=ESP_OK;
 inline const esp_partition_t *esp_ota_get_running_partition(){return &running;}
 inline const esp_partition_t *esp_ota_get_boot_partition(){return boot_query_fails?nullptr:boot_partition;}
 inline const esp_partition_t *esp_ota_get_next_update_partition(void *){return candidate_query_fails?nullptr:&inactive;}
+inline uint8_t esp_ota_get_app_partition_count(){return 2;}
 inline int esp_ota_begin(const esp_partition_t *,unsigned,unsigned *handle){if(begin_allocation_fails)return -1;*handle=++live_ota_handles;++erases;if(begin_erase_fails)return -1;flashed.clear();inactive_state=ESP_OTA_IMG_UNDEFINED;return 0;}
 inline int esp_ota_write(unsigned,const void *data,size_t size){++writes;if(write_error!=ESP_OK)return write_error;if(size&&flashed.empty()&&*static_cast<const uint8_t *>(data)!=0xe9)return ESP_ERR_OTA_VALIDATE_FAILED;flashed.append(static_cast<const char *>(data),size);return 0;}
 inline int esp_ota_abort(unsigned handle){assert(handle && live_ota_handles);++aborts;--live_ota_handles;return 0;}

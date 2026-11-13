@@ -23,6 +23,7 @@ unsigned nvs_commits{};
 bool commit_ok=true;
 bool cut_after_commit=false;
 unsigned cut_commit_number{};
+unsigned fail_commit_number{};
 struct PowerCut {};
 int nvs_open(const char *,int,nvs_handle_t *h){*h=1;return 0;}
 int nvs_get_blob(nvs_handle_t,const char *key,void *out,size_t *size){
@@ -39,7 +40,7 @@ int nvs_set_blob(nvs_handle_t,const char *key,const void *data,size_t size){
   else if(std::string_view(key)=="verify_hold"){staged_verify_hold.assign(static_cast<const char *>(data),size);staged_verify_hold_dirty=true;}
   else {staged_record.assign(static_cast<const char *>(data),size);staged_request_dirty=true;}return 0;
 }
-int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok)return -1;
+int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok||nvs_commits==fail_commit_number)return -1;
   if(staged_request_dirty)saved_record=staged_record;if(staged_automatic_dirty)saved_automatic=staged_automatic;
   if(staged_verify_hold_dirty)saved_verify_hold=staged_verify_hold;
   staged_request_dirty=staged_automatic_dirty=staged_verify_hold_dirty=false;if(cut_after_commit||nvs_commits==cut_commit_number)throw PowerCut{};return 0;}
@@ -50,7 +51,7 @@ const esp_partition_t *esp_partition_find_first(int type,int subtype,const char 
 }
 int esp_partition_read(const esp_partition_t *partition,size_t offset,void *out,size_t size){
   assert(partition==&otadata&&size==sizeof(esp_ota_select_entry_t));++raw_read_calls;
-  if(raw_read_fails)return -1;
+  if(raw_read_fails||raw_read_failure_sector==int(offset/partition->erase_size))return -1;
   auto entries=raw_metadata;
   if(!raw_metadata_override){
     memset(entries.data(),0xff,sizeof(entries));
@@ -72,8 +73,8 @@ void reset(){reset_http();assert(live_read_buffers==0);read_buffer_allocation_fa
   saved_automatic.clear();staged_automatic.clear();staged_request_dirty=staged_automatic_dirty=false;
   saved_verify_hold.clear();staged_verify_hold.clear();staged_verify_hold_dirty=false;
   nvs_read_failure_key.clear();nvs_write_failure_key.clear();write_error=ESP_OK;
-  raw_read_fails=raw_metadata_override=false;raw_read_calls=0;
-  cut_commit_number=0;
+  raw_read_fails=raw_metadata_override=false;raw_read_calls=0;raw_read_failure_sector=-1;
+  cut_commit_number=fail_commit_number=0;
   boot_query_fails=description_query_fails=candidate_query_fails=false;inactive_state_result=ESP_OK;selection_fails=selection_writes_before_failure=false;metadata_erased=false;nvs_commits=0;
   running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
   application_response=std::string(512,'a');application_response[0]=char(0xe9);uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
