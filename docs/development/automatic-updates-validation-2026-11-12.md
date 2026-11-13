@@ -10,6 +10,8 @@ The measurements and source hashes below describe the initial implementation at
 `98dda2aced3d12846cb972ce0e0afe7031fe24c9`. The
 [description-read retry follow-up](automatic-update-description-retry-2026-11-12.md)
 records the subsequent correction and its validation.
+The [recovery follow-up](automatic-update-recovery-2026-11-13.md) records the
+later storage-fault and boot-handoff fixes.
 
 ## Source and compatibility
 

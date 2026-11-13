@@ -12,6 +12,8 @@ Before: `98dda2aced3d12846cb972ce0e0afe7031fe24c9`.
 Runtime fix: `93c0861a4ae74cb9e38eb015ff1d4be179933d54`.
 The [initial automatic-update validation](automatic-updates-validation-2026-11-12.md)
 remains evidence for its recorded source and measurements.
+The [recovery follow-up](automatic-update-recovery-2026-11-13.md) records later
+corrections to cancellation, verification and boot-handoff recovery.
 
 The correction separates the description-read result from the version comparison.
 Image validation still completes first. A read failure does not stage an image,
