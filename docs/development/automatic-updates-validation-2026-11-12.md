@@ -6,6 +6,11 @@ suppression. See the [behavior and API contract](firmware-upgrades.md).
 The [unreleased notes](../releases/unreleased.md) describe the owner-facing change.
 Existing speakers need one preserving update to receive this feature.
 
+The measurements and source hashes below describe the initial implementation at
+`98dda2aced3d12846cb972ce0e0afe7031fe24c9`. The
+[description-read retry follow-up](automatic-update-description-retry-2026-11-12.md)
+records the subsequent correction and its validation.
+
 ## Source and compatibility
 
 Baseline: `d2f03bb953936cdb53efc92a2743ae56534f002b`. The candidate is identified

@@ -44,8 +44,9 @@ even after restart. A newer release remains eligible. Turning the setting off an
 on or checking again does not remove the skip; **Install update** explicitly
 retries an offered skipped version. Downloaded-image checksum, image validation
 and version failures, startup rollback, and aborted verified USB requests also
-skip automatic installation through that version. Temporary network failures and
-short downloads keep the existing queued-request retry policy.
+skip automatic installation through that version. Temporary network failures,
+short downloads and firmware-description read failures keep the existing
+queued-request retry policy.
 
 The worker streams into the inactive application slot. Interrupted downloads
 restart from the beginning after a five-minute retry delay and a fresh safe-window
@@ -105,6 +106,8 @@ storage failures return 503. Old clients can keep using the existing actions;
 new clients hide the toggle when the capability is absent or unsupported.
 The [automatic update validation report](automatic-updates-validation-2026-11-12.md)
 records automated results, matched image sizes and pending physical checks.
+The [description-read retry validation](automatic-update-description-retry-2026-11-12.md)
+records recovery when a completed image's description cannot be read.
 
 ## Release contract and trust
 
