@@ -45,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
             "-I"+str(ROOT / "firmware/esphome/components/openathan_device"), "-I"+str(ROOT / "lib/openathan-core/include"),
             str(ROOT / "tests" / source), str(ROOT / "firmware/esphome/components/openathan_device/upgrade.cpp"),
             str(ROOT / "firmware/esphome/components/openathan_device/usb_upgrade.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan_device/automatic_updates.cpp"),
+            str(ROOT / "firmware/esphome/components/openathan_device/upgrade_recovery.cpp"),
             str(ROOT / "lib/openathan-core/src/dua.cpp"),
             *additional,
             *([str(ROOT / "firmware/esphome/components/openathan_upgrade_qualification/qualification.cpp")]
@@ -54,6 +56,9 @@ with tempfile.TemporaryDirectory(prefix="openathan-upgrade-runtime-") as tempora
     run("device_http_tests.cpp", "v0.2.0", additional=(str(ROOT / "firmware/esphome/components/openathan_device/digest.cpp"),))
     for version in ("v0.2.0", "v0.2.1", "v0.3.0", "v0.4.0"):
         run("upgrade_runtime_tests.cpp", version)
+    for version in ("v0.2.0", "v0.3.0"):
+        run("automatic_update_tests.cpp", version)
+    run("upgrade_recovery_tests.cpp", "v0.2.0")
     run("usb_upgrade_tests.cpp", "v0.2.0")
     run("usb_upgrade_tests.cpp", "v0.3.0")
     run("usb_upgrade_tests.cpp", "v0.4.0")

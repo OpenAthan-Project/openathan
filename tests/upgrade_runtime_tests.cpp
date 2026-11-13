@@ -15,26 +15,69 @@ using namespace esphome::openathan_device;
 int64_t now_us{};
 int64_t esp_timer_get_time(){return now_us;}
 std::string saved_record, staged_record;
+std::string saved_automatic, staged_automatic;
+std::string saved_verify_hold, staged_verify_hold;
+std::string nvs_read_failure_key, nvs_write_failure_key;
+bool staged_request_dirty{}, staged_automatic_dirty{}, staged_verify_hold_dirty{};
 unsigned nvs_commits{};
 bool commit_ok=true;
 bool cut_after_commit=false;
+unsigned cut_commit_number{};
+unsigned fail_commit_number{};
 struct PowerCut {};
 int nvs_open(const char *,int,nvs_handle_t *h){*h=1;return 0;}
-int nvs_get_blob(nvs_handle_t,const char *,void *out,size_t *size){
-  if(saved_record.empty())return ESP_ERR_NVS_NOT_FOUND;
-  if(out)memcpy(out,saved_record.data(),saved_record.size());
-  *size=saved_record.size();return 0;
+int nvs_get_blob(nvs_handle_t,const char *key,void *out,size_t *size){
+  if(key==nvs_read_failure_key)return -1;
+  const auto &record=std::string_view(key)=="automatic"?saved_automatic:
+      std::string_view(key)=="verify_hold"?saved_verify_hold:saved_record;
+  if(record.empty())return ESP_ERR_NVS_NOT_FOUND;
+  if(out)memcpy(out,record.data(),record.size());
+  *size=record.size();return 0;
 }
-int nvs_set_blob(nvs_handle_t,const char *,const void *data,size_t size){staged_record.assign(static_cast<const char *>(data),size);return 0;}
-int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok)return -1;saved_record=staged_record;if(cut_after_commit)throw PowerCut{};return 0;}
+int nvs_set_blob(nvs_handle_t,const char *key,const void *data,size_t size){
+  if(key==nvs_write_failure_key)return -1;
+  if(std::string_view(key)=="automatic"){staged_automatic.assign(static_cast<const char *>(data),size);staged_automatic_dirty=true;}
+  else if(std::string_view(key)=="verify_hold"){staged_verify_hold.assign(static_cast<const char *>(data),size);staged_verify_hold_dirty=true;}
+  else {staged_record.assign(static_cast<const char *>(data),size);staged_request_dirty=true;}return 0;
+}
+int nvs_commit(nvs_handle_t){++nvs_commits;if(!commit_ok||nvs_commits==fail_commit_number)return -1;
+  if(staged_request_dirty)saved_record=staged_record;if(staged_automatic_dirty)saved_automatic=staged_automatic;
+  if(staged_verify_hold_dirty)saved_verify_hold=staged_verify_hold;
+  staged_request_dirty=staged_automatic_dirty=staged_verify_hold_dirty=false;if(cut_after_commit||nvs_commits==cut_commit_number)throw PowerCut{};return 0;}
 void nvs_close(nvs_handle_t){}
 int nvs_erase_all(nvs_handle_t){assert(false);return -1;}
+const esp_partition_t *esp_partition_find_first(int type,int subtype,const char *){
+  return type==ESP_PARTITION_TYPE_DATA&&subtype==ESP_PARTITION_SUBTYPE_DATA_OTA?&otadata:nullptr;
+}
+int esp_partition_read(const esp_partition_t *partition,size_t offset,void *out,size_t size){
+  assert(partition==&otadata&&size==sizeof(esp_ota_select_entry_t));++raw_read_calls;
+  if(raw_read_fails||raw_read_failure_sector==int(offset/partition->erase_size))return -1;
+  auto entries=raw_metadata;
+  if(!raw_metadata_override){
+    memset(entries.data(),0xff,sizeof(entries));
+    if(!metadata_erased){
+      entries[0].ota_seq=1;entries[0].ota_state=running_state;
+      entries[0].crc=bootloader_common_ota_select_crc(&entries[0]);
+      if(inactive_state!=ESP_OTA_IMG_UNDEFINED){
+        entries[1].ota_seq=2;entries[1].ota_state=inactive_state;
+        entries[1].crc=bootloader_common_ota_select_crc(&entries[1]);
+      }
+    }
+  }
+  assert(offset==0||offset==partition->erase_size);
+  memcpy(out,&entries[offset/partition->erase_size],size);return ESP_OK;
+}
 std::string state(Upgrade &update){JsonDocument doc;update.snapshot(doc.to<JsonObject>());return doc["state"].as<std::string>();}
 int action(Upgrade &update,const char *name,const char *version=nullptr){JsonDocument doc;auto root=doc.to<JsonObject>();if(version)root["version"]=version;std::string error;return update.action(name,root,error);}
 void reset(){reset_http();assert(live_read_buffers==0);read_buffer_allocation_fails=false;read_buffer_allocation_attempts=0;now_us=0;saved_record.clear();staged_record.clear();commit_ok=true;cut_after_commit=false;signature_valid=true;boot_readable=true;transfer_fail=false;on_open=on_read=nullptr;pending_worker=nullptr;task_available=true;task_attempts=0;boot_selections=aborts=rollbacks=confirmations=erases=writes=live_ota_handles=0;begin_allocation_fails=begin_erase_fails=false;image_valid=true;
+  saved_automatic.clear();staged_automatic.clear();staged_request_dirty=staged_automatic_dirty=false;
+  saved_verify_hold.clear();staged_verify_hold.clear();staged_verify_hold_dirty=false;
+  nvs_read_failure_key.clear();nvs_write_failure_key.clear();write_error=ESP_OK;
+  raw_read_fails=raw_metadata_override=false;raw_read_calls=0;raw_read_failure_sector=-1;
+  cut_commit_number=fail_commit_number=0;
   boot_query_fails=description_query_fails=candidate_query_fails=false;inactive_state_result=ESP_OK;selection_fails=selection_writes_before_failure=false;metadata_erased=false;nvs_commits=0;
   running_state=ESP_OTA_IMG_VALID;inactive_state=ESP_OTA_IMG_UNDEFINED;boot_partition=&running;on_boot_selection=nullptr;inactive_version="v0.3.0";esphome::App.reboots=0;
-  application_response=std::string(512,'a');uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
+  application_response=std::string(512,'a');application_response[0]=char(0xe9);uint8_t bytes[32];mbedtls_sha256(reinterpret_cast<const uint8_t *>(application_response.data()),application_response.size(),bytes,0);
   std::string hash;for(auto b:bytes){hash+="0123456789abcdef"[b>>4];hash+="0123456789abcdef"[b&15];}
   JsonDocument payload;payload["schema"]=1;payload["version"]="v0.3.0";payload["commit"]=std::string(40,'a');payload["hardware"]="atoms3r-c126-pyramid-a167";payload["layout"]="dual-2m-audio-3_5m-v1";payload["storageFormat"]=1;payload["audioFormat"]=1;payload["rollback"]=true;payload["bytes"]=512;payload["sha256"]=hash;
   std::string text;serializeJson(payload,text);JsonDocument envelope;envelope["payload"]=text;envelope["signature"]=std::string(128,'0');descriptor_response.clear();serializeJson(envelope,descriptor_response);
@@ -270,7 +313,7 @@ int main(){
     assert(erases==0 && writes==0 && aborts==0 && boot_selections==0);
     assert(state(u)==(callback==cancel_download?"idle":"queued"));
   }
-  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);application_response[20]='b';u.loop(true);run_worker();u.loop(true);assert(boot_selections==0 && aborts==1);assert(state(u)=="queued");}
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);application_response[20]='b';u.loop(true);run_worker();u.loop(true);assert(boot_selections==0 && aborts==1);assert(state(u)=="failed");}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);image_valid=false;u.loop(true);run_worker();u.loop(true);assert(boot_selections==0);}
   for(const bool allocation_failure:{false,true}) {
     reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);queue(u);

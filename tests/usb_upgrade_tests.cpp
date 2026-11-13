@@ -39,6 +39,13 @@ void metadata_fault(MetadataFault fault) {
 void restore_selected_metadata() {
   boot_query_fails=description_query_fails=candidate_query_fails=false;
   inactive_state_result=ESP_OK;inactive_state=ESP_OTA_IMG_NEW;inactive_version="v0.3.0";boot_partition=&inactive;
+  now_us+=5000000;
+}
+void restore_running_metadata() {
+  boot_partition=&running;raw_metadata_override=true;memset(raw_metadata.data(),0xff,sizeof(raw_metadata));
+  raw_metadata[0].ota_seq=3;raw_metadata[0].ota_state=ESP_OTA_IMG_VALID;
+  raw_metadata[1].ota_seq=2;raw_metadata[1].ota_state=ESP_OTA_IMG_NEW;
+  for(auto &entry:raw_metadata)entry.crc=bootloader_common_ota_select_crc(&entry);
 }
 void save_usb_request(const char *expected) {
   JsonDocument record;record["schema"]=2;record["source"]="usb";
@@ -99,7 +106,9 @@ void check_selection_reads() {
     if(selected) {boot_partition=&inactive;inactive_state=ESP_OTA_IMG_NEW;} else boot_query_fails=true;
     expect_usb_blocked(u,record);
     assert(state(u)==(selected?"awaiting_power":"usb_selection_uncertain"));
-    boot_query_fails=false;boot_partition=&running;u.loop(true);assert(state(u)=="usb_interrupted");
+    boot_query_fails=false;boot_partition=&running;
+    if(selected)restore_running_metadata();
+    now_us+=5000000;u.loop(true);assert(state(u)=="usb_interrupted");
     std::vector<std::string> reply;assert(u.usb_command(ABORT,{"interrupted"},reply)==0 && !u.usb_busy());
   }
   for(auto rejection:{ESP_OTA_IMG_INVALID,ESP_OTA_IMG_ABORTED}) {
@@ -140,7 +149,7 @@ int main() {
       Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
       assert(state(u)==(unreadable?"usb_selection_uncertain":"awaiting_power"));expect_usb_blocked(u,record);
       restore_selected_metadata();u.loop(true);assert(state(u)=="awaiting_power");expect_usb_blocked(u,record);
-      boot_partition=&running;u.loop(true);assert(state(u)=="current" && !u.usb_busy());
+      restore_running_metadata();u.loop(true);assert(state(u)=="current" && !u.usb_busy());
       expect_result(u,"superseded");expect_record("","");
       assert(erases==0 && writes==0 && boot_selections==0 && esphome::App.reboots==0 && http_requests.empty());
     }
@@ -163,6 +172,16 @@ int main() {
     std::cout<<"USB handoff confirms only after startup health\n";return 0;
   }
   check_selection_reads();
+  {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+    const auto token=start_usb(u);std::vector<std::string> reply;
+    assert(u.usb_command(VERIFY,{token},reply)==0);
+    assert(u.usb_command(ABORT,{token},reply)==0);
+    offer(u);u.loop(true);assert(state(u)=="available" && boot_selections==0);
+    JsonDocument status;u.snapshot(status.to<JsonObject>());assert(status["automatic_updates"]["release_skipped"]==true);
+    Upgrade reboot;begin(reboot,a);offer(reboot);reboot.loop(true);assert(state(reboot)=="available");
+    const auto retry=start_usb(reboot);assert(reboot.usb_command(VERIFY,{retry},reply)==0);
+    assert(reboot.usb_command(ABORT,{retry},reply)==0);
+  }
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);signature_valid=false;
     const auto token=start_usb(u);std::vector<std::string> reply;
     assert(u.usb_command(VERIFY,{token},reply)==1);assert(erases==0&&writes==0&&saved_record.empty());}
@@ -182,13 +201,13 @@ int main() {
     send_app(u,token);assert(u.usb_command(FINISH,{token},reply)==0);assert(reply[0]=="verified");assert(state(u)=="awaiting_power"&&boot_selections==1);
     const auto record=saved_record;now_us+=100000000;u.loop(true);assert(saved_record==record&&esphome::App.reboots==0&&http_requests.empty());}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
-    assert(u.usb_command(VERIFY,{token},reply)==0);application_response[0]='b';send_app(u,token);
+    assert(u.usb_command(VERIFY,{token},reply)==0);application_response[20]='b';send_app(u,token);
     assert(u.usb_command(FINISH,{token},reply)==1&&boot_selections==0&&live_ota_handles==0);}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
     assert(u.usb_command(VERIFY,{token},reply)==0);now_us+=41000000;u.loop(false);assert(aborts==1&&boot_selections==0&&!u.usb_busy());}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
-    assert(u.usb_command(VERIFY,{token},reply)==0);send_app(u,token);cut_after_commit=true;
-    try{u.usb_command(FINISH,{token},reply);assert(false);}catch(const PowerCut&){}cut_after_commit=false;
+    assert(u.usb_command(VERIFY,{token},reply)==0);send_app(u,token);cut_commit_number=nvs_commits+3;
+    try{u.usb_command(FINISH,{token},reply);assert(false);}catch(const PowerCut&){}cut_commit_number=0;
     Upgrade restarted;begin(restarted,a);restarted.loop(true);assert(state(restarted)=="usb_interrupted"&&http_requests.empty()&&boot_selections==0);
     assert(restarted.usb_command(ABORT,{"interrupted"},reply)==0&&!restarted.usb_busy());}
   {reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);const auto token=start_usb(u);std::vector<std::string> reply;
@@ -200,7 +219,7 @@ int main() {
     assert(u.usb_command(VERIFY,{token},reply)==0);send_app(u,token);
     selection_fails=true;selection_writes_before_failure=selected;
     assert(u.usb_command(FINISH,{token},reply)==255&&state(u)=="usb_selection_uncertain");
-    assert(!saved_record.empty()&&u.usb_busy());u.loop(true);
+    assert(!saved_record.empty()&&u.usb_busy());now_us+=5000000;u.loop(true);
     assert(state(u)==(selected?"awaiting_power":"usb_interrupted")&&http_requests.empty()&&esphome::App.reboots==0);
     selection_fails=false;selection_writes_before_failure=false;
   }

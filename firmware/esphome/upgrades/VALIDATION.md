@@ -167,6 +167,13 @@ a successful response alone does not establish stack or runtime-memory headroom.
 
 ## HTTPS, holds and interruption matrix
 
+Automatic installation defaults on in qualification firmware too, using only its
+private feed. Before exposing a newer candidate, turn **Automatic updates** off
+through the isolated device's Settings and read back the saved preference. Keep
+it off during the manual interruption matrix. Arm holds before offering a newer
+candidate so an unattended test cannot select it before the operator is ready.
+Never expose the production feed or change production preference records.
+
 Start the feed on the selected LAN address. Keep the device clock synchronized
 and arrange the calculated test schedule so that upgrades can run safely between
 announcements. Do not change the system clock or production prayer history.
@@ -196,7 +203,8 @@ power loss; they are not durable product controls.
 | Case | Required evidence |
 | --- | --- |
 | Invalid descriptor signature | `offer --fault signature`; failed check, no queue/erase/write/selection change. |
-| Corrupt or short image | `--fault corrupt` or `truncate`; old version remains, no selection, request retained/cancellable. |
+| Corrupt image | `--fault corrupt`; old version remains, no selection, queue clears and automatic installation through that version is skipped across restart. An explicit manual install can retry. |
+| Short image | `--fault truncate`; old version remains, no selection, request retained/cancellable for a fresh transfer after the retry delay. |
 | Transport interruption | `--fault disconnect` closes a half-length response; separately stop/restart the feed or interrupt the controlled network during a delayed download. Record the actual intervention and recovery. |
 | Delayed networking | `--header-delay` or `--chunk-delay` allows observation during blocking operations. Playback/safety/cancellation must prevent the next flash operation. |
 | Cancel during download | Cancel after progress begins; no boot selection/restart, read back an empty queue. |
@@ -207,6 +215,17 @@ power loss; they are not durable product controls.
 | Failed v0.0.3 startup | Injected health failure prevents confirmation; after 90 seconds the device rolls back to v0.0.2 and reports the rejected request. No operator cut is needed for this case. |
 | Healthy v0.0.4 | After rollback, a fresh request installs and confirms the other slot without resetting records or recordings. |
 | Queue restoration | Restart before a download and at a pre-selection hold; durable version/signature remain bound to the request. Cancel clears it. |
+| Unattended update | Confirm the default or enable Automatic updates, arm the required hold, then offer a newer private release. Close the browser without choosing Install. Verify safe staging, slot switch, startup confirmation and preserved settings/history/audio. |
+| Saved opt-out | Disable automatic updates before selection, including during a delayed download. Verify cancellation and no automatic installation after restart; manual requests remain intact. |
+| Rejected-release suppression | After cancellation, checksum/image rejection or startup rollback, keep offering that release across restart. No automatic erase/selection may repeat. Offer a newer release and verify eligibility returns. |
+| Interrupted verification | A retained verification record prevents another automatic attempt after restart. Healthy recovery skips that release; an explicit manual installation can retry it. Ordinary partial downloads still retry. |
+| Unavailable cancellation storage | Cancel reports failure and retains the request when suppression cannot be saved. A healthy restart and successful explicit cancellation preserve the skip. |
+| Uncertain selection or metadata | Preserve the handoff record, deny cancellation/preference changes, and do not erase or select again until read-only reconciliation establishes the outcome. |
+
+Host fault injection covers exact storage and selection boundaries, including a
+selection write that succeeds before reporting failure. For attended hardware
+interruptions, record the observed phase and actual intervention. A host result
+does not establish a physical cut at that exact instruction boundary.
 
 Complete at least **ten recorded interrupted attempts** while an older VALID
 application is retained. Repeat transport, cancellation and pre-selection cases

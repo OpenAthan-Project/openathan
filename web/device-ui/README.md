@@ -236,9 +236,13 @@ See the [light contract](../../docs/development/lights.md) for countdown/status
 colors, separate persistence, and LED hardware acceptance.
 
 The [firmware upgrade flow](../../docs/development/firmware-upgrades.md) checks
-for stable releases and queues owner-requested application updates between prayers.
-The authenticated **Updates** group provides check, install, cancel and
-reconnect/status controls. The public USB installer remains a fresh-install and
+for stable releases and queues signed application updates between prayers.
+The authenticated **Updates** group includes **Automatic updates**, enabled by
+default on capable firmware, plus manual check, install, cancel and reconnect/status
+controls. Its independent revisioned preference uses the existing write scheduler,
+readback and conflict recovery; older firmware hides the toggle. Turning it off
+cancels only an automatic request before boot selection. Skipped releases remain
+available for explicit manual installation. The public USB installer remains a fresh-install and
 credential-recovery tool, with a separately gated preserving USB updater for
 capable firmware. While a USB request is active, the local Updates group displays
 transfer, interruption or owner power-handoff status and hides network cancellation;

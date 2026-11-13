@@ -65,11 +65,13 @@
 <section id="format-group" class="setting-group" aria-labelledby="format-heading"><h3 id="format-heading">Time format</h3><label for="time-format">Show times as<select id="time-format"><option value="24">24-hour (13:30)</option><option value="12">12-hour (1:30 PM)</option></select></label><p class="hint">Device-local times on this page and the speaker screen.</p><p id="format-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="format-recovery" class="actions" hidden></div></section>
   <section class="setting-group" id="firmware-section" hidden aria-labelledby="firmware-title">
     <h3 id="firmware-title">Updates</h3>
+    <div id="automatic-updates-group" hidden><label class="check"><input id="automatic-updates-enabled" type="checkbox" disabled aria-describedby="automatic-updates-help">Automatic updates</label><p id="automatic-updates-help" class="hint">Install signed stable releases and restart automatically.</p><p id="automatic-updates-feedback" class="feedback" role="status">Reading saved preferences…</p><div id="automatic-updates-recovery" class="actions" hidden></div></div>
     <p id="firmware-version"></p>
     <p id="firmware-status" role="status" aria-live="polite"></p>
     <p id="firmware-last-check"></p>
+    <p id="firmware-skipped" class="hint" hidden></p>
     <a id="firmware-notes" hidden target="_blank" rel="noopener noreferrer">Read release notes</a>
-    <p>Updates keep your settings and recordings. Installation waits until playback ends and the next Athan is at least 15 minutes away.</p>
+    <p>Updates keep your settings, prayer history and recordings. Installation waits until playback ends and the next Athan is at least 15 minutes away.</p>
     <div class="actions"><button id="firmware-check" type="button">Check for updates</button><button id="firmware-install" type="button" hidden>Install update</button><button id="firmware-cancel" type="button" class="quiet" hidden>Cancel queued update</button></div>
   </section>
 </div></div>

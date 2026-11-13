@@ -3,6 +3,7 @@
 #undef main
 int main(){
   reset();Upgrade u;esphome::openathan_component::OpenAthan a;begin(u,a);
+  JsonDocument doc;u.snapshot(doc.to<JsonObject>());assert(doc["automatic_updates"]["supported"]==false);
   now_us=60000000;u.loop(true);assert(!pending_worker&&task_attempts==0);
   offer(u);assert(action(u,"install","v0.3.0")==503);
   u.loop(true);assert(erases==0&&boot_selections==0);
