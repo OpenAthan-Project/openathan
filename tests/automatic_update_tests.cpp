@@ -116,14 +116,49 @@ int main() {
     offer(rollback); rollback.loop(true); assert(state(rollback) == "available" && erases == 1);
     Upgrade reboot; begin(reboot, a); offer(reboot); reboot.loop(true); assert(state(reboot) == "available" && erases == 1);
   }
-  for (unsigned failure = 0; failure < 3; ++failure) {
-    reset(); Upgrade u; esphome::openathan_component::OpenAthan a; begin(u, a); automatic_queue(u);
+  for (bool manual : {false, true}) for (unsigned failure = 0; failure < 3; ++failure) {
+    reset(); Upgrade u; esphome::openathan_component::OpenAthan a; begin(u, a);
+    if (manual) queue(u); else automatic_queue(u);
     if (failure == 0) application_response[20] = 'b';
     if (failure == 1) image_valid = false;
     if (failure == 2) inactive_version = "v0.2.1";
     u.loop(true); run_worker(); assert(state(u) == "failed" && live_ota_handles == 0 && boot_selections == 0);
+    expect_record("", ""); assert(snapshot(u)["automatic_updates"]["skipped_version"] == "v0.3.0");
     const auto count = erases; Upgrade reboot; begin(reboot, a); offer(reboot); reboot.loop(true);
-    assert(state(reboot) == "available" && erases == count);
+    assert(state(reboot) == "available" && erases == count && boot_selections == 0);
+    assert(snapshot(reboot)["automatic_updates"]["release_skipped"] == true);
+  }
+  for (bool manual : {false, true}) for (bool restart : {false, true}) {
+    reset(); Upgrade u; esphome::openathan_component::OpenAthan a; begin(u, a);
+    if (manual) queue(u); else automatic_queue(u);
+    const auto request = saved_record, policy = saved_automatic;
+    description_query_fails = true; u.loop(true); run_worker();
+    if (state(u) != "queued") {
+      std::cerr << "Description read failure for " << (manual ? "manual" : "automatic")
+                << " request: state=" << state(u)
+                << ", skipped_version=" << snapshot(u)["automatic_updates"]["skipped_version"].as<std::string>()
+                << ", request_retained=" << (saved_record == request) << "\n";
+    }
+    assert(state(u) == "queued" && live_ota_handles == 0 && boot_selections == 0 && esphome::App.reboots == 0);
+    assert(saved_record == request && saved_automatic == policy);
+    assert(snapshot(u)["automatic_updates"]["skipped_version"] == "");
+    assert(snapshot(u)["queue_source"] == (manual ? "manual" : "automatic"));
+    const auto attempts = task_attempts;
+    now_us += 299999000; u.loop(true);
+    assert(task_attempts == attempts && !pending_worker && boot_selections == 0);
+    description_query_fails = false;
+    Upgrade reboot;
+    if (restart) { u.shutdown(); now_us = 0; begin(reboot, a); }
+    else now_us += 1000;
+    Upgrade &retry = restart ? reboot : u;
+    assert(state(retry) == "queued" && snapshot(retry)["queue_source"] == (manual ? "manual" : "automatic"));
+    assert(saved_record == request && saved_automatic == policy);
+    retry.loop(true); run_worker();
+    assert(live_ota_handles == 0 && boot_selections == 0);
+    retry.loop(true);
+    assert(boot_selections == 1 && esphome::App.reboots == 1 && erases == 2);
+    expect_record(descriptor_response, "v0.3.0");
+    assert(snapshot(retry)["automatic_updates"]["skipped_version"] == "");
   }
   { reset(); saved_policy(true, "", "v0.2.1"); Upgrade u; esphome::openathan_component::OpenAthan a; begin(u, a);
     automatic_queue(u); assert(snapshot(u)["automatic_updates"]["release_skipped"] == false); }
