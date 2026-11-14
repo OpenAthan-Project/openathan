@@ -31,8 +31,9 @@ clock, next prayer, prayer ring, playback and connection information. Brightness
 and 12/24-hour formatting are saved.
 
 The **BOOT** button stops audio; a short press while idle shows the webpage QR
-and addresses. **RESET** restarts the device. Touch input, microphones and SD
-storage are not supported by OpenAthan.
+and addresses. Hold it for about three seconds, then release to skip the next
+Athan; repeat the same hold to restore it. **RESET** restarts the device. Touch
+input, microphones and SD storage are not supported by OpenAthan.
 
 ## Setup
 

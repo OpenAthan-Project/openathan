@@ -34,8 +34,9 @@ cold-start retention requires a working time source and separate physical valida
 All seven LEDs show the existing prayer/status colours together, with saved
 brightness and an off switch. KEY1 lowers volume, KEY2 stops audio and KEY3 raises
 volume. Each volume press changes the saved setting by five percentage points.
-BOOT stops audio on a short press, skips the next Athan on a 2–5 second press,
-and cancels a skip on a 6–10 second press. RESET restarts the device.
+BOOT stops audio on a short press. Hold it for about three seconds (2–5 seconds),
+then release to skip the next Athan; repeat the same hold to restore it.
+RESET restarts the device.
 
 With the USB-C socket at the top, the five buttons down the right edge are
 **RESET → BOOT → KEY3 → KEY2 → KEY1**. KEY2 is the fourth button down; BOOT is

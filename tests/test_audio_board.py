@@ -1,5 +1,6 @@
 """Source-generation and profile boundaries for the screenless board."""
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -50,6 +51,9 @@ class AudioBoardProfiles(unittest.TestCase):
                 build=Path(temporary)/('openathan' if mode=='production' else 'openathan-test')
                 defines=(build/'src/esphome/core/defines.h').read_text()
                 source=(build/'src/main.cpp').read_text()
+                clicks=re.findall(r'ClickTrigger\(boot_button, (\d+), (\d+)\);.*?'
+                                  r'PhysicalControlAction<>\(athan_scheduler, (\d+)\);',source,re.S)
+                self.assertEqual(clicks,[('50','1000','0'),('2000','5000','3')])
                 self.assertIn('"waveshare-esp32-s3-audio-board"',defines)
                 self.assertIn('"waveshare-audio-board.upgrade.json"',defines)
                 self.assertIn(f'#define OPENATHAN_UPDATES_ENABLED {int(mode=="production")}\n',defines)

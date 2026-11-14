@@ -83,6 +83,9 @@ interval:
       - openathan.button:
           id: athan_test_scheduler
           action: cancel_skip
+      - openathan.button:
+          id: athan_test_scheduler
+          action: toggle_skip
 """
         self.validate(config, True)
 

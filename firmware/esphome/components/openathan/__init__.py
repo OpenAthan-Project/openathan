@@ -107,7 +107,7 @@ register_control("openathan.skip_next", 1)
 register_control("openathan.cancel_skip", 2)
 
 
-PHYSICAL_CONTROL_KINDS = {"stop": 0, "skip_next": 1, "cancel_skip": 2}
+PHYSICAL_CONTROL_KINDS = {"stop": 0, "skip_next": 1, "cancel_skip": 2, "toggle_skip": 3}
 
 
 @automation.register_action("openathan.button", PhysicalControlAction, cv.Schema({

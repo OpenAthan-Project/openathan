@@ -152,9 +152,12 @@ whether the requested state is durable; failed actions log a warning.
   player pipelines, then queues the correct announcement file in FIFO order.
   Queue acceptance is not confirmation of audible playback or completion.
 
-The reference front button uses a short click to stop, a 2–5 second click to skip
-next, and a 6–10 second click to cancel skip. There is no automatic/manual test
-play action on that button in this scheduler build.
+The reference front button uses a short click to stop. Hold it for about three
+seconds (2–5 seconds), then release to skip the next Athan; repeat the same hold
+to restore a saved skip. Other hold durations do nothing. The physical
+`openathan.button` action `toggle_skip` selects skip or cancel from the current
+saved skip state. Explicit skip/cancel automation and phone commands remain
+idempotent. There is no automatic/manual test play action on that button.
 
 The generic `packages/openathan.yaml` loads the component without board, Wi-Fi,
 native API, or Voice Pyramid assumptions. Integrators supply `time_id`, settings,
