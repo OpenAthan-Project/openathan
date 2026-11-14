@@ -87,8 +87,8 @@ the clock then displays `--:--`. Without connection navigation, the connected
 footer stays blank. With a device reader, the idle footer instead offers
 "Press for page." Wi-Fi loss alone changes
 the footer to Offline: valid-clock standalone scheduling continues. An
-unrelated/stale skip does not label a different event. Stop during active or
-pending audio and the existing skip/cancel holds retain their behavior.
+unrelated/stale skip does not label a different event. Stop still interrupts
+active or pending audio. A three-second hold toggles Skip/Restore.
 
 ### Speaker-page connection view
 
@@ -108,11 +108,11 @@ after 60 seconds of monotonic inactivity and starts on the normal view at boot.
 
 The display reads connection and pending-audio state through an optional callback;
 it does not reconstruct the MAC suffix or change credentials, settings or history.
-The `openathan.button` physical action accepts `stop`, `skip_next` or
-`cancel_skip`; boards retain their existing press durations. It retains Stop,
-including accepted Quran requests
-still resolving their audio URL. Starting audio dismisses connection information;
-skip/cancel holds close it before performing their existing action. The ordinary
+The `openathan.button` physical action accepts `stop`, `skip_next`, `cancel_skip`
+or `toggle_skip`. Boards use a three-second hold (2–5 seconds) to toggle the
+saved skip on release. Stop also cancels accepted Quran requests still resolving
+their audio URL. Starting audio dismisses connection information;
+skip/restore holds close it before performing their action. The ordinary
 `openathan.stop`, `openathan.skip_next` and `openathan.cancel_skip` automation
 actions retain their existing meanings. Missing/failed displays preserve controls.
 

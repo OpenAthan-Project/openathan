@@ -149,11 +149,11 @@ The BOOT button uses the same release-triggered controls as the reference Atom:
 | Press duration | Action on release |
 | --- | --- |
 | 50 ms–1 second | Stop active/pending audio; while idle, open or close connection information in firmware with that feature |
-| 2–5 seconds | Skip the next scheduled Athan |
-| 6–10 seconds | Cancel the skip |
+| About 3 seconds (2–5 seconds) | Skip the next scheduled Athan, or restore it when a skip is saved |
 | Other durations | No application action |
 
-These actions use existing scheduler safeguards and do not start manual playback.
+Repeat the same three-second hold to undo a skip. These actions use existing
+scheduler safeguards and do not start manual playback.
 The connection screen contains a QR code, hostname and current IPv4 address,
 keeps the prayer ring visible, and closes after 60 seconds without interaction.
 Scan it using a phone on the same LAN. Offline speakers retain the hostname and

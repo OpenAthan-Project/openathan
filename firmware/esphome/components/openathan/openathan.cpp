@@ -177,6 +177,7 @@ bool OpenAthan::cancel_skip() {
   return ok;
 }
 void OpenAthan::physical_control(unsigned kind) {
+  if (kind == 3) kind = status().skip ? 2 : 1;
   if (physical_control_handler_) {
     physical_control_handler_(kind);
     return;

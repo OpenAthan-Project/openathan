@@ -362,6 +362,36 @@ static void physical_control_fallback() {
   CHECK(f.audio.stops == 1 && !f.audio.active);
   skip.play(); CHECK(f.device.status().skip);
   cancel.play(); CHECK(!f.device.status().skip);
+  PhysicalControlAction<> toggle(&f.device, 3);
+  const auto next = f.device.status().next->key;
+  const auto records = nvs_test::committed;
+  toggle.play(); CHECK(f.device.status().skip == next);
+  Fixture reboot(false); reboot.begin();
+  CHECK(reboot.device.status().skip == next);
+  PhysicalControlAction<> restore(&reboot.device, 3);
+  restore.play(); CHECK(!reboot.device.status().skip);
+  restore.play(); CHECK(reboot.device.status().skip == next);
+  restore.play(); CHECK(!reboot.device.status().skip);
+  CHECK(nvs_test::committed == records);
+}
+
+static void physical_toggle_storage_failures() {
+  using esphome::openathan_component::PhysicalControlAction;
+  for (bool skipped : {false, true}) {
+    Fixture f; f.begin();
+    if (skipped) CHECK(f.device.skip_next());
+    const auto original = f.device.status().skip;
+    const auto records = nvs_test::committed;
+    nvs_test::fail_commit = true;
+    PhysicalControlAction<> toggle(&f.device, 3);
+    toggle.play();
+    CHECK(f.device.status().skip == original);
+    CHECK(f.device.status().fault == Fault::STORAGE && !f.device.status().automatic_ready);
+    CHECK(nvs_test::committed == records && f.audio.starts == 0);
+    nvs_test::fail_commit = false; nvs_test::power_cycle();
+    Fixture reboot(false); reboot.begin();
+    CHECK(reboot.device.status().skip == original);
+  }
 }
 
 static void connection_navigation_adapter(bool round) {
@@ -483,6 +513,11 @@ static void connection_navigation_adapter(bool round) {
   skip.play(); CHECK(screen.page() == Page::STATUS && f.device.status().skip);
   press.play();
   cancel.play(); CHECK(screen.page() == Page::STATUS && !f.device.status().skip);
+  PhysicalControlAction<> toggle(&f.device, 3);
+  press.play(); CHECK(screen.page() == Page::QR);
+  toggle.play(); CHECK(screen.page() == Page::STATUS && f.device.status().skip);
+  press.play(); CHECK(screen.page() == Page::QR);
+  toggle.play(); CHECK(screen.page() == Page::STATUS && !f.device.status().skip);
 
   // Reconstructing the presenter does not restore a transient navigation page.
   press.play();
@@ -752,6 +787,8 @@ static void setup_gate_and_preview() {
   for (int i=0;i<65;++i) f.device.step(1);
   CHECK(f.audio.starts == 0 && nvs_test::writes == initial_writes);
   CHECK(!f.device.skip_next() && !f.device.cancel_skip());
+  esphome::openathan_component::PhysicalControlAction<> toggle(&f.device, 3);
+  toggle.play(); CHECK(!f.device.status().skip && nvs_test::writes == initial_writes);
   PrayerDay times; std::vector<Event> events; std::vector<ScheduleConflict> conflicts;
   CHECK(f.device.preview(f.value(), times, events, conflicts));
   CHECK(nvs_test::writes == initial_writes && f.audio.starts == 0);
@@ -780,6 +817,8 @@ static void maintenance_latches_writes() {
   CHECK(f.save(changed) == SettingsResult::STORAGE);
   CHECK(f.device.change_time_format(12,1) == TimeFormatResult::STORAGE);
   CHECK(!f.device.finish_setup(1) && !f.device.skip_next() && !f.device.cancel_skip());
+  esphome::openathan_component::PhysicalControlAction<> toggle(&f.device, 3);
+  toggle.play(); CHECK(!f.device.status().skip);
   f.device.step(86400); f.device.reload_schedule();
   CHECK(nvs_test::writes == writes && !f.device.activated() && f.audio.starts == 0);
 }
@@ -1239,6 +1278,7 @@ static void json_transport() {
 int main() {
   upgrade_boot_scheduler_health();
   physical_control_fallback();
+  physical_toggle_storage_failures();
   connection_navigation_adapter(false);
   connection_navigation_adapter(true);
   failed_connection_display_controls();

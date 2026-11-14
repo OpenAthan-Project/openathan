@@ -42,7 +42,7 @@ media_player:
   - id: !extend athan_player
     internal: true
 
-# Diagnostic controls: short click stops; 2-5s skips next; 6-10s cancels skip.
+# Diagnostic controls: short click stops; 2-5s toggles the next-prayer skip.
 binary_sensor:
   - platform: gpio
     id: front_button
@@ -59,10 +59,6 @@ binary_sensor:
       - min_length: 2s
         max_length: 5s
         then:
-          - openathan.skip_next:
+          - openathan.button:
               id: athan_scheduler
-      - min_length: 6s
-        max_length: 10s
-        then:
-          - openathan.cancel_skip:
-              id: athan_scheduler
+              action: toggle_skip

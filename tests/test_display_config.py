@@ -1,6 +1,7 @@
 """Exercise the pinned display code generator, not just the presenter fake LCD."""
 import importlib.util
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -24,6 +25,9 @@ class DisplayConfigTests(unittest.TestCase):
                                     env=dict(os.environ, ESPHOME_BUILD_PATH=str(build)), capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             source = (build / "openathan/src/main.cpp").read_text()
+            clicks = re.findall(r'ClickTrigger\(front_button, (\d+), (\d+)\);.*?'
+                                r'PhysicalControlAction<>\(athan_scheduler, (\d+)\);', source, re.S)
+            self.assertEqual(clicks, [('50', '1000', '0'), ('2000', '5000', '3')])
             self.assertIn("MipiSpiBuffer<uint8_t", source)
             # Pinned ESPHome omits the setter for its default 0-degree rotation.
             # Any nonzero rotation emits a setter, including the old 180 value.
