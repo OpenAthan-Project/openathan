@@ -57,9 +57,17 @@ development path.
 
 `tools/check_feasibility.py` passed these artifacts. Both 2 MiB application slots
 and the separate 3.5 MiB audio partition remain unchanged. These numbers are
-pre-final measurements. The final rebuild was skipped after sandbox denial of
-SDK cache writes; final-revision OTA measurements and affected-profile capacity
-checks remain required before release qualification.
+pre-final measurements.
+
+The final Atom firmware built successfully at **1,464,976 bytes**, an increase
+of **27,104 bytes** over the matched baseline, with **107,888 bytes** remaining
+under the application budget. Its SDK configuration matches the baseline and
+its capacity checks passed. This build contains the final firmware/UI source;
+later changes only document the results.
+
+The final Box V2 and Audio Board rebuilds were skipped after sandbox denial of
+SDK cache writes. Their final-revision OTA measurements and capacity checks
+remain required before release qualification.
 
 ## Storage and qualification limits
 
