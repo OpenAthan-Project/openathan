@@ -28,6 +28,7 @@ class OpenAthan {
   ::openathan::Playback *audio{};
   ::openathan::Playback *playback() const { return audio; }
   void stop() { if (audio) audio->stop(); }
+  void quiesce_for_maintenance() { active = false; stop(); }
   Status status() const {return sample;}
   Clock read() const {return clock;}
   Settings *settings_service(){return &settings;}

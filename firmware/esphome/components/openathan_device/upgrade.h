@@ -45,6 +45,10 @@ class Upgrade : public UpgradeApi {
   bool confirmed() const { return confirmed_; }
   bool usb_busy() const { return usb_token_ || usb_request_; }
   bool active() const { return active_; }
+  bool media_idle() const {
+    return storage_ok_ && verify_ok_ && server_ready_ && !active_ && !usb_busy() && !staged_ &&
+        queued_.envelope.empty() && expected_.empty() && verify_hold_.empty();
+  }
   bool streaming_blocked() const { return usb_busy() || active_ || (!automatic_request_ && state_ == "queued") || state_ == "restarting"; }
  private:
   static void worker_(void *argument);

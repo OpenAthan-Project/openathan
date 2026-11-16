@@ -860,6 +860,25 @@ static void display_api() {
   f.device.set_display_output(nullptr); CHECK(call("POST",R"({"schema":1,"expected_revision":4,"brightness_percent":50})").code==404);
   CHECK(!deserializeJson(response,call("GET").response)); CHECK(!response["supported"].as<bool>());
 }
+static void athan_media_api() {
+  using namespace esphome::openathan_device;
+  Fixture f; f.begin(); LocalApi api(&f.device, nullptr, 0);
+  struct Probe : AthanApi {
+    unsigned calls{}; int code{202}; std::string requested;
+    void snapshot(JsonObject root) override { root["schema"] = 1; root["revision"] = 7; root["state"] = "waiting"; }
+    int action(const std::string &name, JsonObjectConst, std::string &error) override {
+      ++calls; requested = name; error = "Reload recordings before selecting"; return code;
+    }
+  } probe;
+  api.set_athan_media(&probe);
+  ApiExchange request; request.method = "GET"; request.uri = "/api/athan"; api.handle(request);
+  JsonDocument response; CHECK(!deserializeJson(response, request.response) && response["revision"] == 7 && probe.calls == 0);
+  request.method = "POST"; request.uri = "/api/athan/selection"; request.body = "{}"; api.handle(request);
+  CHECK(request.code == 202 && probe.requested == "selection" && probe.calls == 1);
+  CHECK(!deserializeJson(response, request.response) && response["state"] == "waiting");
+  probe.code = 409; api.handle(request);
+  CHECK(request.code == 409 && !deserializeJson(response, request.response) && response["revision"] == 7 && !response["error"].isNull());
+}
 static void dua_api() {
   using namespace esphome::openathan_device;
   Fixture f; f.begin(); LocalApi api(&f.device,nullptr,0);
@@ -1288,6 +1307,6 @@ int main() {
   display_button_guidance();
   display_integration(); light_time_and_setup(); light_integration(); physical_volume(); updates_and_replay(); volume_and_faults(); timezones(); occurrence_identity(); setup_gate_and_preview(); maintenance_latches_writes();
 #ifdef OPENATHAN_JSON_TEST
-  dua_api(); display_api(); speaker_name_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
+  athan_media_api(); dua_api(); display_api(); speaker_name_api(); time_format_api(); light_api(); json_transport(); coordinate_roundtrip(); local_api(); local_api_stop(); local_api_quran(); local_api_date(); local_api_coordinates();
 #endif
 }

@@ -78,6 +78,8 @@ void Device::setup() {
   api_->set_quran(&quran_);
   dua_.begin(athan_);
   api_->set_dua(&dua_);
+  athan_media_.begin(athan_);
+  api_->set_athan_media(&athan_media_);
   hostname_ = std::string(App.get_name().c_str()) + ".local";
   const std::string mac = get_mac_address();
   realm_ = "OpenAthan-" + mac;
@@ -233,7 +235,8 @@ void Device::serial_request(const Frame& request) {
     send_(request.extension, 2, {255}); return;
   }
   if (request.extension && command >= ::openathan::usb_upgrade::BEGIN && command <= ::openathan::usb_upgrade::ABORT) {
-    if (maintenance_ || (command == ::openathan::usb_upgrade::BEGIN && (wifi_attempt_.active() || scanning_))) {
+    if (maintenance_ || athan_media_.owns_storage() || athan_media_.active() ||
+        (command == ::openathan::usb_upgrade::BEGIN && (wifi_attempt_.active() || scanning_))) {
       send_(true, 2, {255}); return;
     }
     std::vector<std::string> reply;
@@ -248,7 +251,7 @@ void Device::serial_request(const Frame& request) {
   }
   const bool provisioning = (!request.extension && (command == 1 || command == 4)) ||
       (request.extension && command == 2);
-  if (provisioning && (playback_busy() || dua_.active() || upgrade_.active())) {
+  if (provisioning && (playback_busy() || dua_.active() || upgrade_.active() || athan_media_.active() || athan_media_.owns_storage())) {
     send_(request.extension, 2, {255}); return;
   }
   send_(request.extension, 2, {0});
@@ -347,16 +350,19 @@ void Device::on_wifi_scan_results(const wifi::wifi_scan_vector_t<wifi::WiFiScanR
   scanning_ = false;
 }
 void Device::loop() {
-  upgrade_.set_background_busy(dua_.active() || quran_.playback_pending() || maintenance_ ||
+  upgrade_.set_background_busy(dua_.active() || athan_media_.active() || athan_media_.owns_storage() || quran_.playback_pending() || maintenance_ ||
       wifi_attempt_.active() || scanning_ || phone_response_ || phone_attempt_);
   upgrade_.loop(wifi::global_wifi_component->is_connected());
   const auto dua_clock = athan_->read();
   const auto dua_status = athan_->status();
   const bool dua_window = upgrade_window(playback_busy(), dua_clock.valid, athan_->activated(),
       dua_status.automatic_ready, dua_clock.utc, dua_status.next ? std::optional<int64_t>(dua_status.next->utc) : std::nullopt);
-  dua_.loop(connected(), dua_window && athan_->activated() && upgrade_.confirmed() && !maintenance_ && !phone_setup_active() &&
+  dua_.loop(connected(), dua_window && athan_->activated() && upgrade_.confirmed() && !maintenance_ && !athan_media_.active() && !athan_media_.owns_storage() && !phone_setup_active() &&
       !wifi_attempt_.active() && !scanning_ && !upgrade_.streaming_blocked());
-  quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || dua_.active() || upgrade_.streaming_blocked());
+  athan_media_.loop(connected(), !maintenance_ && !phone_setup_active() && !wifi_attempt_.active() && !scanning_ &&
+      !phone_response_ && !phone_attempt_ && !dua_.active() && !quran_.playback_pending(),
+      upgrade_.media_idle(), upgrade_.confirmed(), dua_.startup_ready());
+  quran_.loop(wifi::global_wifi_component->is_connected(), maintenance_ || dua_.active() || athan_media_.owns_storage() || upgrade_.streaming_blocked());
   const auto now = now_ms();
   phone_loop_(now);
 #ifdef USE_OPENATHAN_SPEAKER_DISCOVERY
@@ -423,7 +429,7 @@ void Device::loop() {
     std::lock_guard<std::mutex> lock(request->mutex);
     if (!request->cancelled) {
       // Dua/network work may have started earlier in this same iteration.
-      upgrade_.set_background_busy(dua_.active() || quran_.playback_pending() || maintenance_ ||
+      upgrade_.set_background_busy(dua_.active() || athan_media_.active() || athan_media_.owns_storage() || quran_.playback_pending() || maintenance_ ||
           wifi_attempt_.active() || scanning_ || phone_response_ || phone_attempt_);
       handle_http_(*request);
       if (request->phone_connect) phone_response_ = request;
@@ -589,6 +595,10 @@ void Device::handle_http_(HttpExchange& request) {
   if (upgrade_.usb_busy() && request.method != "GET" &&
       !(request.method == "POST" && request.uri == "/api/stop")) {
     error(request, 409, "Finish or reconcile the USB update before another change"); return;
+  }
+  if (athan_media_.owns_storage() && request.method != "GET" && request.uri != "/api/stop" &&
+      request.uri != "/api/athan/retry") {
+    error(request, 409, "Wait for the recording replacement and restart"); return;
   }
   api_->set_context(hostname_, wifi::global_wifi_component->is_connected());
   api_->handle(request);

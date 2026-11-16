@@ -14,6 +14,9 @@ class DuaMedia : public DuaApi {
   void shutdown() { safe_ = false; cancel_ = true; }
   void preference_changed() override { safe_ = false; cancel_ = true; }
   bool active() const { return active_; }
+  bool startup_ready() const {
+    return initialized_ && (!compatible_ || !storage_ok_ || !installed_ || athan_->playback()->dua_ready());
+  }
   void snapshot(JsonObject root) override;
   int retry(std::string &error) override;
  private:
@@ -30,7 +33,7 @@ class DuaMedia : public DuaApi {
   esp_partition_mmap_handle_t mapping_{};
   std::optional<::openathan::DuaBank> installed_;
   nvs_handle_t journal_{};
-  bool storage_ok_{}, compatible_{}, latched_{}, success_pending_{};
+  bool storage_ok_{}, compatible_{}, latched_{}, success_pending_{}, initialized_{};
   unsigned target_{}, staging_{};
   uint64_t retry_at_{};
   std::atomic<bool> active_{}, cancel_{}, safe_{};

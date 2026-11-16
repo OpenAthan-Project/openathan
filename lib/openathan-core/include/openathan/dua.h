@@ -46,6 +46,9 @@ class DuaSequence : public Playback {
   bool healthy() const override { return backend_ && backend_->healthy(); }
   bool playing() const override { return backend_ && backend_->playing(); }
   bool busy() const override { return phase_ != Phase::IDLE || (backend_ && backend_->busy()); }
+  bool media_storage_supported() const override { return backend_ && backend_->media_storage_supported(); }
+  bool media_storage_idle() const override { return phase_ == Phase::IDLE && backend_ && backend_->media_storage_idle(); }
+  void lock_media_storage() override { if (backend_) backend_->lock_media_storage(); }
   bool start(Track track) override;
   void stop() override;
   uint32_t playback_epoch() const override { return backend_ ? backend_->playback_epoch() : 0; }

@@ -90,6 +90,7 @@ bool DuaMedia::scan_() {
 }
 void DuaMedia::begin(openathan_component::OpenAthan *athan) {
   athan_ = athan;
+  initialized_ = true;
   if (!athan_->playback() || !athan_->playback()->dua_supported()) return;
   if (nvs_open(openathan_storage::PRAYER, NVS_READWRITE, &journal_) != ESP_OK) return;
   uint32_t journal{}; size_t length = sizeof(journal);

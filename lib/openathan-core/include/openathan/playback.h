@@ -19,6 +19,10 @@ class Playback {
   virtual bool healthy() const { return ready(); }
   virtual bool playing() const = 0;
   virtual bool busy() const { return playing() || source() != PlaybackSource::NONE || stream_state() == StreamState::LOADING; }
+  virtual bool media_storage_supported() const { return false; }
+  virtual bool media_storage_idle() const { return false; }
+  // Destructive media replacement retains this lock until a fresh startup.
+  virtual void lock_media_storage() {}
   virtual PlaybackCompletion completion() const { return {}; }
   virtual bool dua_supported() const { return false; }
   virtual bool dua_ready() const { return false; }

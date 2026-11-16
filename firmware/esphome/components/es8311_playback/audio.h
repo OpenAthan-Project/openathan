@@ -33,6 +33,9 @@ class Audio : public Component, public ::openathan::Playback {
   void on_shutdown() override { set_amplifier_(false); enabled_ = false; }
   bool ready() const override { return enabled_ && healthy_(); }
   bool playing() const override { return playback_ && playback_->playing(); }
+  bool media_storage_supported() const override { return playback_ && playback_->media_storage_supported(); }
+  bool media_storage_idle() const override { return playback_ && playback_->media_storage_idle(); }
+  void lock_media_storage() override { if (playback_) playback_->lock_media_storage(); }
   bool start(::openathan::Track track) override { return ready() && playback_->start(track); }
   void stop() override { if (playback_) playback_->stop(); }
   ::openathan::PlaybackCompletion completion() const override { return playback_ ? playback_->completion() : ::openathan::PlaybackCompletion{}; }

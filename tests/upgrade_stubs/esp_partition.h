@@ -12,3 +12,6 @@ int esp_partition_mmap(const esp_partition_t *,size_t,size_t,int,const void **,e
 int esp_partition_read(const esp_partition_t *,size_t,void *,size_t);
 int esp_partition_write(const esp_partition_t *,size_t,const void *,size_t);
 int esp_partition_erase_range(const esp_partition_t *,size_t,size_t);
+int esp_partition_get_sha256(const esp_partition_t *, uint8_t *);
+void esp_partition_munmap(esp_partition_mmap_handle_t);
+inline const char *esp_err_to_name(int) { return "injected failure"; }

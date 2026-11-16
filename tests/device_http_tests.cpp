@@ -34,9 +34,8 @@ struct ApiProbe {
   void handle(HttpExchange &request) {
     ++calls;
     if (request.method == "POST") {
-      assert(request.uri == "/api/stop" && request.body == "{}");
-      ++stop_calls;
-      athan.sample.playing = false;
+      assert((request.uri == "/api/stop" || request.uri == "/api/athan/retry") && request.body == "{}");
+      if (request.uri == "/api/stop") { ++stop_calls; athan.sample.playing = false; }
     }
     JsonDocument status;
     status["playing"] = athan.sample.playing;
@@ -62,6 +61,7 @@ struct Device {
   ApiProbe api_storage;
   ApiProbe *api_{&api_storage};
   Upgrade &upgrade_;
+  struct MediaProbe { bool owned{}; bool owns_storage() const { return owned; } } athan_media_;
 };
 namespace {
 #include "device_http_helpers.inc"
@@ -189,6 +189,18 @@ void app_chunk(Upgrade &upgrade, uint64_t token, size_t offset) {
   assert(upgrade.usb_chunk({token, 1, uint32_t(offset), bytes}));
 }
 int main() {
+  {
+    reset(); esphome::openathan_component::OpenAthan current;
+    Upgrade upgrade; begin(upgrade, current);
+    esphome::openathan_device::Device device(upgrade, current); Client client(device);
+    device.athan_media_.owned = true;
+    assert(client.call("GET", "/api/athan").code == 200);
+    assert(client.call("POST", "/api/stop").code == 200);
+    assert(client.call("POST", "/api/athan/retry").code == 200);
+    for (const char *path : {"/api/athan/selection", "/api/athan/cancel", "/api/firmware/install", "/api/settings", "/api/quran/play"})
+      assert(client.call("POST", path).code == 409);
+    assert(!erases && !writes && !boot_selections);
+  }
   // An actual partial transfer leaves its journal intact across restart. Normal
   // scheduled playback can resume long after the interruption.
   reset(); esphome::openathan_component::OpenAthan athan;
