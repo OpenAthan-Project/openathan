@@ -34,6 +34,12 @@ async function fixture(){
       res.writeHead(200,{'Content-Type':files[req.url][1],'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"});res.end(await readFile(join(__dirname,'../web/device-ui',files[req.url][0])));return;
     }
     const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+    if(req.method==='GET' && req.url==='/api/athan'){
+      state.athanReads=(state.athanReads||0)+1;
+      if(!state.athan){send(404,{error:'Not found'});return;}
+      if(state.athanFailRead){send(503,{error:'Status unavailable'});return;}
+      send(200,state.athan);return;
+    }
     if(req.method==='GET' && req.url==='/api/firmware'){if(state.failRead){send(503,{error:'Status unavailable'});return;}send(200,state.device.firmware);return;}
     if(req.method==='GET' && req.url==='/api/dua'){send(200,state.device.dua);return;}
     if(req.method==='GET' && req.url==='/api/speaker-name'){if(state.nameFailRead){send(503,{error:'Read unavailable'});return;}send(200,state.device.speaker_name);return;}
@@ -52,6 +58,17 @@ async function fixture(){
     let body='';for await(const data of req)body+=data;
     const payload=JSON.parse(body);state.posts.push({url:req.url,payload:structuredClone(payload),origin:req.headers.origin});
     if(req.headers.origin!==`http://${req.headers.host}`){send(403,{error:'Same-origin JSON required'});return;}
+    if(req.url.startsWith('/api/athan/')){
+      const athan=state.athan;
+      if(req.url.endsWith('/selection')){
+        if(payload.expected_revision!==athan.revision){send(409,{error:'Recording selection changed'});return;}
+        athan.revision++;athan.state='waiting';athan.requested={normal:payload.normal,fajr:payload.fajr};athan.can_cancel=true;
+      }else if(req.url.endsWith('/catalog'))athan.catalog.state='ready';
+      else if(req.url.endsWith('/retry')){athan.state='waiting';athan.can_retry=false;athan.can_cancel=true;}
+      else if(req.url.endsWith('/cancel')){athan.revision++;athan.state='idle';athan.requested=null;athan.can_cancel=false;}
+      if(state.athanDrop){state.athanDrop=false;res.writeHead(202,{'Content-Type':'application/json'});res.end('{');return;}
+      send(202,athan);return;
+    }
     if(req.url.startsWith('/api/firmware/')){
       const firmware=state.device.firmware;
       if(req.url.endsWith('/automatic')){
@@ -186,7 +203,167 @@ async function mockQuranCatalog(page){
  await page.route('**/api/quran/catalog',route=>route.fulfill({json:{state:'ready',request:1,
   data:route.request().postDataJSON().kind==='editions'?{editions:[{id:9,name:'Edition',surahs:[18]}]}:quranReciters()}}));
 }
+function withAthan(f){
+ const recording=(id,role,name,hash)=>({id,role,name,bytes:900000,sha256:hash.repeat(64),attribution:'Sample attribution',source:'https://example.org/recordings/'+id,license:'Sample license'});
+ const recordings=[recording('regular-a','normal','Sample regular Athan A','a'),recording('regular-b','normal','Sample regular Athan B','b'),recording('fajr-a','fajr','Sample Fajr Athan A','c'),recording('fajr-b','fajr','Sample Fajr Athan B','d')];
+ f.state.athan={schema:1,supported:true,revision:4,state:'idle',error:'',received_bytes:0,total_bytes:0,can_cancel:false,can_retry:false,
+  installed:{normal:{...recordings[0]},fajr:{...recordings[2]}},requested:null,catalog:{state:'ready',version:'v1.0.0',error:'',recordings}};
+}
+async function athanSettings(page){
+ await settings(page);
+ await page.waitForFunction(()=>!document.getElementById('athan-normal').disabled);
+}
 for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split(',')){
+ test(`${browserName}: Athan recordings distinguish installed pair from explicit draft`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{viewport:{width:390,height:844}}),{page}=o;
+  try{
+   await athanSettings(page);
+   assert.equal(await page.locator('#athan-installed-normal').textContent(),'Sample regular Athan A');
+   assert.ok(await page.locator('#athan-install').isDisabled());
+   await page.locator('#athan-normal').selectOption('regular-b');await page.locator('#athan-fajr').selectOption('fajr-b');
+   assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/athan/')).length,0);
+   if(process.env.OPENATHAN_ATHAN_SCREENSHOTS){
+    for(const width of [390,320,1280]){
+     await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:join(process.env.OPENATHAN_ATHAN_SCREENSHOTS,`final-${width}.png`),fullPage:true});
+     if(width<768)await page.locator('#athan-group').screenshot({path:join(process.env.OPENATHAN_ATHAN_SCREENSHOTS,`final-${width}-section.png`)});
+    }
+   }
+   await page.locator('#athan-install').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
+   assert.deepEqual(f.state.posts.find(p=>p.url==='/api/athan/selection').payload,{schema:1,expected_revision:4,normal:'regular-b',fajr:'fajr-b'});
+   assert.equal(await page.locator('#athan-installed-normal').textContent(),'Sample regular Athan A');assert.ok(await page.locator('#athan-cancel').isVisible());
+   f.state.athan.state='restarting';f.state.athan.can_cancel=false;
+   await page.locator('[data-view="today"]').click();await settings(page);
+   await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('Restarting'));
+   assert.ok(await page.locator('#athan-normal').isDisabled());assert.ok(await page.locator('#athan-cancel').isHidden());
+   assert.doesNotMatch(await page.locator('#athan-status').textContent(),/Recordings installed/);
+   f.state.athan.state='ready';f.state.athan.installed.normal=f.state.athan.catalog.recordings[1];f.state.athan.installed.fajr=f.state.athan.catalog.recordings[3];f.state.athan.requested=null;
+   await page.locator('[data-view="today"]').click();await settings(page);
+   await page.waitForFunction(()=>document.getElementById('athan-installed-normal').textContent==='Sample regular Athan B');
+   assert.match(await page.locator('#athan-status').textContent(),/installed · available offline/);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan catalog loads once and refreshes only explicitly`,async()=>{
+  const f=await fixture();withAthan(f);f.state.athan.catalog.state='idle';const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   assert.equal(f.state.athanReads,undefined);
+   await athanSettings(page);await page.waitForFunction(()=>document.getElementById('athan-catalog-status').textContent==='Catalog v1.0.0');
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/catalog').length,1);
+   await page.locator('[data-view="today"]').click();const before=f.state.athanReads;
+   await page.clock.runFor(10000);await requestsFinished(page);assert.equal(f.state.athanReads,before);
+   await athanSettings(page);await page.clock.runFor(7000);await requestsFinished(page);
+   assert.ok(f.state.athanReads>=before+2);assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/catalog').length,1);
+   await page.locator('#athan-catalog-refresh').click();await requestsFinished(page);
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/catalog').length,2);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan missing support and first-run setup hide recording controls`,async()=>{
+  for(const mode of ['older','unsupported','setup']){
+   const f=await fixture();if(mode!=='older')withAthan(f);if(mode==='unsupported')f.state.athan.supported=false;if(mode==='setup')f.state.device.setup='incomplete';
+   const o=await open(f,browserName,{},true),{page}=o;
+   try{
+    if(mode!=='setup')await settings(page);await requestsFinished(page);await page.clock.runFor(9000);await requestsFinished(page);
+    assert.ok(await page.locator('#athan-group').isHidden());assert.equal(f.state.athanReads,mode==='setup'?undefined:1);
+    assert.equal(f.state.posts.filter(p=>p.url.startsWith('/api/athan/')).length,0);
+   }finally{await o.close();}
+  }
+ });
+ test(`${browserName}: Athan unknown installed IDs never select or install a catalog default`,async()=>{
+  const f=await fixture();withAthan(f);Object.assign(f.state.athan.installed.normal,{id:'',name:'Installed regular Athan',sha256:''});Object.assign(f.state.athan.installed.fajr,{id:'legacy-fajr',name:'Installed Fajr Athan',sha256:''});
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await athanSettings(page);assert.equal(await page.locator('#athan-normal').inputValue(),'');assert.equal(await page.locator('#athan-fajr').inputValue(),'legacy-fajr');assert.ok(await page.locator('#athan-install').isDisabled());
+   await page.locator('#athan-normal').selectOption('regular-b');assert.ok(await page.locator('#athan-install').isDisabled());
+   await page.locator('#athan-fajr').selectOption('fajr-b');assert.ok(await page.locator('#athan-install').isEnabled());
+   assert.equal(f.state.posts.length,0);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan lost selection response requires GET before retry and preserves newer draft`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');
+   f.state.athanDrop=true;f.state.athanFailRead=true;await page.locator('#athan-install').click();
+   await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('response was lost'));await requestsFinished(page);
+   assert.ok(await page.locator('#athan-install').isDisabled());assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/selection').length,1);
+   await page.locator('#athan-fajr').selectOption('fajr-b');
+   f.state.athanFailRead=false;await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
+   assert.equal(await page.locator('#athan-fajr').inputValue(),'fajr-b');assert.match(await page.locator('#athan-requested').textContent(),/Sample Fajr Athan A/);
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/selection').length,1);
+   await page.locator('#athan-cancel').click();await page.waitForFunction(()=>document.getElementById('athan-cancel').hidden);
+   assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');assert.equal(await page.locator('#athan-fajr').inputValue(),'fajr-b');
+   await page.locator('#athan-install').click();await page.waitForFunction(()=>!document.getElementById('athan-cancel').hidden);
+   const writes=f.state.posts.filter(p=>p.url==='/api/athan/selection');assert.equal(writes.length,2);assert.deepEqual(writes[1].payload,{schema:1,expected_revision:6,normal:'regular-b',fajr:'fajr-b'});
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan can adopt catalog identities when installed audio hashes already match`,async()=>{
+  const f=await fixture();withAthan(f);f.state.athan.installed.normal.id='legacy-normal';f.state.athan.installed.fajr.id='legacy-fajr';
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-a');await page.locator('#athan-fajr').selectOption('fajr-a');
+   assert.ok(await page.locator('#athan-install').isEnabled());await page.locator('#athan-install').click();await page.waitForFunction(()=>!document.getElementById('athan-requested').hidden);
+   assert.deepEqual(f.state.posts.find(p=>p.url==='/api/athan/selection').payload,{schema:1,expected_revision:4,normal:'regular-a',fajr:'fajr-a'});
+   assert.equal(f.state.athan.installed.normal.id,'legacy-normal');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan stale poll cannot regress accepted installation`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{},true),{page}=o;const gate=deferred(),started=deferred();
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');
+   const old=structuredClone(f.state.athan);await page.route('**/api/athan',async route=>{started.resolve();await gate.promise;await route.fulfill({json:old});});
+   await page.locator('#refresh').click();await requestStarted(started);
+   await page.locator('#athan-install').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
+   gate.resolve();await requestsFinished(page);
+   assert.match(await page.locator('#athan-status').textContent(),/safe gap/);assert.ok(await page.locator('#athan-cancel').isEnabled());assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');
+  }finally{gate.resolve();await o.close();}
+ });
+ test(`${browserName}: Athan revision conflict preserves draft and retries only after review`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');f.state.athan.revision++;
+   await page.locator('#athan-install').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('draft is kept'));await requestsFinished(page);
+   assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/selection').length,1);
+   assert.ok(await page.locator('#athan-install').isEnabled());await page.locator('#athan-install').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
+   assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/selection')[1].payload.expected_revision,5);
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan retry and cancellation follow observed capabilities`,async()=>{
+  const f=await fixture();withAthan(f);Object.assign(f.state.athan,{state:'repair_needed',can_retry:false,requested:{normal:'regular-b',fajr:'fajr-b'}});const o=await open(f,browserName),{page}=o;
+  try{
+   await athanSettings(page);assert.match(await page.locator('#athan-status').textContent(),/internet to repair/);assert.ok(await page.locator('#athan-retry').isHidden());assert.ok(await page.locator('#athan-install').isHidden());
+   f.state.athan.can_retry=true;await page.locator('#refresh').click();await page.locator('#athan-retry').waitFor({state:'visible'});
+   await page.locator('#athan-retry').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/retry').length,1);
+   Object.assign(f.state.athan,{state:'downloading',received_bytes:500,total_bytes:1000});await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('50%'));assert.ok(await page.locator('#athan-cancel').isVisible());
+   f.state.athan.state='installing';f.state.athan.can_cancel=false;await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('Installing recordings'));
+   assert.ok(await page.locator('#athan-cancel').isHidden());assert.ok(await page.locator('#athan-retry').isHidden());assert.ok(await page.locator('#athan-normal').isDisabled());assert.ok(await page.locator('#athan-catalog-refresh').isDisabled());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan refresh retains missing draft IDs and renders external text safely`,async()=>{
+  const f=await fixture();withAthan(f);f.state.athan.catalog.recordings[1].name='<img src=x onerror=alert(1)>';f.state.athan.catalog.recordings[1].attribution='<script>unsafe()</script>';f.state.athan.catalog.recordings[1].source='javascript:alert(1)';
+  const o=await open(f,browserName),{page}=o;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');assert.equal(await page.locator('#athan-normal option:checked').textContent(),'<img src=x onerror=alert(1)>');assert.equal(await page.locator('#athan-normal-credit a').count(),0);assert.equal(await page.locator('#athan-normal-credit script').count(),0);
+   f.state.athan.catalog.recordings=f.state.athan.catalog.recordings.filter(r=>r.id!=='regular-b');await page.locator('#athan-catalog-refresh').click();await requestsFinished(page);
+   assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');assert.equal(await page.locator('#athan-normal option:checked').textContent(),'<img src=x onerror=alert(1)>');assert.ok(await page.locator('#athan-install').isDisabled());
+   f.state.athan.catalog.state='failed';f.state.athan.catalog.error='Connection unavailable';await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-catalog-status').textContent.includes('Connection unavailable'));
+   assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');assert.ok(await page.locator('#athan-catalog-refresh').isEnabled());
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan long names fit narrow screens and enlarged keyboard controls`,async()=>{
+  const f=await fixture();withAthan(f);for(const r of f.state.athan.catalog.recordings)r.name='Sample recording with a long name for narrow screens and enlarged text';f.state.athan.installed.normal.name='Installed sample recording with a long name for narrow screens and enlarged text';
+  const o=await open(f,browserName,{viewport:{width:390,height:844}}),{page}=o;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');
+   for(const width of [390,320,1280]){
+    await page.setViewportSize({width,height:844});await page.evaluate(()=>document.documentElement.style.fontSize='32px');
+    await page.locator('#athan-normal').focus();
+    for(let step=0;step<3;step++){await page.keyboard.press('Tab');if(await page.evaluate(()=>document.activeElement.id==='athan-fajr'))break;}
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'athan-fajr');
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    const field=await page.locator('#athan-fajr').boundingBox();assert.ok(field.width<=width && field.height>=44);
+    assert.equal(await page.locator('#athan-fajr').evaluate(el=>getComputedStyle(el.parentElement).outlineStyle),'solid');
+    if(process.env.OPENATHAN_ATHAN_SCREENSHOTS){await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:join(process.env.OPENATHAN_ATHAN_SCREENSHOTS,`final-${width}-200-text.png`),fullPage:true});}
+   }
+  }finally{await o.close();}
+ });
  function withAutomatic(f){f.state.device.firmware={version:'v0.2.0',state:'idle',updates_enabled:true,supported:true,last_check:100,result:'',error:'',
    automatic_updates:{schema:1,revision:0,enabled:true,application:'applied',supported:true,skipped_version:'',release_skipped:false}};}
  test(`${browserName}: automatic updates default on, persist and reconcile a dropped save`,async()=>{

@@ -50,6 +50,16 @@
 <p id="name-feedback" class="feedback" role="status">Reading saved name…</p><div id="name-recovery" class="actions" hidden></div>
 </section>
 <section id="athan-preferences-group" class="setting-group" aria-labelledby="preferences-heading"><h3 id="preferences-heading">Athan preferences</h3><fieldset><legend>Play Athan for</legend><div id="enabled-prayers" class="checks"></div></fieldset><p class="hint">Sunrise marks the start of daylight; it has no Athan.</p><label class="range-label" for="settings-volume">Volume <output id="settings-volume-value">—</output></label><input id="settings-volume" type="range" min="0" max="100" disabled><p id="preferences-feedback" class="feedback success" role="status">Reading saved preferences…</p><div id="preferences-recovery" class="actions" hidden></div></section>
+<section id="athan-group" class="setting-group" aria-labelledby="athan-heading" hidden>
+<h3 id="athan-heading">Athan recordings</h3>
+<p class="hint">Choose a regular Athan and a separate Fajr recording. Once installed, both play offline.</p>
+<dl class="athan-installed"><div><dt>Installed regular Athan</dt><dd id="athan-installed-normal" dir="auto">Reading recording…</dd></div><div><dt>Installed Fajr Athan</dt><dd id="athan-installed-fajr" dir="auto">Reading recording…</dd></div></dl>
+<div id="athan-choices" hidden><label for="athan-normal">Regular Athan<select id="athan-normal" disabled aria-describedby="athan-normal-credit"></select></label><p id="athan-normal-credit" class="hint athan-credit"></p><label for="athan-fajr">Fajr Athan<select id="athan-fajr" disabled aria-describedby="athan-fajr-credit"></select></label><p id="athan-fajr-credit" class="hint athan-credit"></p></div>
+<p id="athan-requested" class="hint" hidden></p><p id="athan-status" class="feedback" role="status">Reading recordings…</p>
+<div class="actions"><button id="athan-install" class="primary" type="button" disabled>Install recordings</button><button id="athan-retry" type="button" hidden>Retry installation</button><button id="athan-cancel" type="button" hidden>Cancel installation</button></div>
+<p class="hint athan-install-help">Replacing recordings includes a brief restart. Keep the speaker powered. An interrupted installation may need internet access to repair.</p>
+<div class="athan-catalog-tools"><button id="athan-catalog-refresh" type="button">Refresh catalog</button><p id="athan-catalog-status" class="feedback" role="status"></p></div>
+</section>
 </div><section id="prayer-group" class="setting-group" aria-labelledby="prayer-heading">
 <h3 id="prayer-heading">Prayer times</h3><p id="prayer-intro" class="hint">Location and calculation changes need a timetable review before they are saved.</p>
 <ol id="setup-progress" class="setup-progress" hidden><li>Location</li><li>Calculation</li><li>Review</li><li>Finish</li></ol><form id="prayer-form">

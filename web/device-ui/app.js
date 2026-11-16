@@ -683,6 +683,7 @@ function renderTimes(id, schedule, settings, isPreview = false) {
 }
 function render() {
   renderQuran();
+  renderAthan();
   const state = snapshot,
     next = state?.clock_ready && state?.setup === "active" ? state.next : null,
     skipped = isSkipped(next, state?.skip);
@@ -813,6 +814,7 @@ function render() {
     renderTimes("preview-times", preview, merge(domains.settings.confirmed.value, draft), true);
   if (firmware.data) renderFirmware(firmware.data);
   renderDraftControls();
+  if (athanVisible() && !athan.attempted) queueMicrotask(readAthan);
 }
 function showView(view, focus = true) {
   if (firstRun) view = "settings";
@@ -829,7 +831,201 @@ function showView(view, focus = true) {
   }
   if (view === "quran" && !quran.attempted) void loadQuran();
   if (view === "quran") resizeQuranPlayer();
+  if (view === "settings" && !firstRun) void readAthan();
 }
+
+const athan = { data: null, draft: null, draftVersion: 0, dirty: false, submitted: null, names: new Map(), order: 0,
+  operation: null, uncertain: null, reading: false, attempted: false, unsupported: false,
+  catalogAttempted: false, stale: false, message: "" };
+const athanMessages = {
+  idle: "Choose recordings, then install them on the speaker.",
+  waiting: "Waiting for Wi-Fi and a safe gap between prayers.",
+  downloading: "Downloading and checking both recordings.",
+  installing: "Installing recordings. Keep the speaker powered; cancellation is no longer available.",
+  restarting: "Restarting the speaker. Waiting to confirm the installed recordings…",
+  ready: "Recordings installed · available offline.",
+  repair_needed: "Installation was interrupted. Connect the speaker to the internet to repair its recordings.",
+  failed: "Installation could not finish. Your choices are kept.",
+  unavailable: "Recording storage is unavailable. Your choices are kept."
+};
+function athanVisible() {
+  return snapshot?.setup === "active" && !$("settings-view").hidden && !document.hidden;
+}
+function acceptAthan({ data, order }) {
+  if (order < athan.order || (athan.data && Number.isInteger(data?.revision) && data.revision < athan.data.revision)) {
+    const error = new Error("Waiting for current recording status");
+    error.stale = true;
+    throw error;
+  }
+  if (data?.schema !== 1 || !Number.isInteger(data.revision) || !athanMessages[data.state] ||
+      !data.installed?.normal || !data.installed?.fajr || !data.catalog ||
+      !Array.isArray(data.catalog.recordings)) {
+    const error = new Error("Recording status could not be confirmed");
+    error.order = order;
+    throw error;
+  }
+  athan.order = order;
+  athan.data = data;
+  athan.stale = false;
+  athan.unsupported = data.supported === false;
+  for (const item of data.catalog.recordings) athan.names.set(item.id, item.name);
+  if (!athan.draft || (!athan.dirty && !athan.submitted)) athan.draft = Object.fromEntries(["normal", "fajr"].map(role =>
+    [role, data.requested?.[role] ?? data.installed[role].id ?? ""]));
+  if (data.state === "ready" && athan.submitted && ["normal", "fajr"].every(role =>
+      data.installed[role].id === athan.submitted.pair[role])) {
+    if (athan.draftVersion === athan.submitted.draftVersion) athan.dirty = false;
+    athan.submitted = null;
+  }
+  if (athan.uncertain && order > athan.uncertain.order) {
+    const operation = athan.uncertain;
+    athan.uncertain = null;
+    if (!operation.conflict) athan.message = operation.action === "selection" && data.revision === operation.revision && !data.requested
+      ? "The installation was not queued. Your choices are kept; you can install them again." : "";
+  }
+  renderAthan();
+}
+async function readAthan() {
+  if (!athanVisible() || athan.reading || athan.operation || athan.unsupported) return;
+  athan.reading = true;
+  athan.attempted = true;
+  try {
+    acceptAthan(await request("/api/athan"));
+    if (!athan.catalogAttempted && athan.data.supported !== false) {
+      athan.catalogAttempted = true;
+      if (athan.data.catalog.state === "idle") void athanAction("catalog");
+    }
+  } catch (error) {
+    if (error.stale || (error.order && error.order < athan.order)) return;
+    if (error.status === 404) athan.unsupported = true;
+    else {
+      athan.stale = true;
+      athan.message = athan.data?.state === "restarting"
+        ? "Waiting for the speaker to reconnect. Keep it powered."
+        : "Recording status is unavailable. Your choices are kept; use Refresh status to reconnect.";
+    }
+  } finally {
+    athan.reading = false;
+    renderAthan();
+  }
+}
+function athanSelection(role) {
+  return athan.data?.catalog.recordings.find(item => item.role === role && item.id === athan.draft?.[role]);
+}
+function renderAthanCredit(role, item) {
+  const node = $("athan-" + role + "-credit");
+  const key = stable(item ? [item.attribution, item.source, item.license] : null);
+  if (node.dataset.content === key) return;
+  node.dataset.content = key;
+  node.replaceChildren();
+  if (!item) return;
+  node.append(document.createTextNode([item.attribution, item.license].filter(Boolean).join(" · ")));
+  try {
+    const url = new URL(item.source);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return;
+    const link = document.createElement("a");
+    link.href = url.href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Source";
+    if (node.textContent) node.append(document.createTextNode(" · "));
+    node.append(link);
+  } catch {}
+}
+function renderAthan() {
+  const data = athan.data;
+  $("athan-group").hidden = firstRun || athan.unsupported || !athan.attempted;
+  if (!data) {
+    text("athan-status", athan.message || "Reading recordings…");
+    $("athan-install").disabled = true;
+    $("athan-catalog-refresh").disabled = true;
+    return;
+  }
+  const locked = !!athan.operation || !!athan.uncertain || athan.stale || !connected,
+    active = ["waiting", "downloading", "installing", "restarting", "repair_needed"].includes(data.state) || !!data.requested,
+    destructive = ["installing", "restarting"].includes(data.state);
+  for (const role of ["normal", "fajr"]) {
+    const installed = data.installed[role], select = $("athan-" + role),
+      items = data.catalog.recordings.filter(item => item.role === role),
+      options = items.map(item => [item.id, item.name]);
+    text("athan-installed-" + role, installed.name || `Installed ${role === "normal" ? "regular" : "Fajr"} Athan`);
+    if (!items.some(item => item.id === athan.draft?.[role]))
+      options.unshift([athan.draft?.[role] || "", athan.names.get(athan.draft?.[role]) ||
+        (athan.draft?.[role] === installed.id ? installed.name : "Choose a recording") || "Installed recording"]);
+    const key = stable(options);
+    if (select.dataset.options !== key) {
+      select.replaceChildren(...options.map(([id, name]) => {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = name;
+        return option;
+      }));
+      select.dataset.options = key;
+    }
+    select.value = athan.draft?.[role] || "";
+    select.disabled = destructive || !!athan.operation || !items.length;
+    renderAthanCredit(role, athanSelection(role));
+  }
+  $("athan-choices").hidden = !data.catalog.recordings.length;
+  $("athan-requested").hidden = !data.requested;
+  if (data.requested) text("athan-requested", "Requested recordings: " + ["normal", "fajr"].map(role =>
+    athan.names.get(data.requested[role]) || (role === "normal" ? "Regular Athan" : "Fajr Athan")).join(" · "));
+  const sameInstalled = ["normal", "fajr"].every(role => athanSelection(role)?.id === data.installed[role].id &&
+      athanSelection(role)?.sha256 === data.installed[role].sha256),
+    selectionReady = ["normal", "fajr"].every(role => !!athanSelection(role));
+  $("athan-install").hidden = active;
+  $("athan-install").disabled = locked || writing() || active || data.state === "unavailable" || !selectionReady || sameInstalled;
+  $("athan-retry").hidden = data.can_retry !== true || !["failed", "repair_needed"].includes(data.state);
+  $("athan-retry").disabled = locked || writing();
+  $("athan-cancel").hidden = data.can_cancel !== true || destructive;
+  $("athan-cancel").disabled = locked || writing();
+  $("athan-catalog-refresh").disabled = locked || writing() || active || data.catalog.state === "loading";
+  const progress = data.state === "downloading" && data.total_bytes > 0
+    ? ` ${Math.min(100, Math.floor(100 * data.received_bytes / data.total_bytes))}%` : "";
+  text("athan-status", athan.uncertain
+    ? "The response was lost. Reading recording status before allowing another action. Use Refresh status if the speaker is unavailable."
+    : athan.message || (athan.dirty && !active && ["idle", "ready"].includes(data.state) ? "Choices changed · install to apply them." : athanMessages[data.state]) + progress + (data.error ? " " + data.error : ""));
+  $("athan-status").className = "feedback" + (athan.stale || ["failed", "repair_needed", "unavailable"].includes(data.state) ? " error" : data.state === "ready" && !athan.dirty ? " success" : "");
+  text("athan-catalog-status", data.catalog.state === "loading" ? "Loading catalog…"
+    : data.catalog.state === "failed" ? "Catalog unavailable. Refresh to try again. " + (data.catalog.error || "")
+    : data.catalog.state === "ready" ? data.catalog.recordings.length ? "Catalog " + data.catalog.version : "No recordings are available. Refresh the catalog to check again."
+    : "Internet is needed to load the catalog.");
+}
+async function athanAction(action) {
+  const data = athan.data;
+  if (!data || athan.operation || athan.uncertain || athan.stale || !connected || writing() ||
+      ["installing", "restarting"].includes(data.state)) return;
+  if (action === "selection" && ($("athan-install").disabled || $("athan-install").hidden)) return;
+  if (action === "retry" && data.can_retry !== true) return;
+  if (action === "cancel" && data.can_cancel !== true) return;
+  if (action === "catalog" && ["waiting", "downloading", "repair_needed"].includes(data.state)) return;
+  const operation = { action, order: requestOrder + 1, revision: data.revision, draftVersion: athan.draftVersion, pair: clone(athan.draft) },
+    body = action === "selection" ? { schema: 1, expected_revision: data.revision, ...athan.draft } : {};
+  athan.operation = operation;
+  athan.message = "";
+  if (action === "selection") athan.submitted = operation;
+  renderAthan();
+  try {
+    acceptAthan(await request("/api/athan/" + action, body));
+  } catch (error) {
+    operation.conflict = error.status === 409;
+    athan.uncertain = operation;
+    athan.message = error.status === 409 ? "Recording choices changed on the speaker. Your draft is kept; review it before installing." : "";
+  } finally {
+    athan.operation = null;
+    renderAthan();
+    if (athan.uncertain) await readAthan();
+  }
+}
+for (const role of ["normal", "fajr"]) $("athan-" + role).addEventListener("change", () => {
+  athan.draft[role] = $("athan-" + role).value;
+  athan.draftVersion++;
+  athan.dirty = true;
+  athan.message = "";
+  renderAthan();
+});
+for (const [id, action] of [["install", "selection"], ["retry", "retry"], ["cancel", "cancel"], ["catalog-refresh", "catalog"]])
+  $("athan-" + id).addEventListener("click", () => athanAction(action));
+setInterval(() => { if (athanVisible() && athan.attempted) void readAthan(); }, 3000);
 
 // Quran sessions are transient; saved prayer settings never acquire media URLs.
 const quran = { reciters: [], surahs: [], editions: [], next: null, total: 0,
@@ -1819,9 +2015,11 @@ $("reconnect").addEventListener("click", async () => {
       if (domains[key].blocked === "uncertain") await resolve(key, "check");
   }
   if (!timezonesReady) await loadTimezones();
+  await readAthan();
 });
 $("refresh").addEventListener("click", async () => {
   await refresh();
+  await readAthan();
   if (!timezonesReady) await loadTimezones();
 });
 addEventListener("beforeunload", (e) => {

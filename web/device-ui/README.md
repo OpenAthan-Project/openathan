@@ -268,7 +268,7 @@ keeps Play blocked and Stop reachable. Tokens remain in memory, while browser
 storage remembers selection IDs only. A missing token requires page reload and
 firmware compatibility checking. See the [streaming contract](../../docs/development/quran-streaming.md)
 for APIs, bounds and physical qualification gates. Adhkar and owner-facing stored
-audio replacement remain future work.
+audio uploads remain future work.
 
 The [redesign validation report](../../docs/development/device-ui-redesign-validation-2026-10-05.md)
 retains integration evidence. The [holistic review report](../../docs/development/device-ui-holistic-review-2026-10-06.md)
@@ -277,6 +277,31 @@ runtime limitations. The [maintenance validation report](../../docs/development/
 records the subsequent controller organization, scenario-specific test waits and
 matched capacity measurements.
 Browser fixtures are simulated; they do not establish physical-device behavior.
+
+## Athan recordings
+
+Settings keeps the installed regular and Fajr recordings separate from the edited
+pair. The curated catalog loads once on entry; Refresh catalog explicitly checks
+again. Install recordings submits both choices together, independently of prayer
+preferences. For replacement, the speaker downloads and verifies the pair before
+writing stored audio, then restarts briefly. Matching installed audio is reused.
+The UI confirms installation only from the speaker's
+ready status after that restart. Installed recordings play offline. An interruption
+during replacement can require internet access to repair the recordings.
+
+The UI reads `/api/athan` on Settings entry and polls every three seconds while
+Settings is visible, with at most one read in flight. First-run setup and older
+firmware with a 404 keep the group hidden. Draft choices survive polls, catalog
+failures, conflicts and uncertain responses. A lost response requires fresh GET
+readback before another action. Refresh status retries that read without repeating
+the write.
+Retry and Cancel follow the reported capabilities, and installation/restart locks
+recording controls. The existing shared Stop remains the playback control.
+
+Run focused cases with `--test-name-pattern='Athan'` against
+`../../tests/device_ui.test.cjs` in Chromium and WebKit. Fixtures use explicitly
+named sample recordings and sample attribution, not published media or licensing
+claims. Browser checks do not establish physical installation or audio quality.
 
 
 ## Dua after Athan
