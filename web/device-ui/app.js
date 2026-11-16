@@ -897,12 +897,7 @@ async function readAthan() {
   } catch (error) {
     if (error.stale || (error.order && error.order < athan.order)) return;
     if (error.status === 404) athan.unsupported = true;
-    else {
-      athan.stale = true;
-      athan.message = athan.data?.state === "restarting"
-        ? "Waiting for the speaker to reconnect. Keep it powered."
-        : "Recording status is unavailable. Your choices are kept; use Refresh status to reconnect.";
-    }
+    else athan.stale = true;
   } finally {
     athan.reading = false;
     renderAthan();
@@ -932,10 +927,13 @@ function renderAthanCredit(role, item) {
   } catch {}
 }
 function renderAthan() {
-  const data = athan.data;
+  const data = athan.data,
+    staleMessage = !athan.stale ? "" : data?.state === "restarting"
+      ? "Waiting for the speaker to reconnect. Keep it powered."
+      : "Recording status is unavailable. Your choices are kept; use Refresh status to reconnect.";
   $("athan-group").hidden = firstRun || athan.unsupported || !athan.attempted;
   if (!data) {
-    text("athan-status", athan.message || "Reading recordings…");
+    text("athan-status", staleMessage || athan.message || "Reading recordings…");
     $("athan-install").disabled = true;
     $("athan-catalog-refresh").disabled = true;
     return;
@@ -985,7 +983,7 @@ function renderAthan() {
     ? data.state === "unavailable"
       ? "Recording storage is unavailable. The installation outcome is unconfirmed. Use Refresh status after the speaker recovers."
       : "The request outcome is unconfirmed. Reading recording status before allowing another action. Use Refresh status if the speaker is unavailable."
-    : athan.message || (athan.dirty && !active && ["idle", "ready"].includes(data.state) ? "Choices changed · install to apply them." : athanMessages[data.state]) + progress + (data.error ? " " + data.error : ""));
+    : staleMessage || athan.message || (athan.dirty && !active && ["idle", "ready"].includes(data.state) ? "Choices changed · install to apply them." : athanMessages[data.state]) + progress + (data.error ? " " + data.error : ""));
   $("athan-status").className = "feedback" + (athan.stale || ["failed", "repair_needed", "unavailable"].includes(data.state) ? " error" : data.state === "ready" && !athan.dirty ? " success" : "");
   text("athan-catalog-status", data.catalog.state === "loading" ? "Loading catalog…"
     : data.catalog.state === "failed" ? "Catalog unavailable. Refresh to try again. " + (data.catalog.error || "")

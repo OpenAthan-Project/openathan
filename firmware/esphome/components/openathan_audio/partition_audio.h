@@ -33,8 +33,13 @@ class PartitionAudio : public Component, public ::openathan::Playback {
   bool ready() const override { return !media_locked_ && ready_ && player_ && player_->is_ready(); }
   bool media_storage_supported() const override { return true; }
   bool media_storage_idle() const override {
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
     return player_ && player_->playback_stopped() && !playing() && source_ == ::openathan::PlaybackSource::NONE &&
         !awaiting_stop_ && !pending_file_ && pending_url_.empty();
+#else
+    // Upstream ESPHome cannot confirm that all queued readers have stopped.
+    return false;
+#endif
   }
   void lock_media_storage() override { media_locked_ = true; }
   bool playing() const override;
