@@ -151,6 +151,11 @@ def require_committed_registry(path, data):
         'Production requires the committed registry at HEAD')
 
 
+def committed_public_key():
+    return subprocess.check_output(
+        ['git', 'show', 'HEAD:' + PUBLIC_KEY.relative_to(ROOT).as_posix()], cwd=ROOT)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -173,7 +178,9 @@ def main():
             if not args.candidate:
                 require_committed_registry(args.registry, registry)
                 require(not args.signing_key.resolve().is_relative_to(ROOT.resolve()), 'Keep the signing key outside the repository')
-            build(registry, args.assets, args.output, args.candidate, args.signing_key.read_bytes() if args.signing_key else None, PUBLIC_KEY.read_bytes())
+            build(registry, args.assets, args.output, args.candidate,
+                  args.signing_key.read_bytes() if args.signing_key else None,
+                  None if args.candidate else committed_public_key())
         else:
             if not args.candidate:
                 require_committed_registry(args.registry, registry)
@@ -184,7 +191,7 @@ def main():
                 require(len(raw) <= 24576 and raw == canonical(expected), 'Candidate payload mismatch')
                 doc = expected
             else:
-                doc = verify_envelope(raw, PUBLIC_KEY.read_bytes())
+                doc = verify_envelope(raw, committed_public_key())
                 require(doc == expected, 'Catalog differs from registry')
             verify_assets(args.bundle, doc, filename)
         print('Catalog and assets verified')

@@ -1,7 +1,10 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -85,6 +88,45 @@ class CatalogTests(unittest.TestCase):
             (assets / 'extra').touch()
             with self.assertRaises(ValueError): catalog.build(catalog.canonical(self.reg), assets, root / 'other', True)
             self.assertFalse((root / 'other').exists())
+
+    def test_cli_uses_committed_public_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / 'repo'
+            (repo / 'tools').mkdir(parents=True)
+            (repo / 'release').mkdir()
+            shutil.copyfile(catalog.ROOT / 'tools/athan_catalog.py', repo / 'tools/athan_catalog.py')
+            (repo / 'release/athan-recordings.json').write_bytes(catalog.canonical(self.reg))
+            public_path = repo / 'release/upgrade-public-key.pem'
+            public_path.write_bytes(self.public)
+            env = dict(os.environ, GIT_AUTHOR_NAME='Test', GIT_AUTHOR_EMAIL='test@example.org',
+                       GIT_COMMITTER_NAME='Test', GIT_COMMITTER_EMAIL='test@example.org')
+            for args in (['init', '-q'], ['add', 'release'], ['commit', '-qm', 'Approve fixtures']):
+                subprocess.run(['git', '-C', str(repo), *args], check=True, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            attacker_private, attacker_public = keypair()
+            public_path.write_bytes(attacker_public)
+            signing_key = root / 'signing.pem'
+            signing_key.write_bytes(self.private)
+            assets = root / 'assets'
+            assets.mkdir()
+            for role in ('normal', 'fajr'):
+                (assets / (role + '.mp3')).write_bytes(role.encode())
+            output = root / 'bundle'
+            command = [sys.executable, str(repo / 'tools/athan_catalog.py')]
+            result = subprocess.run(command + ['build', '--assets', str(assets), '--output', str(output),
+                                    '--signing-key', str(signing_key)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            catalog.verify_envelope((output / 'catalog.json').read_bytes(), self.public)
+            result = subprocess.run(command + ['verify', '--bundle', str(output)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            signing_key.write_bytes(attacker_private)
+            rejected = root / 'rejected'
+            result = subprocess.run(command + ['build', '--assets', str(assets), '--output', str(rejected),
+                                    '--signing-key', str(signing_key)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Signing key differs from production P-256 trust', result.stderr)
+            self.assertFalse(rejected.exists())
 
 
 if __name__ == '__main__': unittest.main()
