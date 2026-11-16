@@ -73,3 +73,32 @@ before building a release candidate. Packaging reads approval from that committe
 revision. Hash and format checks bind the review to supplied bytes; audible
 quality, correct Fajr content and final hardware qualification require separate
 evidence. Approval alone does not establish a qualified public release.
+
+## Prospective catalog recordings
+
+The separate [Athan catalog registry](release/athan-recordings.json) retains the
+current normal and Fajr recordings above with their existing approvals. Their
+catalog entries refer to those exact hashes. An older normal selection is omitted
+because its exact source and approval cannot be recovered from this registry.
+
+Three prospective recordings are from Ahmed Khalaf's Athan project at commit
+[`ad2bf1799add51cca4aaf1f123b1c212378c7786`](https://github.com/nandxorandor/Athan/tree/ad2bf1799add51cca4aaf1f123b1c212378c7786).
+The author's [README](https://github.com/nandxorandor/Athan/blob/ad2bf1799add51cca4aaf1f123b1c212378c7786/README.md#licence)
+identifies the three `Developer_Athan-*` recordings as his own and states CC BY
+4.0. The other recordings in that project have different terms and are not included.
+These three are **unapproved candidates**. Permission evidence does not establish
+maintainer acceptance of the recordings, listening quality, Fajr wording, or
+physical device qualification.
+
+| Source file | Source SHA-256 | Candidate SHA-256 |
+| --- | --- | --- |
+| [`Developer_Athan-1.mp3`](https://github.com/nandxorandor/Athan/blob/ad2bf1799add51cca4aaf1f123b1c212378c7786/app/src/main/assets/athan/developer/Developer_Athan-1.mp3) | `48ce7a63922bc666be0d4919056a31445ace775b3b7ffc4ab07325d8edf9ddb6` | `c34af7604dbb7407f8e550e58cfa46774115d1c3a0d50a001b84d55d6471b687` |
+| [`Developer_Athan-2.mp3`](https://github.com/nandxorandor/Athan/blob/ad2bf1799add51cca4aaf1f123b1c212378c7786/app/src/main/assets/athan/developer/Developer_Athan-2.mp3) | `0fb1127d6fea0d8552999c10798fd19624c0815128d49e420f650ef5bdd79acb` | `c98235206faaa5b229bacf95cc041f6bf0faa017313de1cc9ae9a96b2cd2390e` |
+| [`Developer_Athan-3_Fajr.mp3`](https://github.com/nandxorandor/Athan/blob/ad2bf1799add51cca4aaf1f123b1c212378c7786/app/src/main/assets/athan/fajr/Developer_Athan-3_Fajr.mp3) | `18b43fca35558ed05de0cbf8fcf468fd606e17cacb688bfed065e45787f56378` | `2fa61ff15b3a261860e6bf403e442e4c23f8a376bce57a9a91fdd2a451118813` |
+
+The candidates were re-encoded outside the repository using ffmpeg 8.0. For each
+source, the command was `ffmpeg -i INPUT -map_metadata -1 -ac 1 -ar 44100
+-codec:a libmp3lame -b:a 64k OUTPUT`. The candidates are 1,157,580, 1,057,688,
+and 796,255 bytes respectively. Re-encoding is a modification and must be
+identified alongside the creator, source, and [CC BY 4.0 license](https://creativecommons.org/licenses/by/4.0/)
+when distributed. Original source assets and converted files remain outside Git.
