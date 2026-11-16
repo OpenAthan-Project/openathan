@@ -198,17 +198,15 @@ void AthanMedia::begin(openathan_component::OpenAthan *athan) {
   identity_ok_ = record_.phase <= Phase::QUEUED || record_.firmware == firmware_;
   std::array<SavedTrack, 2> physical{};
   const bool valid = scan_(physical);
+  destructive_ = record_.phase == Phase::WRITING || record_.phase == Phase::REBOOT;
   installed_ = record_.installed;
-  if (valid) {
+  if (valid && !destructive_) {
     for (size_t i = 0; i < 2; ++i) {
       if (physical[i].bytes != installed_[i].bytes || physical[i].sha256 != installed_[i].sha256) installed_[i] = physical[i];
     }
   }
-  destructive_ = record_.phase == Phase::WRITING || record_.phase == Phase::REBOOT;
   boot_verified_ = destructive_ && valid && same_pair(physical, record_.requested);
   if (destructive_) {
-    // Intent remains distinct from installed identity until startup is healthy.
-    installed_ = record_.installed;
     state_ = boot_verified_ ? "restarting" : "repair_needed";
     if (!boot_verified_) quiesce_();
   } else if (!valid) { state_ = "unavailable"; error_ = "Installed audio is invalid without a repair receipt"; }
