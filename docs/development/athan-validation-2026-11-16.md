@@ -62,12 +62,48 @@ pre-final measurements.
 The final Atom firmware built successfully at **1,464,976 bytes**, an increase
 of **27,104 bytes** over the matched baseline, with **107,888 bytes** remaining
 under the application budget. Its SDK configuration matches the baseline and
-its capacity checks passed. This build contains the final firmware/UI source;
-later changes only document the results.
+its capacity checks passed. This build contains the firmware and UI source
+before the review fixes below.
 
-The final Box V2 and Audio Board rebuilds were skipped after sandbox denial of
-SDK cache writes. Their final-revision OTA measurements and capacity checks
-remain required before release qualification.
+At that checkpoint, the final Box V2 and Audio Board rebuilds were skipped after
+sandbox denial of SDK cache writes. The review-fix measurements below supersede
+that pending build status.
+
+## Review-fix revalidation
+
+The review fixes restore developer-profile compilation and clear transient
+connection feedback after healthy recording-status reads. Production retains
+the same stopped-reader checks. Upstream profiles cannot authorize destructive
+replacement without those checks.
+
+The upstream compile regression failed with `no member named 'playback_stopped'`.
+Both browser recovery cases failed in Chromium and WebKit
+because old reconnect or unavailable text remained after healthy reads.
+After the fixes, the upstream, Quran and dua-only adapter targets built, all
+26 CTests passed, and all 34 focused Chromium/WebKit cases passed. The production
+recovery checks, six catalog tests and seven audio-image tests also passed.
+Independent correctness and comment reviews found no actionable issues.
+
+Both previously failing scheduler profiles also compiled and passed capacity
+checks. The device image is 1,130,896 bytes, and the validation image is
+1,148,560 bytes. The validation build passed on a separate retry after the first
+attempt encountered incomplete local component-cache files.
+
+Matched production builds compare `2e846d1` with the corrected source in
+`c110c4b`. Both sides use the pinned toolchain and the same non-development
+measurement identity described above. SDK configuration, resolved dependencies
+and partitions match within each pair.
+
+| Profile | Before OTA bytes | After OTA bytes | Delta | Remaining under 1.5 MiB |
+| --- | ---: | ---: | ---: | ---: |
+| AtomS3R | 1,464,976 | 1,464,992 | +16 | 107,872 |
+| Waveshare Box V2 | 1,468,768 | 1,468,784 | +16 | 104,080 |
+| Waveshare Audio Board | 1,432,688 | 1,432,704 | +16 | 140,160 |
+
+Capacity checks passed for all three production profiles. Static RAM did not
+change. The measured images leave at least 628,368 free bytes in their 2 MiB
+slots. These builds use synthetic compile-only media and do not establish
+physical qualification.
 
 ## Storage and qualification limits
 
