@@ -28,8 +28,12 @@ The reference firmware supports:
 
 Application-only firmware updates retain installed recordings. A newer recording
 in a fresh-install bundle does not replace audio on an existing speaker. The optional [dua feature](dua.md) installs only its own signed recording over
-Wi-Fi into reserved tail banks. It never replaces normal/Fajr recordings;
-replacing those requires a separately reviewed preserving procedure. Keep recordings outside application slots.
+Wi-Fi into reserved tail banks. It never replaces normal/Fajr recordings.
+The [curated recording service](athan-recordings.md) replaces the selected
+normal/Fajr pair through a verified download, journaled write and reboot.
+An interrupted replacement can require online repair. Keep recordings outside
+application slots. The public catalog and recordings require separate approval
+and publication.
 
 ## Quran
 

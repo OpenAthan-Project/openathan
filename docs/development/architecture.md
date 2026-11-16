@@ -173,6 +173,17 @@ Quran resume. The shared-audio partition is unchanged. See the
 [streaming contract](quran-streaming.md) for HTTPS restrictions, local APIs,
 the pinned reader patch and separate hardware qualification gates.
 
+### Curated Athan recordings
+
+The product layer's Athan media service owns a signed catalog, an independent
+selection and repair journal, PSRAM staging and bounded shared-audio writes.
+The scheduler continues to request normal or Fajr tracks through `Playback`.
+The optional storage-lock capability prevents queued readers from retaining
+audio pointers during replacement. Fresh startup after a controlled reboot
+activates the new pair and reinitializes dua. Firmware-update and provisioning
+ownership remain excluded during destructive work. See the
+[recording contract](athan-recordings.md) for APIs and recovery limits.
+
 ### Dua after Athan
 
 The portable optional sequence controller wraps scheduled Athan requests, then

@@ -42,8 +42,8 @@ python3 tools/athan_catalog.py verify --bundle /path/to/new-release-bundle
 
 For a signed bundle, verification also requires the approved registry committed at
 `HEAD`. Check out the corresponding release revision before verifying an older
-version. The tool checks the private key against `release/upgrade-public-key.pem` and
-verifies the resulting P-256 signature. It rejects unapproved recordings,
+version. The tool checks the private key against `release/upgrade-public-key.pem`
+committed at `HEAD` and verifies the resulting P-256 signature. It rejects unapproved recordings,
 noncanonical or invalid metadata, unexpected files, mismatched lengths and hashes,
 and any pair whose OAUDIO01 image exceeds `0x300000` bytes, including the
 4096-byte header and 16-byte alignment. It writes a new directory atomically and
@@ -55,3 +55,6 @@ The signed `catalog.json` and each MP3 are intended for the same immutable relea
 version. The device uses `latest/download/catalog.json` to discover the current
 version and downloads its assets from the versioned release. This tool does not
 create a release, upload files, or make a catalog public.
+
+The [device recording contract](athan-recordings.md) describes installation,
+offline use, status endpoints and interrupted-write repair.
