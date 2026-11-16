@@ -15,7 +15,10 @@ class DuaMedia : public DuaApi {
   void preference_changed() override { safe_ = false; cancel_ = true; }
   bool active() const { return active_; }
   bool startup_ready() const {
-    return initialized_ && (!compatible_ || !storage_ok_ || !installed_ || athan_->playback()->dua_ready());
+    if (!initialized_) return false;
+    const auto *playback = athan_->playback();
+    return !playback || !playback->dua_supported() ||
+        (compatible_ && storage_ok_ && (!installed_ || playback->dua_ready()));
   }
   void snapshot(JsonObject root) override;
   int retry(std::string &error) override;

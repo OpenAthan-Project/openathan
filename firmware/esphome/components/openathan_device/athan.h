@@ -23,6 +23,7 @@ class AthanMedia : public AthanApi {
 
  private:
   enum class Phase : uint32_t { IDLE, QUEUED, WRITING, REBOOT };
+  enum class DuaCompletion : uint16_t { BASELINE_UNAVAILABLE, REQUIRE_STARTUP };
   struct SavedTrack {
     char id[49]{}, name[81]{};
     uint16_t reserved{};
@@ -34,7 +35,7 @@ class AthanMedia : public AthanApi {
     uint32_t revision{};
     Phase phase{Phase::IDLE};
     char version[34]{};
-    uint16_t reserved{};
+    DuaCompletion dua_completion{DuaCompletion::BASELINE_UNAVAILABLE};
     std::array<uint8_t, 32> catalog{}, firmware{};
     std::array<SavedTrack, 2> installed{}, requested{};
     std::array<uint8_t, 32> checksum{};

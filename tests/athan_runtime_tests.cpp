@@ -15,6 +15,13 @@
 
 using namespace esphome::openathan_device;
 using namespace openathan;
+template<typename Tag, typename Tag::Type Member> struct WorkerAccess {
+  friend typename Tag::Type access(Tag) { return Member; }
+};
+struct RunAthanWorker { using Type = void (AthanMedia::*)(); friend Type access(RunAthanWorker); };
+struct ActiveAthanWorker { using Type = std::atomic<bool> AthanMedia::*; friend Type access(ActiveAthanWorker); };
+template struct WorkerAccess<RunAthanWorker, &AthanMedia::run_>;
+template struct WorkerAccess<ActiveAthanWorker, &AthanMedia::active_>;
 static const std::string BASE = "https://github.com/OpenAthan-Project/athan-audio/releases/";
 static const std::string VERSION = BASE + "download/v1.0.0/";
 static std::vector<uint8_t> flash, original;
@@ -24,7 +31,7 @@ static std::map<nvs_handle_t, std::string> namespaces;
 static unsigned next_handle{};
 static int flash_operations{}, commits{}, reads{}, cut_flash{-1}, cut_commit{-1}, fail_commit{-1}, fail_read{-1};
 static size_t cut_header_prefix{2048};
-static bool fail_nvs_readback{}, commit_then_fail{}, fail_identity{};
+static bool fail_nvs_readback{}, commit_then_fail{}, fail_identity{}, fail_athan_open{}, fail_dua_read{}, fail_partition_lookup{};
 static uint8_t firmware_identity{0x5a};
 static int64_t now_us{};
 static std::function<void()> on_flash;
@@ -32,11 +39,13 @@ static std::string normal_data(4097, 'n'), fajr_data(8193, 'f');
 struct PowerCut {};
 int64_t esp_timer_get_time() { return now_us; }
 int nvs_open(const char *name, int, nvs_handle_t *handle) {
+  if (fail_athan_open && std::strcmp(name, "oa_athan") == 0) return -1;
   *handle = ++next_handle; namespaces[*handle] = name; return ESP_OK;
 }
 void nvs_close(nvs_handle_t) {}
 std::string key(nvs_handle_t handle, const char *name) { return namespaces.at(handle) + "/" + name; }
 int nvs_get_blob(nvs_handle_t handle, const char *name, void *out, size_t *size) {
+  if (fail_dua_read && key(handle, name) == "openathan/dua_stage") return -1;
   const auto found = durable.find(key(handle, name));
   if (found == durable.end()) return ESP_ERR_NVS_NOT_FOUND;
   if (fail_nvs_readback && key(handle, name) == "oa_athan/record") return -1;
@@ -44,7 +53,7 @@ int nvs_get_blob(nvs_handle_t handle, const char *name, void *out, size_t *size)
   *size = found->second.size(); return ESP_OK;
 }
 int nvs_set_blob(nvs_handle_t handle, const char *name, const void *data, size_t size) {
-  assert(key(handle, name) == "oa_athan/record" && size <= 1024);
+  assert(key(handle, name) == "oa_athan/record" && size == 820);
   const auto *first = static_cast<const uint8_t *>(data); pending[key(handle, name)] = {first, first + size}; return ESP_OK;
 }
 int nvs_commit(nvs_handle_t) {
@@ -56,7 +65,9 @@ int nvs_commit(nvs_handle_t) {
   return commits == fail_commit ? -1 : ESP_OK;
 }
 int nvs_erase_all(nvs_handle_t) { assert(false); return -1; }
-const esp_partition_t *esp_partition_find_first(int, int, const char *name) { return name ? &audio_partition : &otadata; }
+const esp_partition_t *esp_partition_find_first(int, int, const char *name) {
+  return name ? (fail_partition_lookup ? nullptr : &audio_partition) : &otadata;
+}
 int esp_partition_get_sha256(const esp_partition_t *partition, uint8_t *out) {
   assert(partition == &running); std::fill_n(out, 32, firmware_identity); return fail_identity ? -1 : ESP_OK;
 }
@@ -113,7 +124,7 @@ void reset() {
   flash_operations = commits = reads = 0; cut_flash = cut_commit = fail_commit = fail_read = -1;
   cut_header_prefix = 2048;
   now_us = 0;
-  fail_nvs_readback = commit_then_fail = fail_identity = false; firmware_identity = 0x5a;
+  fail_nvs_readback = commit_then_fail = fail_identity = fail_athan_open = fail_dua_read = false; firmware_identity = 0x5a;
   signature_valid = task_available = true; read_buffer_allocation_fails = spiram_allocation_fails = false;
   running_state = ESP_OTA_IMG_VALID; boot_partition = &running; boot_query_fails = metadata_erased = false;
   esphome::App.reboots = 0; on_flash = {};
@@ -129,9 +140,11 @@ struct Speaker {
   esphome::openathan_component::OpenAthan athan;
   DuaMedia dua;
   AthanMedia media;
-  Speaker() {
+  explicit Speaker(bool dua_enabled = false, bool missing_media_partition = false) {
     audio.set_player(&player); audio.setup(); athan.audio = &audio; athan.health = audio.ready();
-    athan.dua_prefs.begin(); dua.begin(&athan); media.begin(&athan);
+    athan.dua_store.value.enabled = dua_enabled;
+    athan.dua_prefs.begin(); dua.begin(&athan);
+    fail_partition_lookup = missing_media_partition; media.begin(&athan); fail_partition_lookup = false;
   }
   JsonDocument snapshot() { JsonDocument out; media.snapshot(out.to<JsonObject>()); return out; }
   std::string state() { return snapshot()["state"].as<std::string>(); }
@@ -345,6 +358,128 @@ void ownership_and_cancel() {
   }
   complete_boot();
 }
+void cancelled_staging_boundary() {
+  for (size_t growth : {0, 4096}) {
+    reset();
+    const std::string replacement_normal(normal_data.size() + growth, 'x'), replacement_fajr(fajr_data.size() + growth, 'y');
+    const auto choices = catalog([&](JsonObject root) {
+      auto recordings = root["recordings"].as<JsonArray>();
+      for (unsigned i = 0; i < 2; ++i) {
+        auto added = recordings.add<JsonObject>(); added.set(recordings[i]);
+        const auto &data = i ? replacement_fajr : replacement_normal;
+        added["id"] = i ? "fajr-two" : "normal-two";
+        added["file"] = i ? "fajr-two.mp3" : "normal-two.mp3";
+        added["bytes"] = data.size(); added["sha256"] = digest(data);
+      }
+    });
+    http_replies[BASE + "latest/download/catalog.json"].data = choices;
+    http_replies[VERSION + "catalog.json"].data = choices;
+    http_replies[VERSION + "normal-two.mp3"] = {200, "", replacement_normal};
+    http_replies[VERSION + "fajr-two.mp3"] = {200, "", replacement_fajr};
+    {
+      Speaker speaker; speaker.load(); speaker.select(); speaker.tick();
+      assert(pending_worker); pending_worker = nullptr;
+      (speaker.media.*access(RunAthanWorker{}))();
+      assert(speaker.media.active() && speaker.action("cancel") == 202);
+      speaker.tick(); speaker.media.*access(ActiveAthanWorker{}) = false;
+      assert(speaker.action("selection", R"({"schema":1,"expected_revision":2,"normal":"normal-two","fajr":"fajr-two"})") == 202);
+      speaker.tick();
+      assert(pending_worker && !speaker.media.owns_storage() && speaker.audio.ready() && flash == original);
+      run_worker(); speaker.install();
+    }
+    Speaker boot; boot.tick();
+    assert(boot.state() == "ready" && !boot.media.owns_storage());
+    assert(boot.snapshot()["installed"]["normal"]["id"] == "normal-two");
+    assert(std::memcmp(flash.data() + 4096, replacement_normal.data(), replacement_normal.size()) == 0);
+    assert(boot.audio.start(Track::FAJR)); boot.player.drain_commands(); boot.audio.loop();
+    const auto *file = boot.player.queued.back();
+    assert(file->length == replacement_fajr.size() && std::memcmp(file->data, replacement_fajr.data(), file->length) == 0);
+    preserved();
+  }
+  for (bool committed : {false, true}) {
+    reset();
+    Speaker speaker; speaker.load(); speaker.select(); speaker.download();
+    fail_commit = commits + 1; commit_then_fail = committed;
+    assert(speaker.action("cancel") == 503); speaker.tick();
+    assert(speaker.state() == "unavailable" && !pending_worker && !flash_operations && flash == original && speaker.audio.ready());
+    assert(speaker.action("retry") == 503 && speaker.action("selection", R"({"schema":1,"expected_revision":1,"normal":"normal-one","fajr":"fajr-one"})") == 503);
+  }
+  std::cout << "Cancelled staged workers cannot supply a later selection, including a larger pair\n";
+}
+void unknown_startup_ownership() {
+  for (unsigned failure = 0; failure < 6; ++failure) {
+    reset();
+    {
+      Speaker speaker; speaker.load(); speaker.select(); speaker.download(); speaker.tick();
+      assert(speaker.media.owns_storage() && !pending_worker && flash == original);
+    }
+    const auto journal = durable;
+    fail_identity = failure == 0; fail_athan_open = failure == 1; fail_nvs_readback = failure == 2;
+    if (failure == 3) durable["oa_athan/record"].back() ^= 1;
+    if (failure == 4) durable["oa_athan/record"].pop_back();
+    {
+      Speaker boot(false, failure == 5); boot.tick();
+      assert(boot.state() == "unavailable" && boot.media.owns_storage() && !pending_worker && !flash_operations);
+      assert(boot.audio.ready() && boot.audio.start(Track::NORMAL));
+      assert(boot.action("catalog") == 503 && boot.action("cancel") == 503);
+    }
+    fail_identity = fail_athan_open = fail_nvs_readback = false; durable = journal;
+    {
+      Speaker boot; assert(boot.media.owns_storage()); boot.download(); boot.install();
+    }
+    complete_boot();
+  }
+  std::cout << "Unknown startup ownership holds through partition, identity, journal open/read, checksum, and length failures\n";
+}
+void dua_startup_completion() {
+  reset();
+  {
+    struct NoDuaAudio : esphome::openathan_audio::PartitionAudio { bool dua_supported() const override { return false; } } audio;
+    esphome::openathan_component::OpenAthan athan; athan.audio = &audio;
+    DuaMedia dua; assert(!dua.startup_ready()); dua.begin(&athan); assert(dua.startup_ready());
+  }
+  for (bool repair : {false, true}) {
+    reset();
+    {
+      Speaker speaker(true); speaker.load(); assert(speaker.dua.startup_ready() && speaker.audio.dua_ready());
+      speaker.select(); speaker.download();
+      if (repair) {
+        cut_flash = 1;
+        try { speaker.install(); assert(false); } catch (const PowerCut &) {}
+        cut_flash = -1;
+      } else speaker.install();
+    }
+    fail_dua_read = true;
+    if (repair) {
+      Speaker boot(true); assert(!boot.dua.startup_ready()); boot.tick(true, true, true, false); run_worker();
+      boot.player.drain_commands(); boot.tick(true, true, true, false); run_worker(); boot.tick();
+    }
+    const auto receipt = durable.at("oa_athan/record");
+    const auto reboots = esphome::App.reboots; const auto operations = flash_operations;
+    {
+      Speaker boot(true); boot.tick();
+      assert(!boot.dua.startup_ready() && !boot.audio.dua_ready());
+      assert(boot.state() == "restarting" && boot.media.owns_storage() && durable.at("oa_athan/record") == receipt);
+      now_us += 90000000; boot.tick(); boot.tick();
+      assert(boot.state() == "failed" && boot.media.owns_storage() && !boot.snapshot()["can_retry"].as<bool>());
+      assert(esphome::App.reboots == reboots && flash_operations == operations && !pending_worker);
+      assert(durable.at("oa_athan/record") == receipt); preserved();
+    }
+    fail_dua_read = false; complete_boot();
+  }
+  reset(); fail_dua_read = true;
+  {
+    Speaker speaker(true); assert(!speaker.dua.startup_ready() && speaker.audio.ready() && !speaker.media.owns_storage());
+    assert(speaker.audio.start(Track::NORMAL)); speaker.audio.stop(); speaker.player.drain_commands();
+    speaker.load(); speaker.select(); speaker.download(); speaker.install();
+  }
+  {
+    Speaker boot(true); boot.tick();
+    assert(boot.state() == "ready" && !boot.media.owns_storage() && !boot.dua.startup_ready() && !boot.audio.dua_ready());
+    assert(boot.audio.start(Track::NORMAL)); preserved();
+  }
+  std::cout << "Athan completion preserves the captured Dua startup requirement across repair and restart\n";
+}
 void repair_guards() {
   reset();
   {
@@ -404,7 +539,10 @@ void startup_and_storage_failures() {
     reset(); std::fill(flash.begin() + DUA_BANK_START, flash.end(), 0xff);
     if (corrupt) flash[DUA_BANK_START + 200] = 0;
     const auto protected_tail = std::vector<uint8_t>(flash.begin() + DUA_BANK_START, flash.end());
-    { Speaker speaker; speaker.load(); speaker.select(); speaker.download(); speaker.install(); }
+    {
+      Speaker speaker; speaker.load(); assert(speaker.dua.startup_ready() == !corrupt);
+      speaker.select(); speaker.download(); speaker.install();
+    }
     Speaker boot; boot.tick(); assert(boot.state() == "ready" && boot.audio.ready() && !boot.audio.dua_ready());
     assert(std::equal(protected_tail.begin(), protected_tail.end(), flash.begin() + DUA_BANK_START));
   }
@@ -444,10 +582,11 @@ int main(int argc, char **argv) {
   assert(argc == 3); std::ifstream input(argv[1], std::ios::binary);
   original = {std::istreambuf_iterator<char>(input), {}}; assert(original.size() == AUDIO_PARTITION_SIZE);
 #if defined(OPENATHAN_PROVISIONING_TEST_STORAGE) || (defined(OPENATHAN_UPDATES_ENABLED) && !OPENATHAN_UPDATES_ENABLED)
-  reset(); { Speaker speaker; assert(speaker.action("catalog") == 503); speaker.tick(); assert(!pending_worker && !flash_operations && !commits); }
+  reset(); { Speaker speaker; assert(speaker.action("catalog") == 503); speaker.tick(); assert(!pending_worker && !flash_operations && !commits && !speaker.media.owns_storage()); }
   std::cout << "Isolated and disabled profiles cannot replace production Athan audio\n"; return 0;
 #endif
   normal_and_noop(); flash_cuts(); nvs_faults(); prewrite_failures(); catalog_failures(); ownership_and_cancel(); repair_guards();
+  cancelled_staging_boundary(); unknown_startup_ownership(); dua_startup_completion();
   startup_and_storage_failures(); boundary_pair(); canonical_catalog(argv[2]);
   assert(!pending_worker && !live_http_clients && !live_read_buffers);
   std::cout << "Athan production service passed durable recovery, reboot rebinding, dua preservation, trust, ownership, and cancellation checks\n";

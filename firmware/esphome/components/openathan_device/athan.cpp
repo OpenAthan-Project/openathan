@@ -136,7 +136,7 @@ bool AthanMedia::load_() {
   const auto result = nvs_get_blob(nvs_, "record", &record_, &bytes);
   if (result == ESP_ERR_NVS_NOT_FOUND) { record_ = {}; return true; }
   if (result != ESP_OK || bytes != sizeof(record_) || std::memcmp(record_.magic, "OAATH001", 8) ||
-      record_.phase > Phase::REBOOT || record_.reserved ||
+      record_.phase > Phase::REBOOT || record_.dua_completion > DuaCompletion::REQUIRE_STARTUP ||
       !hash(reinterpret_cast<const uint8_t *>(&record_), offsetof(Record, checksum), record_.checksum.data())) return false;
   for (const auto *pair : {&record_.installed, &record_.requested}) {
     for (const auto &track : *pair) {
@@ -187,6 +187,7 @@ void AthanMedia::begin(openathan_component::OpenAthan *athan) {
   supported_ = !openathan_storage::TEST_MODE && OPENATHAN_UPDATES_ENABLED && std::strcmp(OPENATHAN_BUILD_COMMIT, "development") &&
       athan_ && athan_->playback() && athan_->playback()->media_storage_supported();
   if (!supported_) return;
+  destructive_ = true;
   partition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "athan_audio");
   if (!partition_ || partition_->size != ::openathan::AUDIO_PARTITION_SIZE || partition_->erase_size != 4096) return;
   const auto *running = esp_ota_get_running_partition();
@@ -325,13 +326,15 @@ void AthanMedia::loop(bool connected, bool permitted, bool firmware_idle, bool f
   std::lock_guard<std::mutex> lock(mutex_);
   if (!supported_ || !storage_ok_ || !identity_ok_ || state_ == "unavailable") return;
   if (boot_verified_) {
-    if (!firmware_idle || !boot_safe() || !athan_->upgrade_health() || !dua_ready) {
+    if (!firmware_idle || !boot_safe() || !athan_->upgrade_health() ||
+        (record_.dua_completion == DuaCompletion::REQUIRE_STARTUP && !dua_ready)) {
       if (now_ms() - started_ms_ >= 90000) {
         state_ = "failed"; error_ = "Recordings verified, but playback startup is incomplete; restart the speaker";
       }
       return;
     }
     Record next = record_; next.installed = record_.requested; next.requested = {}; next.phase = Phase::IDLE;
+    next.dua_completion = DuaCompletion::BASELINE_UNAVAILABLE;
     if (!save_(next)) return;
     installed_ = next.installed; destructive_ = false; boot_verified_ = false; state_ = "ready"; error_.clear();
     return;
@@ -356,6 +359,7 @@ void AthanMedia::loop(bool connected, bool permitted, bool firmware_idle, bool f
     if (!destructive_) {
       if (!athan_->playback()->media_storage_idle()) { state_ = "waiting"; return; }
       Record next = record_; next.phase = Phase::WRITING; next.firmware = firmware_;
+      next.dua_completion = dua_ready ? DuaCompletion::REQUIRE_STARTUP : DuaCompletion::BASELINE_UNAVAILABLE;
       if (!save_(next)) { destructive_ = true; return; }
       destructive_ = true;
     }
@@ -401,7 +405,7 @@ void AthanMedia::run_() {
     }
   }
   std::lock_guard<std::mutex> lock(mutex_);
-  if (cancel_ || record_.phase == Phase::IDLE) return;
+  if (cancel_ || record_.revision != request.revision || record_.phase != request.phase) return;
   staged_ = std::move(pair); staged_ready_ = true; catalog_ = std::move(fetched); catalog_state_ = "ready"; catalog_error_.clear();
 }
 bool AthanMedia::write_() {
@@ -463,6 +467,7 @@ int AthanMedia::action(const std::string &action, JsonObjectConst input, std::st
     if (next.revision == UINT32_MAX) { error = "Recording revision is exhausted"; return 503; }
     ++next.revision;
     if (!save_(next)) { error = error_; return 503; }
+    staged_.reset(); staged_ready_ = false;
     cancel_ = true; latched_ = false; state_ = "idle"; error_.clear(); return 202;
   }
   if (action != "selection") { error = "Unknown recording action"; return 404; }
@@ -487,6 +492,7 @@ int AthanMedia::action(const std::string &action, JsonObjectConst input, std::st
   if (unchanged) { next.installed = next.requested; next.requested = {}; next.phase = Phase::IDLE; }
   else next.phase = Phase::QUEUED;
   if (!save_(next)) { error = error_; return 503; }
+  staged_.reset(); staged_ready_ = false;
   installed_ = next.installed; state_ = unchanged ? "ready" : "waiting"; error_.clear(); latched_ = false;
   return 202;
 }
