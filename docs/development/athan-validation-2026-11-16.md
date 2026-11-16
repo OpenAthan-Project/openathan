@@ -84,6 +84,12 @@ After the fixes, the upstream, Quran and dua-only adapter targets built, all
 recovery checks, six catalog tests and seven audio-image tests also passed.
 Independent correctness and comment reviews found no actionable issues.
 
+CI then exposed missing media probes in the phone-setup host fixture. The
+updated fixture passed production, mDNS-disabled and isolated variants under
+UBSan, including media ownership exclusions and preservation of stored records.
+The subsequent Quran runtime checks also passed. This follow-up changes no
+production firmware or UI source.
+
 Both previously failing scheduler profiles also compiled and passed capacity
 checks. The device image is 1,130,896 bytes, and the validation image is
 1,148,560 bytes. The validation build passed on a separate retry after the first

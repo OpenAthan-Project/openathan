@@ -159,6 +159,7 @@ struct UpgradeProbe {
   bool usb_busy() const { return busy; }
   bool streaming_blocked() const { return busy || blocked || working; }
   bool active() const { return working; }
+  bool media_idle() const { return !streaming_blocked(); }
   void set_background_busy(bool value) { background_busy=value; }
   bool confirmed() const { return true; }
   void loop(bool) {}
@@ -169,8 +170,15 @@ struct UpgradeProbe {
 struct DuaProbe {
   bool running{},start_next{};
   bool active() const { return running; }
+  bool startup_ready() const { return !running && !start_next; }
   void shutdown() {}
   void loop(bool, bool permitted) { if(start_next && permitted) { running=true;start_next=false; } }
+};
+struct AthanMediaProbe {
+  bool running{},storage_owned{};
+  bool active() const { return running; }
+  bool owns_storage() const { return storage_owned; }
+  void loop(bool,bool,bool,bool,bool) {}
 };
 struct QuranProbe { bool playback_pending() const { return false; } void loop(bool,bool) {} };
 struct ApiProbe {
@@ -222,6 +230,7 @@ struct Device {
 #endif
   std::shared_ptr<HttpExchange> phone_response_;
   DuaProbe dua_;
+  AthanMediaProbe athan_media_;
   bool playback_busy() const { return athan_->playback_busy(); }
   UpgradeProbe upgrade_; QuranProbe quran_; ApiProbe api_storage; ApiProbe *api_{&api_storage};
   std::mutex queue_mutex_; std::deque<std::shared_ptr<HttpExchange>> requests_;
@@ -298,12 +307,15 @@ void closed_startup() {
   { Fixture f(false);f.athan.settings.ok=false;f.device.loop();assert(!f.device.phone_setup_active()); }
 }
 void busy_admission() {
-  for (unsigned kind=0;kind<3;++kind) {
+  for (unsigned kind=0;kind<5;++kind) {
     Fixture f(false);
     if(kind==0)f.athan.busy=true; // Includes the silent pause.
     if(kind==1)f.device.dua_.running=true;
     if(kind==2)f.device.upgrade_.working=true;
+    if(kind==3)f.device.athan_media_.running=true;
+    if(kind==4)f.device.athan_media_.storage_owned=true;
     f.device.loop();assert(!f.device.phone_initialized_ && !f.device.phone_setup_active());
+    assert(!f.device.phone_eligible_());
     const auto writes=nvs_test::writes;
     for(const auto &request:std::vector<Frame>{{false,3,rpc(1,{"Other","other password"})},
         {false,3,rpc(4,{})},{true,3,rpc(2,{"replacement password"})}}) {
@@ -311,8 +323,28 @@ void busy_admission() {
       assert(f.sent.size()==1 && f.sent[0]==frame(request.extension,2,std::vector<uint8_t>{255}));
       assert(nvs_test::writes==writes && !f.device.wifi_attempt_.active() && !f.device.scanning_);
     }
+    if(kind>=3) {
+      f.sent.clear();f.device.serial_request({true,3,rpc(openathan::usb_upgrade::BEGIN,{})});
+      assert(f.sent==std::vector<std::vector<uint8_t>>{frame(true,2,std::vector<uint8_t>{255})});
+      assert(f.device.upgrade_.commands==0 && f.device.upgrade_.background_busy && nvs_test::writes==writes);
+    }
     f.athan.busy=false;f.device.dua_.running=false;f.device.upgrade_.working=false;
+    f.device.athan_media_={};
     f.device.loop();assert(f.device.phone_initialized_ && f.device.phone_setup_active());f.preserved();
+  }
+  for (bool owns_storage : {false,true}) {
+    Fixture f(false);f.athan.incomplete=false;f.device.dua_.start_next=true;
+    f.device.athan_media_.running=!owns_storage;f.device.athan_media_.storage_owned=owns_storage;
+    f.device.loop();
+    assert(!f.device.dua_.running && f.device.dua_.start_next && f.device.upgrade_.background_busy);
+    f.device.athan_media_={};f.device.loop();assert(f.device.dua_.running);f.preserved();
+  }
+  {
+    Fixture f;const auto writes=nvs_test::writes;
+    f.device.athan_media_.storage_owned=true;
+    assert(f.call("POST","/setup/scan","{}")->code==403);
+    assert(!f.device.phone_setup_active() && !esphome::wifi::wifi_probe.ap && nvs_test::writes==writes);
+    f.preserved();
   }
   // The HTTP request must see a dua worker started in this same iteration.
   Fixture f(false);f.athan.incomplete=false;f.device.dua_.start_next=true;
