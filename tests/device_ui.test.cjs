@@ -242,6 +242,30 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    assert.match(await page.locator('#athan-status').textContent(),/installed · available offline/);
   }finally{await o.close();}
  });
+ for(const state of ['restarting','idle'])test(`${browserName}: Athan ${state} read failure clears after healthy status`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{},true),{page}=o;
+  try{
+   await athanSettings(page);await requestsFinished(page);
+   if(state==='restarting'){
+    f.state.athan.state=state;f.state.athan.requested={normal:'regular-b',fajr:'fajr-b'};
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('Restarting the speaker'));
+   }
+   f.state.athanFailRead=true;await page.locator('#refresh').click();await requestsFinished(page);
+   await page.locator('#athan-status.error').waitFor({state:'visible'});
+   assert.match(await page.locator('#athan-status').textContent(),state==='restarting'?/Waiting for the speaker to reconnect/:/Recording status is unavailable/);
+   assert.ok(await page.locator('#athan-catalog-refresh').isDisabled());
+   f.state.athanFailRead=false;
+   if(state==='restarting'){
+    f.state.athan.state='ready';f.state.athan.requested=null;
+    f.state.athan.installed.normal=f.state.athan.catalog.recordings[1];f.state.athan.installed.fajr=f.state.athan.catalog.recordings[3];
+   }
+   await page.locator('#refresh').click();await requestsFinished(page);
+   await page.waitForFunction(()=>!document.getElementById('athan-catalog-refresh').disabled);
+   assert.equal(await page.locator('#athan-installed-normal').textContent(),state==='restarting'?'Sample regular Athan B':'Sample regular Athan A');
+   assert.match(await page.locator('#athan-status').textContent(),state==='restarting'?/Recordings installed · available offline/:/Choose recordings, then install them/);
+  }finally{await o.close();}
+ });
  test(`${browserName}: Athan catalog loads once and refreshes only explicitly`,async()=>{
   const f=await fixture();withAthan(f);f.state.athan.catalog.state='idle';const o=await open(f,browserName,{},true),{page}=o;
   try{

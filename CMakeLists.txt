@@ -177,6 +177,11 @@ if(NOT APPLE)
   target_link_libraries(audio_adapter_no_quran_tests PRIVATE OpenSSL::Crypto)
 endif()
 
+add_library(audio_adapter_upstream_compile OBJECT
+  firmware/esphome/components/openathan_audio/partition_audio.cpp)
+target_include_directories(audio_adapter_upstream_compile PRIVATE tests/stubs lib/openathan-core/include
+  firmware/esphome/components/openathan_audio)
+
 add_executable(audio_board_adapter_tests tests/audio_board_adapter_tests.cpp)
 target_include_directories(audio_board_adapter_tests PRIVATE tests/audio_board_stubs tests/waveshare_stubs
   tests/stubs firmware lib/openathan-core/include)

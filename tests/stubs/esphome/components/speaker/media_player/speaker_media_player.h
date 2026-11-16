@@ -25,10 +25,12 @@ struct SpeakerMediaPlayer {
   uint32_t announcement_session() const { return session; }
   PipelineOutcome announcement_outcome() const { return outcome; }
   AudioPipelineState announcement_state() const { return pipeline_state; }
+#if defined(OPENATHAN_QURAN) || defined(OPENATHAN_DUA_PIPELINE)
   bool playback_stopped() const {
     return initialized && pending_commands.empty() && pipeline_state == AudioPipelineState::STOPPED &&
            media_pipeline_state == AudioPipelineState::STOPPED;
   }
+#endif
   bool initialized{true};
   float volume{0.7f};
   bool muted{}, drop_volume{};
