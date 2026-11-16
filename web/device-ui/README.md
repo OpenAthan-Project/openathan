@@ -292,9 +292,9 @@ during replacement can require internet access to repair the recordings.
 The UI reads `/api/athan` on Settings entry and polls every three seconds while
 Settings is visible, with at most one read in flight. First-run setup and older
 firmware with a 404 keep the group hidden. Draft choices survive polls, catalog
-failures, conflicts and uncertain responses. A lost response requires fresh GET
-readback before another action. Refresh status retries that read without repeating
-the write.
+failures, conflicts and uncertain responses. A lost response requires healthy GET
+readback before another action. Unavailable storage keeps the outcome unconfirmed
+through recovery. Refresh status retries the read without repeating the write.
 Retry and Cancel follow the reported capabilities, and installation/restart locks
 recording controls. The existing shared Stop remains the playback control.
 

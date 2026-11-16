@@ -876,7 +876,7 @@ function acceptAthan({ data, order }) {
     if (athan.draftVersion === athan.submitted.draftVersion) athan.dirty = false;
     athan.submitted = null;
   }
-  if (athan.uncertain && order > athan.uncertain.order) {
+  if (athan.uncertain && data.state !== "unavailable" && order > athan.uncertain.order) {
     const operation = athan.uncertain;
     athan.uncertain = null;
     if (!operation.conflict) athan.message = operation.action === "selection" && data.revision === operation.revision && !data.requested
@@ -890,7 +890,7 @@ async function readAthan() {
   athan.attempted = true;
   try {
     acceptAthan(await request("/api/athan"));
-    if (!athan.catalogAttempted && athan.data.supported !== false) {
+    if (!athan.catalogAttempted && athan.data.supported !== false && athan.data.state !== "unavailable" && !athan.uncertain) {
       athan.catalogAttempted = true;
       if (athan.data.catalog.state === "idle") void athanAction("catalog");
     }
@@ -940,7 +940,7 @@ function renderAthan() {
     $("athan-catalog-refresh").disabled = true;
     return;
   }
-  const locked = !!athan.operation || !!athan.uncertain || athan.stale || !connected,
+  const locked = !!athan.operation || !!athan.uncertain || athan.stale || !connected || data.state === "unavailable",
     active = ["waiting", "downloading", "installing", "restarting", "repair_needed"].includes(data.state) || !!data.requested,
     destructive = ["installing", "restarting"].includes(data.state);
   for (const role of ["normal", "fajr"]) {
@@ -973,7 +973,7 @@ function renderAthan() {
       athanSelection(role)?.sha256 === data.installed[role].sha256),
     selectionReady = ["normal", "fajr"].every(role => !!athanSelection(role));
   $("athan-install").hidden = active;
-  $("athan-install").disabled = locked || writing() || active || data.state === "unavailable" || !selectionReady || sameInstalled;
+  $("athan-install").disabled = locked || writing() || active || !selectionReady || sameInstalled;
   $("athan-retry").hidden = data.can_retry !== true || !["failed", "repair_needed"].includes(data.state);
   $("athan-retry").disabled = locked || writing();
   $("athan-cancel").hidden = data.can_cancel !== true || destructive;
@@ -982,7 +982,9 @@ function renderAthan() {
   const progress = data.state === "downloading" && data.total_bytes > 0
     ? ` ${Math.min(100, Math.floor(100 * data.received_bytes / data.total_bytes))}%` : "";
   text("athan-status", athan.uncertain
-    ? "The response was lost. Reading recording status before allowing another action. Use Refresh status if the speaker is unavailable."
+    ? data.state === "unavailable"
+      ? "Recording storage is unavailable. The installation outcome is unconfirmed. Use Refresh status after the speaker recovers."
+      : "The request outcome is unconfirmed. Reading recording status before allowing another action. Use Refresh status if the speaker is unavailable."
     : athan.message || (athan.dirty && !active && ["idle", "ready"].includes(data.state) ? "Choices changed · install to apply them." : athanMessages[data.state]) + progress + (data.error ? " " + data.error : ""));
   $("athan-status").className = "feedback" + (athan.stale || ["failed", "repair_needed", "unavailable"].includes(data.state) ? " error" : data.state === "ready" && !athan.dirty ? " success" : "");
   text("athan-catalog-status", data.catalog.state === "loading" ? "Loading catalog…"
@@ -993,7 +995,7 @@ function renderAthan() {
 async function athanAction(action) {
   const data = athan.data;
   if (!data || athan.operation || athan.uncertain || athan.stale || !connected || writing() ||
-      ["installing", "restarting"].includes(data.state)) return;
+      ["installing", "restarting", "unavailable"].includes(data.state)) return;
   if (action === "selection" && ($("athan-install").disabled || $("athan-install").hidden)) return;
   if (action === "retry" && data.can_retry !== true) return;
   if (action === "cancel" && data.can_cancel !== true) return;

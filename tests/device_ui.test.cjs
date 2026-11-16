@@ -282,7 +282,7 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
   try{
    await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');
    f.state.athanDrop=true;f.state.athanFailRead=true;await page.locator('#athan-install').click();
-   await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('response was lost'));await requestsFinished(page);
+   await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('outcome is unconfirmed'));await requestsFinished(page);
    assert.ok(await page.locator('#athan-install').isDisabled());assert.equal(f.state.posts.filter(p=>p.url==='/api/athan/selection').length,1);
    await page.locator('#athan-fajr').selectOption('fajr-b');
    f.state.athanFailRead=false;await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
@@ -302,6 +302,24 @@ for(const browserName of (process.env.OPENATHAN_TEST_BROWSERS||'chromium').split
    assert.ok(await page.locator('#athan-install').isEnabled());await page.locator('#athan-install').click();await page.waitForFunction(()=>!document.getElementById('athan-requested').hidden);
    assert.deepEqual(f.state.posts.find(p=>p.url==='/api/athan/selection').payload,{schema:1,expected_revision:4,normal:'regular-a',fajr:'fajr-a'});
    assert.equal(f.state.athan.installed.normal.id,'legacy-normal');
+  }finally{await o.close();}
+ });
+ test(`${browserName}: Athan unavailable storage cannot resolve an uncertain persisted installation`,async()=>{
+  const f=await fixture();withAthan(f);const o=await open(f,browserName,{},true),{page}=o;let attempts=0;
+  try{
+   await athanSettings(page);await page.locator('#athan-normal').selectOption('regular-b');await page.locator('#athan-fajr').selectOption('fajr-b');
+   const durable={...structuredClone(f.state.athan),revision:5,state:'waiting',requested:{normal:'regular-b',fajr:'fajr-b'},can_cancel:true};
+   await page.route('**/api/athan/selection',async route=>{
+    attempts++;f.state.athan.state='unavailable';f.state.athan.error='Recording storage could not be read';
+    await route.fulfill({status:503,contentType:'application/json',body:'{'});
+   });
+   await page.locator('#athan-install').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('storage is unavailable'));await requestsFinished(page);
+   assert.match(await page.locator('#athan-status').textContent(),/outcome is unconfirmed/);assert.doesNotMatch(await page.locator('#athan-status').textContent(),/was not queued/);
+   for(const id of ['athan-install','athan-retry','athan-cancel','athan-catalog-refresh'])assert.ok(await page.locator('#'+id).isDisabled());
+   await page.clock.runFor(7000);await requestsFinished(page);assert.equal(attempts,1);assert.match(await page.locator('#athan-status').textContent(),/outcome is unconfirmed/);
+   f.state.athan=durable;await page.locator('#refresh').click();await page.waitForFunction(()=>document.getElementById('athan-status').textContent.includes('safe gap'));
+   assert.equal(attempts,1);assert.ok(await page.locator('#athan-install').isHidden());assert.ok(await page.locator('#athan-cancel').isEnabled());
+   assert.equal(await page.locator('#athan-normal').inputValue(),'regular-b');assert.equal(await page.locator('#athan-fajr').inputValue(),'fajr-b');assert.match(await page.locator('#athan-requested').textContent(),/Sample regular Athan B/);
   }finally{await o.close();}
  });
  test(`${browserName}: Athan stale poll cannot regress accepted installation`,async()=>{
