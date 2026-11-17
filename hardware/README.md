@@ -1,6 +1,6 @@
 # Choose your OpenAthan hardware
 
-OpenAthan releases currently support the two builds below. Both play scheduled
+OpenAthan releases currently support the three builds below. All play scheduled
 Athan, stream Quran, offer optional dua after Athan, and use phone or USB setup.
 You do not need to solder, write code or run Home Assistant.
 
@@ -10,6 +10,7 @@ You do not need to solder, write code or run Home Assistant.
 | --- | --- | --- | --- |
 | M5Stack AtomS3R **C126** + Voice Pyramid **A167** | Connect two modules | Small display, front button, RGB prayer lights | [Parts](reference-builds/voice-pyramid/bom.md) · [Setup](reference-builds/voice-pyramid/assembly.md) |
 | Waveshare **ESP32-S3-Touch-LCD-1.85C-BOX V2** | Pre-assembled | Round display with prayer ring, BOOT button | [Parts and setup](reference-builds/waveshare-box-v2/README.md) |
+| Waveshare **ESP32-S3-AUDIO-Board** | Board with matching speaker | No screen; RGB lights and volume/Stop buttons | [Parts and setup](reference-builds/waveshare-audio-board/README.md) |
 
 **Compatibility:** the Atom profile supports the GC9107 display; newer ST7735
 revisions remain unqualified. Waveshare **Box V1 is unsupported**. A167 is also
@@ -19,14 +20,18 @@ Choose the pre-assembled Box V2 if you prefer not to connect modules. Choose the
 Atom/Pyramid combination if you want the separate prayer-status lights and can
 verify the supported Atom display revision. These are compatibility choices;
 this documentation does not establish comparative speaker loudness or quality.
+The AUDIO-Board provides physical volume buttons and status lights without a screen.
 
 ## What you need
 
 In addition to the speaker parts, allow for a USB data cable, suitable USB power,
 a computer with desktop Chrome or Edge for installation/recovery, and a 2.4 GHz
 WPA2/WPA3 personal Wi-Fi network. Check what your seller includes. Prices and
-availability vary by region; the model guides link to manufacturer references
-for identification rather than promising a particular price or seller stock.
+availability vary by region. The model guides include purchase links and technical
+references. The [M5Stack](https://m5stack.com/distributor) and
+[Waveshare](https://www.waveshare.com/distributors) distributor directories cover
+additional regions. A distributor listing does not confirm stock or the revision
+that a seller will ship.
 
 The [public installer](https://openathan.com/install/) supplies ready-to-install
 firmware. A new installation erases existing firmware and saved data. Existing
@@ -39,23 +44,26 @@ speakers should use [preserving updates or credential recovery](../docs/developm
   promises operation after unplugging without resynchronization; Box V2 battery
   retention and drift remain unqualified. Stored Athan and installed dua work
   locally once time is valid; Quran streaming needs internet.
-- **Screen:** both current builds show time, prayer/playback status and connection
+- **Screen:** Atom and Box V2 show time, prayer/playback status and connection
   information, with saved brightness and 12/24-hour formatting.
 - **Physical controls:** the Atom front button or Box V2 BOOT button stops audio.
   While idle, a short press shows connection information. Phone controls provide
   volume and skip/restore actions. Box V2 also has a RESET button to restart it.
 - **Lights:** A167 has supported RGB prayer-status lights. Box V2 uses its screen
-  for the prayer ring; it is not a separate RGB light output.
+  for the prayer ring; it is not a separate RGB light output. AUDIO-Board has
+  seven RGB status lights.
 - **Unused peripherals:** touch input, microphones and SD/removable storage are
   not supported by OpenAthan. Their presence in vendor specifications does not
   make them available in OpenAthan firmware.
 
-## AUDIO-Board development
+## AUDIO-Board release availability
 
-The screenless Waveshare ESP32-S3-AUDIO-Board has a new firmware adapter and
-installer integration. Hardware qualification and a published compatible release
-are pending; it is not yet an additional publicly supported build. See its
-[parts and setup guide](reference-builds/waveshare-audio-board/README.md).
+The screenless Waveshare ESP32-S3-AUDIO-Board is included in the
+[published v0.9.0 release](https://github.com/OpenAthan-Project/openathan/releases/tag/v0.9.0).
+Check the [public installer](https://openathan.com/install/) for current release
+availability. The release records a preserving update on one unit; physical fresh
+installation, retry and recovery through the public installer remain untested.
+See its [parts and setup guide](reference-builds/waveshare-audio-board/README.md).
 
 ## Other hardware and expansions
 
