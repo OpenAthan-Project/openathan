@@ -12,7 +12,7 @@ bool Device::phone_eligible_() const {
   const auto *settings = athan_ ? athan_->settings_service() : nullptr;
   return phone_setup::eligible(athan_ && std::strcmp(athan_->setup_state(), "incomplete") == 0,
       store_.healthy() && settings && settings->healthy() && !maintenance_ && !upgrade_.streaming_blocked() &&
-          !playback_busy() && !dua_.active(),
+          !playback_busy() && !dua_.active() && !athan_media_.active() && !athan_media_.owns_storage(),
       wifi_record_ == ::openathan::LoadResult::EMPTY, password_record_ == ::openathan::LoadResult::ERROR);
 }
 bool Device::phone_setup_active() const {
@@ -53,7 +53,7 @@ void Device::phone_dns_() {
 }
 void Device::phone_loop_(uint64_t now) {
   if (!phone_initialized_ && App.is_setup_complete() && !wifi_attempt_.active() && !scanning_ &&
-      !upgrade_.streaming_blocked() && !playback_busy() && !dua_.active()) {
+      !upgrade_.streaming_blocked() && !playback_busy() && !dua_.active() && !athan_media_.active() && !athan_media_.owns_storage()) {
     phone_initialized_ = true;
     if (phone_eligible_()) {
       phone_session_ = true;
@@ -61,7 +61,7 @@ void Device::phone_loop_(uint64_t now) {
       restore_wifi_();
     }
   }
-  if (phone_session_ && (maintenance_ || upgrade_.streaming_blocked() ||
+  if (phone_session_ && (maintenance_ || upgrade_.streaming_blocked() || athan_media_.owns_storage() ||
       std::strcmp(athan_->setup_state(), "incomplete") != 0 || wifi_record_ == ::openathan::LoadResult::LOADED)) {
     phone_session_ = false; phone_state_ = phone_setup::State::CLOSED;
     phone_candidate_ = {}; phone_response_.reset();

@@ -146,6 +146,8 @@ void LocalApi::handle(ApiExchange& request) {
     snapshot_(root);
   else if (request.method == "GET" && request.uri == "/api/dua" && dua_)
     dua_->snapshot(root);
+  else if (request.method == "GET" && request.uri == "/api/athan" && athan_media_)
+    athan_media_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/firmware" && upgrade_)
     upgrade_->snapshot(root);
   else if (request.method == "GET" && request.uri == "/api/quran/catalog" && quran_)
@@ -171,7 +173,12 @@ void LocalApi::handle(ApiExchange& request) {
     auto payload = input.as<JsonObject>();
     const bool settings_action =
         request.uri == "/api/settings" || request.uri == "/api/preview" || request.uri == "/api/activate";
-    if ((request.uri == "/api/quran/catalog" || request.uri == "/api/quran/play") && quran_) {
+    if (request.uri.rfind("/api/athan/", 0) == 0 && athan_media_) {
+      std::string message;
+      request.code = athan_media_->action(request.uri.substr(11), payload, message);
+      athan_media_->snapshot(root);
+      if (request.code >= 400) root["error"] = message;
+    } else if ((request.uri == "/api/quran/catalog" || request.uri == "/api/quran/play") && quran_) {
       std::string message;
       const int code = quran_->action(request.uri == "/api/quran/play" ? "play" : "catalog", payload, message);
       if (code != 200) { error(request, code, message.c_str()); return; }

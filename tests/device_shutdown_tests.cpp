@@ -18,6 +18,8 @@ void Device::on_wifi_connect_state(StringRef, std::span<const uint8_t,6>) {}
 Upgrade::~Upgrade() = default;
 void DuaMedia::snapshot(JsonObject) {}
 int DuaMedia::retry(std::string &) { return 503; }
+void AthanMedia::snapshot(JsonObject) {}
+int AthanMedia::action(const std::string&, JsonObjectConst, std::string&) { return 503; }
 bool Quran::playback_pending() const { return false; }
 void Quran::shutdown() {}
 void Quran::snapshot(JsonObject) {}

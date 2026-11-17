@@ -1,5 +1,16 @@
 # Unreleased
 
+## Curated Athan recordings
+
+The device Settings page supports separate regular and Fajr choices from a signed
+catalog. The speaker stores the selected pair for offline playback and restarts
+after verified installation. An interrupted write can require online repair.
+Firmware slots, settings, prayer history and dua storage retain their layout.
+
+The first public catalog and candidate recordings still require media approval,
+publication and attended qualification. See the
+[recording contract](../development/athan-recordings.md).
+
 ## One hold to skip or restore Athan
 
 Hold the front or BOOT button for about three seconds, then release to skip the

@@ -201,6 +201,14 @@ and size rejection, and cancellation. These synthetic checks do not establish
 hardware flash latency, listening quality or runtime memory headroom; see the
 [dua contract](../../docs/development/dua.md).
 
+The same job runs `tools/check_athan.py --arduinojson` with the resolved headers.
+It compiles the production Athan service, playback adapter, and dua scanner with
+UBSan. Synthetic fixtures cover signed catalog parsing, interrupted flash and
+NVS commits, repair without audio startup health, protected dua bytes, and fresh
+startup loading the selected pair. The tests also verify that ordinary isolated
+builds cannot replace production audio. They do not qualify hardware recovery,
+listening quality, or runtime memory headroom.
+
 Two additional builds compile `dua/qualification.yaml` and
 `waveshare/dua-qualification.yaml`. These use private media trust with firmware
 updates disabled, isolated storage and a separate dua qualification component.

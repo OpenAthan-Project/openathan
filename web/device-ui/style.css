@@ -25,4 +25,5 @@ label:has(>select){overflow:hidden}label:has(>select:focus){outline:3px solid va
 @media(max-width:350px){#quran-view{padding:0 16px}.quran-player{padding-top:16px}.quran-player-heading h3{font-size:1.25rem}.quran-player-heading button{padding:9px 12px}.quran-selection{padding-top:20px}}
 
 .quran-player.quran-player-flow:has(#quran-stop:not([hidden])){position:static}
+.athan-installed{margin:16px 0}.athan-installed>div+div{margin-top:12px}.athan-installed dt{font-size:.8125rem;color:var(--muted)}.athan-installed dd{margin:2px 0 0;overflow-wrap:anywhere}.athan-credit{min-height:0}.athan-install-help{margin-top:16px}.athan-catalog-tools{margin-top:16px}.athan-catalog-tools .feedback{margin-bottom:0}#athan-group select{font-variant-numeric:normal}
 @media(max-width:767px){.quran-selection :is(button,input,select){scroll-margin-top:var(--quran-player-offset,16px)}}

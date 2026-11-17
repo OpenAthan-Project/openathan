@@ -2,6 +2,7 @@
 
 namespace esphome::openathan_device {
 void Device::on_shutdown() {
+  athan_media_.shutdown();
   dua_.shutdown();
   upgrade_.shutdown();
   quran_.shutdown();

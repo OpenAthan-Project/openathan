@@ -3,6 +3,7 @@
 #include "upgrade_api.h"
 #include "quran_api.h"
 #include "dua_api.h"
+#include "athan_api.h"
 
 namespace esphome::openathan_device {
 struct ZoneEntry {
@@ -27,6 +28,7 @@ class LocalApi {
   void handle(ApiExchange& request);
   void set_upgrade(UpgradeApi *upgrade) { upgrade_ = upgrade; }
   void set_dua(DuaApi *dua) { dua_ = dua; }
+  void set_athan_media(AthanApi *media) { athan_media_ = media; }
   void set_quran(QuranApi *quran) { quran_ = quran; }
 
  private:
@@ -45,5 +47,6 @@ class LocalApi {
   UpgradeApi *upgrade_{};
   QuranApi *quran_{};
   DuaApi *dua_{};
+  AthanApi *athan_media_{};
 };
 }  // namespace esphome::openathan_device
