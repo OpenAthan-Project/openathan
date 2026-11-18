@@ -33,6 +33,8 @@ soldering, or programming.
   the speaker's address so you can find its page again.
 - **Customize the supported screen and lights**, including screen brightness and
   12/24-hour time. Available controls depend on the hardware.
+- **Name your speakers and find them** at `http://openathan.local/` on home Wi-Fi.
+  If the finder is unavailable, use the speaker's individual hostname or current IP.
 - **Update over Wi-Fi** from the speaker's settings while keeping saved settings
   and recordings. USB recovery can change Wi-Fi or reset a forgotten speaker
   password without erasing prayer settings or playback history.
@@ -46,11 +48,12 @@ available controls depend on firmware and hardware.*
 
 ## Supported speakers
 
-Both options run the same core Athan and Quran features and use the browser
+All three options run the same core Athan and Quran features and use the browser
 installer. Buy the exact supported model and revision.
 
 | Speaker | Assembly and interface | Setup guide |
 | --- | --- | --- |
+| **Waveshare ESP32-S3-AUDIO-Board** | Screenless speaker; seven prayer-status lights and volume/Stop buttons | [Parts and setup](hardware/reference-builds/waveshare-audio-board/README.md) |
 | **M5Stack AtomS3R C126 + Voice Pyramid A167** | Two modules to connect; small screen, front button and prayer-status lights | [Parts and setup](hardware/reference-builds/voice-pyramid/assembly.md) |
 | **Waveshare ESP32-S3-Touch-LCD-1.85C-BOX V2** | Pre-assembled speaker; round screen and BOOT button | [Parts and setup](hardware/reference-builds/waveshare-box-v2/README.md) |
 
@@ -97,8 +100,9 @@ for older firmware or bootloader compatibility.
 
 - **Stored Athan and installed dua work offline once the clock is valid.**
   First setup needs internet time. Atom needs internet time again after a cold
-  boot. Waveshare Box V2 can restore initialized clock time across powered
-  restarts; unplugged retention and backup-battery behavior remain unqualified.
+  boot. Waveshare AUDIO-Board and Box V2 have PCF85063 real-time clocks that can
+  restore synchronized time across powered restarts. Unplugged retention,
+  backup-battery behavior and long-term clock drift remain unqualified.
 - **Quran streaming needs internet access to MP3Quran.** It does not provide an
   offline Quran library, ayah controls or playback bookmarks.
 - Settings and scheduling run locally without the public website or Home

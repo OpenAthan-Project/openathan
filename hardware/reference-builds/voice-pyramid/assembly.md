@@ -82,7 +82,7 @@ Once time is valid, stored Athan and installed dua work locally. Quran streaming
 needs internet. Added clocks, external speakers and storage are not supported
 accessories simply because the hardware has expansion ports.
 
-Review the [current release notes](../../../docs/releases/v0.8.0.md) and
+Review the [current release notes](https://github.com/OpenAthan-Project/openathan/releases/latest) and
 [display revision and validation limits](../../../firmware/esphome/components/atom_s3r_display/README.md).
 The calibrated maximum volume has not been qualified for distortion; increase
 volume gradually. Hardware evidence applies to the recorded units and source

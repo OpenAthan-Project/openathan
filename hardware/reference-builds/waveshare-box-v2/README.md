@@ -82,7 +82,7 @@ backup-battery behavior and long-term clock drift remain unqualified. Quran
 streaming requires internet; stored Athan and installed dua work once the clock
 is valid.
 
-Review the [current release notes](../../../docs/releases/v0.8.0.md) and
+Review the [current release notes](https://github.com/OpenAthan-Project/openathan/releases/latest) and
 [model-specific validation](../../../docs/development/waveshare-box-v2.md#attended-validation).
 Publication does not imply testing of every exact release image, panel lot,
 network condition or long-running workload.

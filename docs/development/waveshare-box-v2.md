@@ -6,7 +6,7 @@ authenticated device-local phone controls. V1 uses different audio hardware and
 is not supported by this profile. Touch, microphones and SD storage are
 deferred. Production is available since [v0.5.0](../releases/v0.5.0.md).
 Start with the [parts and setup guide](../../hardware/reference-builds/waveshare-box-v2/README.md)
-for installation; [current release notes](../releases/v0.8.0.md) cover later features and limits.
+for installation; [current release notes](https://github.com/OpenAthan-Project/openathan/releases/latest) cover later features and limits.
 See the [release qualification report](release-validation-2026-10-10.md) and
 [earlier development validation](waveshare-validation-2026-10-09.md) for physical
 results and their limits.
