@@ -12,6 +12,6 @@ Potential future expansions include:
 
 Expansion hardware should remain optional unless it becomes necessary for core reliability.
 
-The Waveshare Box V2's existing onboard clock is part of that model, rather than
-an add-on. Powered-restart restoration is supported; unplugged retention and
-battery behavior remain unqualified. Other clock adapters require separate work.
+The Waveshare AUDIO-Board and Box V2 already have onboard PCF85063 clocks.
+Powered-restart restoration is supported; unplugged retention and backup-battery
+behavior remain unqualified. Other clock adapters require separate work.

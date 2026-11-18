@@ -2,7 +2,7 @@
 
 ESPHome is the preferred initial embedded framework for OpenAthan.
 
-> **Status:** [v0.8.0](../../docs/releases/v0.8.0.md) provides phone/USB setup, local settings, scheduled stored-recording Athan, Quran streaming, optional dua, displays/lights and signed application updates on [supported models](../../hardware/README.md). Stored audio needs a valid clock; Quran needs internet. Release notes retain qualification limits. The [scheduler development build](scheduler/README.md) and [manual feasibility build](feasibility/README.md) remain separate development configurations.
+> **Status:** [Published releases](https://github.com/OpenAthan-Project/openathan/releases/latest) provide phone/USB setup, local settings, scheduled stored-recording Athan, Quran streaming, optional dua, model-specific displays/lights and signed application updates on [supported models](../../hardware/README.md). Stored audio needs a valid clock; Quran needs internet. Release notes retain qualification limits. The [scheduler development build](scheduler/README.md) and [manual feasibility build](feasibility/README.md) remain separate development configurations.
 
 Runtime configuration uses the optional encrypted [settings console](scheduler/SETTINGS.md)
 or the reference firmware's [device-hosted settings interface](provisioning/README.md).
@@ -13,7 +13,7 @@ and explicit activation while retaining the settings service and prayer history.
 
 ### Precompiled reference firmware
 
-Users install official releases from [openathan.com/install](https://openathan.com/install) without YAML or ESPHome knowledge. [`openathan.yaml`](openathan.yaml) composes the reusable package with C126 + A167 hardware; [`waveshare/production.yaml`](waveshare/production.yaml) is the Box V2 release entry point. Official-only provisioning, networking, OTA, and release settings belong at that entry-point layer, not in the generic package. Fresh installation erases saved data; existing speakers use the [preserving upgrade path](../../docs/development/firmware-upgrades.md).
+Users install official releases from [openathan.com/install](https://openathan.com/install) without YAML or ESPHome knowledge. [`openathan.yaml`](openathan.yaml) composes the reusable package with C126 + A167 hardware; [`waveshare/production.yaml`](waveshare/production.yaml) is the Box V2 release entry point, and [`waveshare-audio-board/production.yaml`](waveshare-audio-board/production.yaml) supplies the screenless AUDIO-Board. Official-only provisioning, networking, OTA, and release settings belong at that entry-point layer, not in the generic package. Fresh installation erases saved data; existing speakers use the [preserving upgrade path](../../docs/development/firmware-upgrades.md).
 
 ### Reusable ESPHome integration
 

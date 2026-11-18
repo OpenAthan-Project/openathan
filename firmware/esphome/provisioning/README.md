@@ -4,9 +4,11 @@
 AtomS3R C126 + Voice Pyramid A167. It includes phone and USB provisioning, local
 setup/settings, first-run activation, optional lights and signed firmware updates.
 The public [browser installer](https://openathan.com/install/) consumes published
-artifacts from this repository. Waveshare uses its own
-[`production.yaml`](../waveshare/production.yaml); compare [supported models](../../../hardware/README.md).
-See the [current release notes and limits](../../../docs/releases/v0.8.0.md)
+artifacts from this repository. Box V2 uses
+[`waveshare/production.yaml`](../waveshare/production.yaml), and AUDIO-Board uses
+[`waveshare-audio-board/production.yaml`](../waveshare-audio-board/production.yaml);
+compare [supported models](../../../hardware/README.md).
+See the [current release notes and limits](https://github.com/OpenAthan-Project/openathan/releases/latest)
 and [earlier provisioning results](../../../docs/development/feasibility-report.md#provisioning-hardware-subsets--2026-09-25).
 Serial close/reopen has caused temporary Wi-Fi loss on the tested unit; that
 observation remains relevant to recovery guidance.
@@ -320,7 +322,7 @@ The [dated device report](../../../docs/development/feasibility-report.md) recor
 first-run, USB recovery, phone controls and interruption results by tested source.
 The [earlier release report](../../../docs/development/release-validation-2026-10-03.md)
 records production migration, approved media, listening and public-delivery evidence.
-Current [release notes](../../../docs/releases/v0.8.0.md) and the
+Current [release notes](https://github.com/OpenAthan-Project/openathan/releases/latest) and the
 [phone-setup follow-up](../../../docs/development/phone-setup-validation-2026-10-19.md)
 link later results without extending those earlier passes.
 Host/browser simulations do not establish hidden-network radio behavior, broader

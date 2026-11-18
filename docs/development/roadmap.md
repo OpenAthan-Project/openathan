@@ -1,23 +1,28 @@
 # Roadmap
 
-This roadmap tracks available capabilities and future product work. The current
-published release is [v0.8.0](../releases/v0.8.0.md). Checked items describe
-implementation, not blanket physical qualification; release notes and dated
-validation reports retain their evidence limits.
+This roadmap tracks available capabilities and future product work. See the
+[latest published release](https://github.com/OpenAthan-Project/openathan/releases/latest)
+for current downloads and notes. Checked items describe implementation, not
+blanket physical qualification; release notes and dated validation reports
+retain their evidence limits.
 
 ## Current milestone
 
-Standalone Athan is available on AtomS3R C126 + Voice Pyramid A167 and Waveshare
-Box V2, with local setup, prayer scheduling, stored normal/Fajr audio, device
-controls and signed firmware updates. Releases include MP3Quran streaming
-(v0.6.0), first-run phone setup and connection QR screens (v0.7.0), and optional
-offline dua after scheduled Athan (v0.8.0). Compare the exact supported models in
-the [hardware guide](../../hardware/README.md).
+Standalone Athan is available on AtomS3R C126 + Voice Pyramid A167, Waveshare
+Box V2 and Waveshare AUDIO-Board, with local setup, prayer scheduling, stored
+normal/Fajr audio, device controls and signed firmware updates. Releases include
+MP3Quran streaming (v0.6.0), first-run phone setup and connection QR screens
+(v0.7.0), optional offline dua after scheduled Athan (v0.8.0), AUDIO-Board
+support (v0.9.0), speaker
+names and the local finder (v0.10.0), and automatic updates (v0.11.0).
+Compare the exact supported models in the [hardware guide](../../hardware/README.md).
 
-Atom needs internet time synchronization after a cold boot; Waveshare supports
-onboard RTC restoration after a powered reset. Once the clock is valid, prayer
-calculation and stored-recording playback work independently of the public
-website and Home Assistant.
+First use needs internet time. Atom needs synchronization again after a cold
+boot; AUDIO-Board and Box V2 support onboard PCF85063 clock restoration after a
+powered restart. Unplugged retention, backup-battery operation and long-term
+drift remain unqualified. Once the clock is valid, prayer calculation and
+stored-recording playback work independently of the public website and Home
+Assistant.
 
 ## Phase 0 — Product foundations
 
@@ -39,6 +44,7 @@ website and Home Assistant.
 - [ ] Optional touch playback/volume/dismiss adapter.
 - [x] Optional GC9107 AtomS3R display-status adapter.
 - [x] Waveshare Box V2 audio, round display and BOOT controls.
+- [x] Waveshare AUDIO-Board audio, RGB lights and physical volume/Stop controls.
 
 Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 
@@ -54,7 +60,9 @@ Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 - [x] Startup health confirmation and automatic rollback.
 - [x] Documented USB migration paths for older firmware and bootloaders.
 - [x] Automatic website adoption of approved stable releases.
-- [ ] Browser USB firmware updates that preserve saved data.
+- [x] Browser USB firmware updates that preserve saved data on compatible firmware.
+- [x] Saved speaker names and a local browser finder.
+- [x] Automatic signed updates between prayers, with a saved opt-out.
 
 ## Phase 3 — Quran, dua and adhkar
 
@@ -68,9 +76,9 @@ Audio is fundamental; optional peripherals do not gate the reusable scheduler.
 
 ## Phase 4 — Offline resilience and expansion
 
-- [x] Onboard RTC restoration for Waveshare Box V2.
+- [x] Onboard RTC restoration for Waveshare AUDIO-Board and Box V2.
 - [ ] Backup-power timekeeping and long-term offline resilience.
-- [ ] RTC support for other hardware.
+- [ ] RTC support beyond the two supported Waveshare models.
 - [ ] Removable audio storage, such as microSD or USB mass storage.
 - [ ] Optional offline Quran library.
 - [ ] Additional reference hardware if it reduces cost or improves availability.

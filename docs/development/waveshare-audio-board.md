@@ -26,6 +26,18 @@ records observed compatibility while retaining the unknown PCB revision.
 | BOOT | GPIO0, active low with internal pull-up |
 | Memory | 16 MiB flash, 8 MiB octal PSRAM |
 
+### Clock behavior
+
+First use needs internet time. After a verified network synchronization,
+OpenAthan saves time to the PCF85063 and can restore it at startup while RTC
+power is retained. A powered physical RESET passed on one unit in the
+[dated hardware report](waveshare-audio-board-hardware-2026-10-21.md#observed-operation).
+Complete power-loss retention, backup-battery operation and long-term drift
+remain unqualified. If the RTC cannot supply valid initialized time, scheduled
+Athan waits for internet time synchronization.
+
+### Adapter behavior
+
 The vendor factory driver's `LED_STRIP_COLOR_COMPONENT_FMT_RGB` selects RGB,
 although its adjacent comment says GRB. The profile follows the executable
 configuration; physical red/green/blue observation is required before release.
